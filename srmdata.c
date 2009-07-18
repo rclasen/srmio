@@ -218,7 +218,7 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 	if( data->cused < 1 )
 		return NULL;
 
-	if( NULL == (blocks = malloc( 1+ avail * (sizeof(srm_marker_t)))))
+	if( NULL == (blocks = malloc( (1+ avail) * (sizeof(srm_marker_t)))))
 		return NULL;
 
 	if( NULL == (*blocks = srm_marker_new()))
@@ -237,7 +237,9 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 				srm_marker_t *tmp;
 				size_t ns = avail + 10;
 
-				if( NULL == (tmp = realloc(blocks, 1+ ns)))
+				if( NULL == (tmp = realloc(blocks, (1+ ns) 
+					* (sizeof(srm_marker_t)) )))
+
 					goto clean2;
 
 				blocks = tmp;
