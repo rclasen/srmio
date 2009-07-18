@@ -297,7 +297,9 @@ static int _xwrite( int fd, unsigned char *buf, size_t len )
 	return ret;
 }
 
-int srm_data_write( srm_data_t data, const char *fname )
+/* TODO: srm_data_write_srm6 */
+
+int srm_data_write_srm7( srm_data_t data, const char *fname )
 {
 	unsigned char buf[1024];
 	int fd;
@@ -312,6 +314,8 @@ int srm_data_write( srm_data_t data, const char *fname )
 		errno = EINVAL;
 		return -1;
 	}
+
+	/* TODO: check for 16bit size overflows: chunks, blocks, marker */
 
 	if( NULL == (blocks = srm_data_blocks( data )))
 		return -1;

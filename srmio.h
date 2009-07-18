@@ -105,7 +105,7 @@ void srm_data_free( srm_data_t data );
  ************************************************************/
 
 srm_data_t srm_data_read( const char *fname );
-int srm_data_write( srm_data_t data, const char *fname );
+int srm_data_write_srm7( srm_data_t data, const char *fname );
 
 
 

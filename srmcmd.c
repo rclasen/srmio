@@ -167,7 +167,7 @@ int main( int argc, char **argv )
 		}
 
 		if( opt_write ){
-			if( 0 > srm_data_write( srmdata, opt_write ) ){
+			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
 				fprintf( stderr, "srm_data_write(%s) failed: %m\n", opt_write );
 				return -1;
 			}
@@ -208,7 +208,7 @@ int main( int argc, char **argv )
 		}
 
 		if( opt_write ){
-			if( 0 > srm_data_write( srmdata, opt_write ) ){
+			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
 				fprintf( stderr, "srm_data_write(%s) failed: %m\n", opt_write  );
 				return -1;
 			}
