@@ -1,0 +1,16 @@
+Source: srmio
+Section: misc
+Priority: extra
+Maintainer: Rainer Clasen <bj@zuto.de>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.7.3
+Homepage: http://www.zuto.de/project/srmio
+
+Package: srmio
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: SRM PowerControl V access tool
+ This is a command-line tool to access a SRM PowerControl V bike computer.
+ It's split into a C library and a small command-line frontend. The common
+ tasks like downloading the data or adjusting the most important settings
+ are supported.
