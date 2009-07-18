@@ -265,7 +265,7 @@ static void usage( char *name )
 " --int=<interval>|-i\n"
 "                     set recording interval, 10 -> 1sec\n"
 "\n"
-" --verbose|-v        increase verbosity\n"
+/*" --verbose|-v        increase verbosity\n"*/
 " --help|-h           this cruft\n"
 , name );
 }

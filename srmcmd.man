@@ -44,9 +44,6 @@ supported.
 \fB\-t\fR, \fB\-\-time\fR
 Set the PCs time to the current system time.
 .TP
-\fB\-v\fR, \fB\-\-verbose\fR
-Increase verbosity.
-.TP
 \fB\-w\fR, \fB\-\-write\fR=\fIdestination\fR
 Write data retrieved from PC (or with --read from file) to the specified
 destination file. Files are written using the SRM7 format.
