@@ -1,0 +1,35 @@
+
+srmio
+=====
+
+srmio is a library to access the most important functions of a Schoberer
+Radmesstechnik (SRM) PowerControl V. You can download the data, mark it
+deleted, sync the time and set the recording interval. So hopefully
+you'll get around booting windows after each exercise. Though it is not
+intended as a replacement.
+
+To be as compatible as possible, it's reading (SRM6/SRM7) and writing
+(SRM7) files in a the format srmwin uses.
+
+For now I consider it to be alpha quality at most, so ...
+
+
+******* !!! USE IT AT YOUR OWN RISK, IT MIGHT HARM YOUR SRM !!!  ****
+
+
+Please take this warning serious. I've had no docs for the protocol, so I
+had to figure it out myself. While I had luck with srmwin bringing
+everything back to normal, you might not.
+
+I've used the original prolific-based USB 2 Serial download cable on linux
+2.6.27.
+
+If you just want to use it, please check
+ man srmcmd
+
+Please reade the comments in the source (start with srmio.h) if you want
+to use the lib.
+
+Of course I'm open to all suggestions, comments and patches.
+
+Rainer

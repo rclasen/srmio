@@ -1,0 +1,73 @@
+.TH SRMCMD 8 "18 Juli 2009" "SRM access tool" "Version 0.0.1"
+.SH NAME
+srmcmd \- download/access your SRM PowerControl
+
+.SH SYNOPSIS
+.B srmcmd
+[options] \fIpath\fR
+
+.SH DESCRIPTION
+.B srmcmd
+implemets the serial protocol for SRM's PowerControl V. It allows you to
+download data from the PC attached to \fIpath\fR and adjust the most
+important settings.
+
+.SH OPTIONS
+Options available for the
+.B srmcmd
+command:
+.TP
+\fB\-c\fR, \fB\-\-clear\fR
+Delete data on PC. Well, actually just mark it as deleted. You're still
+able to get it with --get=all.
+.TP
+\fB\-g\fR, \fB\-\-get\fR[=all]
+download newly recorded data from PC. If \fIall\fR is specified, all data
+is retrieved including what was "deleted" before. By default data is
+written to stdout as tab-seperated list.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+A brief message.
+.TP
+\fB\-i\fR, \fB\-\-int\fR=\fIrecint\fR
+Set recording interval. Interval is specified *10. so "10" means 1 sec.
+Supported values: 1 to 9 and 10 to 150 in steps of 10.
+.TP
+\fB\-n\fR, \fB\-\-name\fR
+Show name stored on the PC.
+.TP
+\fB\-r\fR, \fB\-\-read\fR
+instead of accessing the PC, the specified file is read. By default data
+is written to stdout as with --get. Both SRM6 and SRM7 formats are
+supported.
+.TP
+\fB\-t\fR, \fB\-\-time\fR
+Set the PCs time to the current system time.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Increase verbosity.
+.TP
+\fB\-w\fR, \fB\-\-write\fR=\fIdestination\fR
+Write data retrieved from PC (or with --read from file) to the specified
+destination file. Files are written using the SRM7 format.
+
+.SH EXAMPLES
+Show name configured in PC:
+
+ srmcmd -n /dev/ttyUSB0
+
+Download data to out.srm, delete data on PC, adjust clock and set recint
+to 1sec:
+
+ srmcmd -g -t -r 10 -w out.srm /dev/ttyUSB0
+
+.SH "SEE ALSO"
+This is just a very simplistic frontend for the lib. Please check the
+source distribution for details.
+
+.SH BUGS
+Yes. For sure. Just keep in mind, that protocoll and file formats are
+reverse engineered...
+
+.SH AUTHORS
+Rainer Clasen
