@@ -79,7 +79,6 @@ struct _srm_data_t {
 	size_t	mavail;
 
 	/* hack for _get_chunk_cb */
-	struct tm now;
 	int	mfirst;
 };
 typedef struct _srm_data_t *srm_data_t;
@@ -147,8 +146,7 @@ int srmpc_set_recint( srmpc_conn_t conn, int recint );
 
 typedef int (*srmpc_chunk_callback_t)( 
 	srm_chunk_t chunk, 
-	struct tm *timep,
-	unsigned int num,
+	int recint,
 	unsigned int dist,
 	int mfirst,
 	int mcont,

@@ -614,6 +614,7 @@ int srmpc_set_time( srmpc_conn_t conn, struct tm *timep )
 	if( 0 > _srmpc_msg( conn, 'M', buf, 6, NULL, 0, 0 ))
 		return -1;
 		
+	sleep(1); /* need to wait or next cmd fails */
 	DPRINTF( "srmpc_set_time set %s", asctime(timep) );
 	return 0;
 }
@@ -732,7 +733,7 @@ int srmpc_get_recint( srmpc_conn_t conn )
 	}
 	
 	recint = ( *buf & 0x80 ) 
-		? (unsigned char)*buf & 0x80 
+		? (unsigned char)(*buf) & 0x80 
 		: *buf * 10;
 
 	DPRINTF( "srmpc_get_recint raw=0x%02x recint=%d", *buf, recint);
@@ -804,20 +805,37 @@ int srmpc_set_recint( srmpc_conn_t conn, int recint )
  * chunks.
  *
  * block header bytes:
- *  - 0-4: timestamp, encoded with 4bits per decimal digit
- *    - 0 day
- *    - 1 month in bits 0-4, no idea about bits 5-7 - TODO
- *    - 2 hour
- *    - 3 minute
+ *  - byte 0-4: timestamp of first chunk + recint, 
+ *  - byte 0:
+ *    - bit 0-3: day decimal digit 0
+ *    - bit 4-5: day decimal digit 1
+ *    - bit 6: recint bits 3
+ *    - bit 7: unknown TODO
+ *  - byte 1:
+ *    - bit 0-3: month decimal digit 0
+ *    - bit 4: month decimal digit 1
+ *    - bit 5-7: recint bits 0-2
+ *  - byte 2:
+ *    - bit 0-3: hour decimal digit 0
+ *    - bit 4-5: hour decimal digit 1
+ *    - bit 6: recint 0.1 - 0.7 flag
+ *    - bit 7: unknown TODO
+ *  - byte 3:
+ *    - bit 0-3: minute decimal digit 0
+ *    - bit 4-7: minute decimal digit 1
  *  - 5-7: total distance in meter * 3.9 - 24bit big-endian integer
  *  - 8: temperature - (signed?) integer - TODO
  *
  * data chunks (5 byte each):
- *  - 0: marker in bits 6-7, speed msb in 4-5, power msb in 0-3
- *  - 1: power (lsb) - plain integer
- *  - 2: speed (lsb) - plain integer
- *  - 3: cadence - plain integer
- *  - 4: heartrate - plain integer
+ *  - 0: multi-purpose:
+ *	 - bit0-3: power msb
+ *	 - bit4-5: speed msb
+ *       - bit6: new marker
+ *       - bit7: continue last marker
+ *  - 1: power (lsb) - integer
+ *  - 2: speed (lsb) * 5 - integer
+ *  - 3: cadence - integer
+ *  - 4: heartrate - integer
  *
  * Looking at the timestamps in my sample recordings I can find plenty
  * 1sec gaps. While srmwin gets the same data from the SRM, it fills gaps
@@ -839,35 +857,62 @@ int srmpc_set_recint( srmpc_conn_t conn, int recint )
  */
 static int _srmpc_parse_block( char *buf, srmpc_chunk_callback_t cbfunc, void *data )
 {
-	struct tm time;		/* 0-4 */
-	unsigned int dist;	/* 5-7 */
-	int temp;		/* 8 */
+	time_t bstart;
+	struct tm btm;
+	unsigned int dist;
+	int temp;	
 	int num;
 	struct _srm_chunk_t chunk; /* TODO: hack? should use srm_chunk_new()? */
+	unsigned int recint;
 
 	DUMPHEX( "_srmpc_parse_block", buf, 64 );
 
 	if( ! cbfunc )
 		return 0;
 
-	memset( &time, 0, sizeof(struct tm));
-	time.tm_isdst = -1;
-	time.tm_mday = TIMEDEC( (unsigned char)(buf[0]) );
-	time.tm_mon = TIMEDEC( (unsigned char)(buf[1]) & 0x1f ) -1;
-	time.tm_hour = TIMEDEC( (unsigned char)(buf[2]) );
-	time.tm_min = TIMEDEC( (unsigned char)(buf[3]) );
-	time.tm_sec = TIMEDEC( (unsigned char)(buf[4]) );
+	/* get current year */
+	time( &bstart );
+	localtime_r( &bstart, &btm );
 
-	/* TODO: what are buf[1], bits5-7 used for? */
+	/* parse timestamp */
+	btm.tm_isdst = -1;
+	btm.tm_mday = TIMEDEC( (unsigned char)(buf[0]) & 0x3f );
+	if( btm.tm_mon < (btm.tm_mon = TIMEDEC( (unsigned char)(buf[1]) & 0x1f ) -1 ))
+		-- btm.tm_year;
+	btm.tm_hour = TIMEDEC( (unsigned char)(buf[2] & 0x3f ) );
+	btm.tm_min = TIMEDEC( (unsigned char)(buf[3]) );
+	btm.tm_sec = TIMEDEC( (unsigned char)(buf[4]) );
+	bstart = mktime( &btm );
+	/* TODO: with recint <1sec the timestamp's resolution isn't
+	 * sufficient. Try to guess tsec from previous block */
 
 	dist = ( (unsigned char)(buf[5]) << 16 
 		| (unsigned char)(buf[6]) << 8
 		| (unsigned char)(buf[7]) ) / 3.9;
 
  	temp = buf[8];
+	recint = ( ((unsigned char)(buf[1]) & 0xe0) >> 5)
+		| ( ((unsigned char)(buf[0]) & 0x40) >> 3);
+	if( ! (buf[2] & 0x40) )
+		recint *= 10;
+
+	DPRINTF( "_srmpc_parse_block mon=%d day=%d hour=%d min=%d sec=%d "
+		"dist=%d temp=%d recint=%d na0=%x na2=%x", 
+		btm.tm_mon,
+		btm.tm_mday,
+		btm.tm_hour,
+		btm.tm_min,
+		btm.tm_sec,
+		dist,
+		temp,
+		recint,
+		(int)( ( (unsigned char)(buf[0]) & 0xc0) >> 6 ),
+		(int)( ( (unsigned char)(buf[2]) & 0x00) >> 7 ) );
 
 	for( num=0; num < 11; ++num ){
 		char * cbuf = &buf[9 + 5*num];
+		int mfirst = ((unsigned char)(cbuf[0]) & 0x40);
+		int mcont = ((unsigned char)(cbuf[0]) & 0x80);
 
 		DUMPHEX( "_srmpc_parse_block chunk", cbuf, 5 );
 
@@ -877,28 +922,29 @@ static int _srmpc_parse_block( char *buf, srmpc_chunk_callback_t cbfunc, void *d
 			return 0;
 		}
 
-		chunk.time = 0;
-		chunk.tsec = 0;
+		chunk.time = bstart + num * recint / 10;
+		chunk.tsec = num * recint % 10;
 		chunk.temp = temp;
 		chunk.pwr = ( ( (unsigned char)(cbuf[0]) & 0x0f) << 8 ) 
 			| (unsigned char)(cbuf[1]);
-		chunk.speed = 0.5 * ( ( ( (unsigned char)(cbuf[0]) & 0x30) << 4) 
+		chunk.speed =  (double)0.2 * ( 
+			( ( (unsigned char)(cbuf[0]) & 0x30) << 4) 
 			| (unsigned char)(cbuf[2]) );
 		chunk.cad = (unsigned char)(cbuf[3]);
 		chunk.hr = (unsigned char)(cbuf[4]);
+		chunk.ele = 0;
 
 
 		/* TODO: verify data when display is non-metric */
 		/* TODO: verify temperature < 0°C */
-		/* TODO: verify recint != 1sec */
-		/* TODO: verify consecutive marker */
 
-		if( (*cbfunc)( &chunk, &time, num, dist, 
-			((unsigned char)(cbuf[0]) & 0x80),
-			((unsigned char)(cbuf[0]) & 0x40),
+		if( (*cbfunc)( &chunk, recint, dist, 
+			mfirst,
+			mcont,
 			data ) )
 
 			return -1;
+
 	}
 
 	return 0;
@@ -1016,6 +1062,7 @@ int srmpc_get_chunks(
 				(unsigned char)*buf );
 	}
 
+	sleep(1); /* need to wait or next cmd fails */
 	return 0;
 }
 
@@ -1057,8 +1104,7 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
 
 static int _srmpc_chunk_data_cb( 
 	srm_chunk_t chunk, 
-	struct tm *timep,
-	unsigned int num,
+	int recint,
 	unsigned int dist,
 	int mfirst,
 	int mcont,
@@ -1068,15 +1114,14 @@ static int _srmpc_chunk_data_cb(
 
 	(void)dist; /* ignore; */
 
-	if( clist->cused == 0 && timep->tm_mon > clist->now.tm_mon )
-		-- clist->now.tm_year;
-
-	timep->tm_year = clist->now.tm_year;
-	chunk->tsec = num * clist->recint % 10;
-	chunk->time = mktime( timep ) + num * clist->recint / 10;
+	/* TODO: start new file on recint change */
+	if( ! clist->recint )
+		clist->recint = recint;
 
 	/* TODO: is it ok to use the current recint or do we have to
 	 * deduce it from two blocks' timestamps? */
+
+	/* TODO: fill small gaps (<= 2sec) at block boundaries with averaged data? */
 
 	if( 0 > srm_data_add_chunk( clist, chunk ) )
 		return -1;
@@ -1085,7 +1130,14 @@ static int _srmpc_chunk_data_cb(
 	if( clist->mfirst >= 0 && ( ! mcont || mfirst ) )
 		srm_data_add_marker( clist, clist->mfirst, clist->cused -1 );
 
-	clist->mfirst = mfirst ? (int)clist->cused -1 : -1;
+	if( mfirst ){
+		clist->mfirst = (int)clist->cused;
+		DPRINTF( "_srmpc_chunk_data_cb: new marker at %d",
+			clist->mfirst );
+
+	} else if( ! mcont )
+		clist->mfirst = -1;
+	
 
 	return 0;
 }
@@ -1097,12 +1149,6 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall )
 
 	if( NULL == (data = srm_data_new()))
 		return NULL;
-
-	if( 0 > srmpc_get_time( conn, &data->now ))
-		goto clean1;
-
-	if( 0 > (data->recint = srmpc_get_recint( conn ) ))
-		goto clean1;
 
 	if( 0 > (data->slope = srmpc_get_slope( conn ) ))
 		goto clean1;
@@ -1125,7 +1171,10 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall )
 	if( 0 > srmpc_get_chunks(conn, getall, _srmpc_chunk_data_cb, data ) )
 		goto clean2;
 
-	data->marker[0]->last = data->cused;
+	data->marker[0]->last = data->cused-1;
+
+	if( data->mfirst >= 0 )
+		srm_data_add_marker( data, data->mfirst, data->cused );
 
 	return data;
 
