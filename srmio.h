@@ -115,7 +115,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname );
  *
  ************************************************************/
 
-typedef int (*srmpc_log_callback_t)( const char *msg );
+typedef void (*srmpc_log_callback_t)( const char *msg );
 struct _srmpc_conn_t {
 	int		fd;
 	struct termios	oldios;
