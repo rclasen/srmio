@@ -71,6 +71,7 @@ int main( int argc, char **argv )
 	char *fname = NULL;
 	int opt_all = 0;
 	int opt_clear = 0;
+	int opt_force = 0;
 	int opt_get = 0;
 	int opt_help = 0;
 	int opt_int = 0;
@@ -82,6 +83,7 @@ int main( int argc, char **argv )
 	int needhelp = 0;
 	struct option lopts[] = {
 		{ "clear", no_argument, NULL, 'c' },
+		{ "force", no_argument, NULL, 'f' },
 		{ "get", optional_argument, NULL, 'g' },
 		{ "help", no_argument, NULL, 'h' },
 		{ "int", required_argument, NULL, 'i' },
@@ -94,10 +96,14 @@ int main( int argc, char **argv )
 	char c;
 	srmpc_conn_t srm;
 
-	while( -1 != ( c = getopt_long( argc, argv, "cg::h:i:nrtvw:", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "cfg::h:i:nrtvw:", lopts, NULL ))){
 		switch(c){
 		  case 'c':
 			++opt_clear;
+			break;
+
+		  case 'f':
+			++opt_force;
 			break;
 
 		  case 'g':
@@ -181,7 +187,7 @@ int main( int argc, char **argv )
 		return 0;
 	}
 
-	if( NULL == (srm = srmpc_open( fname, 0 ))){
+	if( NULL == (srm = srmpc_open( fname, opt_force ))){
 		fprintf( stderr, "srmpc_open(%s) failed: %m\n", fname );
 		return(1);
 	}
