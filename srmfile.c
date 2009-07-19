@@ -315,7 +315,6 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		return -1;
 	}
 
-	/* TODO: check for 16bit size overflows: chunks, blocks, marker */
 
 	if( NULL == (blocks = srm_data_blocks( data )))
 		return -1;
@@ -327,6 +326,14 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 		for( bcnt = 0; blocks[bcnt] ; ++bcnt );
 	
+		if( bcnt > 0xffff 
+			|| data->mused > 0xffff 
+			|| data->cused > 0xffff ){
+
+			errno = ERANGE;
+			goto clean1;
+		}
+
 		days = data->chunks[0]->time / ( 24 * 3600 ) + SRM2EPOCH;
 		dstamp = _srm_mktime( days  );
 		DPRINTF( "srm_data_write mcnt=%u bcnt=%u days=%u "
