@@ -1,8 +1,6 @@
 AUTOMAKE_OPTIONS=foreign
 
-# TODO: properly test for glib and gstreamer
-
-AM_CFLAGS=-g -Wall -Wextra # -DDEBUG
+#AM_CFLAGS=-g -Wall -Wextra -DDEBUG
 
 man1_MANS=srmcmd.man
 EXTRA_DIST=$(MANS)
