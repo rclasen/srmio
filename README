@@ -11,7 +11,8 @@ intended as a replacement.
 To be as compatible as possible, it's reading (SRM6/SRM7) and writing
 (SRM7) files in a the format srmwin uses.
 
-For now I consider it to be alpha quality at most, so ...
+For now I consider it to be alpha quality at most. I'm still comparing
+it's results for each exercise ...
 
 
 ******* !!! USE IT AT YOUR OWN RISK, IT MIGHT HARM YOUR SRM !!!  ****
@@ -31,5 +32,37 @@ Please reade the comments in the source (start with srmio.h) if you want
 to use the lib.
 
 Of course I'm open to all suggestions, comments and patches.
+
+If you experience problems with *your* PCV, please
+ - recompile with -DDEBUG enabled.
+
+If you want to help me adding support for your PCV, please capture the
+communication of some successful connections with srmwin:
+ - download "portmon" from sysinternals
+ - adjust portmon to log function arguments as hex !!!!!. (Options -> Log Hex)
+ - send me the portmon logfiles, the resulting .srm files and the output
+   from srmcmd with DEBUG output.
+
+Known Problems:
+ - might harm an unknown PCV when it sends something the PCV doesn't
+   expect.
+ - Dates before 1970-1-1 are not supported (SRM usese 1880-1-1 as
+   reference). This might lead to problems with bad timestamps or when the
+   PC clock is misadjusted.
+ - the supplied timestamps are quite flaky. Their resolution isn't
+   sufficient for recints < 1sec. Even with 1sec there are plenty
+   mismatches. srmwin works around the later one by inserting averaged
+   data. No Idea about the first one.
+ - when downloading data, the recint is taken from the first chunks. If it
+   changes later on, it's ignored. Well, srmwin seems to ignore the
+   recorded recint completely and takes the configured one...
+ - downloaded data is always written to a single file. Data isn't split.
+   This might cause problems with multi-day recordings.
+ - there should be more messages in verbose mode
+ - Only writes SRM7 (for now).
+ - doesn't use UUCP-Style Lockfiles.
+ - result of PC in non-metric display mode is untested.
+ - negative temperatures are untested.
+
 
 Rainer

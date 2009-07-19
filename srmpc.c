@@ -7,6 +7,8 @@
  *
  */
 
+#include <stdarg.h>
+
 #include "srmio.h"
 #include "debug.h"
 
@@ -49,6 +51,24 @@ static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const char *arg, size_t
  * low level IO (open/read/write/close)
  *
  ************************************************************/
+
+static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
+{
+	va_list ap;
+	char buf[SRM_BUFSIZE];
+
+	if( ! conn->lfunc )
+		return;
+
+	va_start( ap, fmt );
+
+	if( 0 > vsnprintf(buf, SRM_BUFSIZE, fmt, ap ) )
+		return
+		;
+	va_end( ap );
+	
+	(*conn->lfunc)( buf );
+}
 
 /*
  * send data towards SRM, 
@@ -105,7 +125,8 @@ static int _srmpc_read( srmpc_conn_t conn, char *buf, size_t want )
  *
  * on error errno is set and returns NULL
  */
-srmpc_conn_t srmpc_open( const char *fname, int force )
+srmpc_conn_t srmpc_open( const char *fname, int force,
+	srmpc_log_callback_t lfunc )
 {
 	srmpc_conn_t	conn;
 	struct termios	ios;
@@ -118,6 +139,7 @@ srmpc_conn_t srmpc_open( const char *fname, int force )
 	if( NULL == (conn = malloc(sizeof(struct _srmpc_conn_t))))
 		return NULL;
 	conn->stxetx = 1;
+	conn->lfunc = lfunc;
 
 	/* TODO: uucp style lockfils */
 
@@ -155,6 +177,7 @@ srmpc_conn_t srmpc_open( const char *fname, int force )
 	/* autodetect communcitation type */
 	if( *buf == STX ){
 		if( ret < 7 ){
+			_srm_log( conn, "failed to receive opening response" );
 			errno = EPROTO;
 			return NULL;
 		}
@@ -163,6 +186,7 @@ srmpc_conn_t srmpc_open( const char *fname, int force )
 
 	} else {
 		if( ret < 3 ){
+			_srm_log( conn, "failed to receive opening response" );
 			errno = EPROTO;
 			return NULL;
 		}
@@ -188,6 +212,8 @@ srmpc_conn_t srmpc_open( const char *fname, int force )
 			}
 		}
 		if( ! known ){
+			_srm_log( conn, "PC Version %x.%x not whitelisted",
+				ver[0], ver[1] );
 			errno = ENOTSUP;
 			goto clean3;
 		}
@@ -390,6 +416,7 @@ static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const char *arg, size_t
 		return -1;
 
 	} else if( ret < len ){
+		_srm_log( conn, "failed to get complete response from PC");
 		errno = ECOMM;
 		return -1;
 	}
@@ -1014,6 +1041,8 @@ int srmpc_get_chunks(
 	/* read 64byte blocks, each with header + 11 chunks */
 	while( blocks > 0 ){
 		char	resp = ACK;
+
+		_srm_log( conn, "remaining blocks: %d", blocks);
 
 		ret = _srmpc_read( conn, buf, 64 );
 		DPRINTF( "srmpc_get_chunks: got %d chars", ret );

@@ -64,6 +64,11 @@ static void csvdump( srm_data_t data )
 	}
 }
 
+static void logfunc( const char *msg )
+{
+	fprintf( stderr, "%s\n", msg );
+}
+
 static void usage( char *name );
 
 int main( int argc, char **argv )
@@ -161,7 +166,6 @@ int main( int argc, char **argv )
 		exit(1);
 	}
 
-	/* TODO: use opt_verb */
 
 
 	if( opt_read ){
@@ -187,7 +191,9 @@ int main( int argc, char **argv )
 		return 0;
 	}
 
-	if( NULL == (srm = srmpc_open( fname, opt_force ))){
+	if( NULL == (srm = srmpc_open( fname, opt_force, 
+		opt_verb ? logfunc : NULL  ))){
+
 		fprintf( stderr, "srmpc_open(%s) failed: %m\n", fname );
 		return(1);
 	}
@@ -271,7 +277,7 @@ static void usage( char *name )
 " --int=<interval>|-i\n"
 "                     set recording interval, 10 -> 1sec\n"
 "\n"
-/*" --verbose|-v        increase verbosity\n"*/
+" --verbose|-v        increase verbosity\n"
 " --help|-h           this cruft\n"
 , name );
 }
