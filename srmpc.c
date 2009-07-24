@@ -933,8 +933,8 @@ static int _srmpc_parse_block( char *buf, srmpc_chunk_callback_t cbfunc, void *d
 		dist,
 		temp,
 		recint,
-		(int)( ( (unsigned char)(buf[0]) & 0xc0) >> 6 ),
-		(int)( ( (unsigned char)(buf[2]) & 0x00) >> 7 ) );
+		(int)( ( (unsigned char)(buf[0]) & 0x80) >> 7 ),
+		(int)( ( (unsigned char)(buf[2]) & 0x80) >> 7 ) );
 
 	for( num=0; num < 11; ++num ){
 		char * cbuf = &buf[9 + 5*num];
