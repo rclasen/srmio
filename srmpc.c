@@ -943,10 +943,9 @@ static int _srmpc_parse_block( char *buf, srmpc_chunk_callback_t cbfunc, void *d
 
 		DUMPHEX( "_srmpc_parse_block chunk", cbuf, 5 );
 
-		/* TODO: is it ok to stop the block on an all-zero chunk? */
 		if( 0 == memcmp( cbuf, "\0\0\0\0\0", 5 )){
-			DPRINTF( "_srmpc_parse_block: chunk %d empty, ending block", num );
-			return 0;
+			DPRINTF( "_srmpc_parse_block: skipping empty hunk#%d", num );
+			continue;
 		}
 
 		chunk.time = bstart + num * recint / 10;
