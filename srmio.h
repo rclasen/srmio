@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <time.h>
 #include <getopt.h>
+#include <stdint.h>
 #ifdef DEBUG
 #include <ctype.h>
 #endif
@@ -33,9 +34,10 @@
  *
  ************************************************************/
 
+typedef uint64_t srm_time_t;	/* seconds since epoch * 10 */
+
 struct _srm_chunk_t {
-	time_t		time;	/* chunk end time, seconds since epoch */
-	unsigned int	tsec;	/* chunk end time, tenth of second */
+	srm_time_t	time;	/* chunk end time */
 	double		temp;	/* temperature °C */
 	unsigned int	pwr;	/* avg power W */
 	double		speed;	/* avg speed km/h */
@@ -64,22 +66,22 @@ void srm_marker_free( srm_marker_t marker );
 
 
 struct _srm_data_t {
-	int	recint;
-	double	slope;
-	int	zeropos;
-	int	circum;;
-	char	*notes;
+	srm_time_t	recint;
+	double		slope;
+	int		zeropos;
+	int		circum;;
+	char		*notes;
 
-	srm_chunk_t *chunks;
-	size_t	cused;
-	size_t	cavail;
+	srm_chunk_t	 *chunks;
+	size_t		cused;
+	size_t		cavail;
 
-	srm_marker_t *marker;
-	size_t	mused;
-	size_t	mavail;
+	srm_marker_t	 *marker;
+	size_t		mused;
+	size_t		mavail;
 
 	/* hack for _get_chunk_cb */
-	int	mfirst;
+	int		mfirst;
 };
 typedef struct _srm_data_t *srm_data_t;
 
@@ -143,13 +145,13 @@ double srmpc_get_slope( srmpc_conn_t conn );
 int srmpc_get_zeropos( srmpc_conn_t conn );
 
 int srmpc_get_recint( srmpc_conn_t conn );
-int srmpc_set_recint( srmpc_conn_t conn, int recint );
+int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint );
 
 
 
 typedef int (*srmpc_chunk_callback_t)( 
 	srm_chunk_t chunk, 
-	int recint,
+	srm_time_t recint,
 	unsigned int dist,
 	int mfirst,
 	int mcont,

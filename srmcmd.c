@@ -45,7 +45,7 @@ static void csvdump( srm_data_t data )
 		"\n");
 	for( ck=data->chunks; *ck; ++ck ){
 		printf(
-			"%lu.%1d\t"	/* "time\t" */
+			"%.1lf\t"	/* "time\t" */
 			"%.1f\t"	/* "dur\t" */
 			"%.1lf\t"	/* "temp\t" */
 			"%d\t"		/* "pwr\t" */
@@ -53,8 +53,8 @@ static void csvdump( srm_data_t data )
 			"%d\t"		/* "cad\t" */
 			"%d\t"		/* "hr\t" */
 			"\n",
-			(*ck)->time, (*ck)->tsec,
-			(float)data->recint/10,
+			(double)(*ck)->time / 10,
+			(float)data->recint / 10,
 			(*ck)->temp,
 			(*ck)->pwr,
 			(*ck)->speed,

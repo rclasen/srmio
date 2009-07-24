@@ -121,16 +121,14 @@ clean1:
 int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
 {
 	DPRINTF( "srm_data_add_chunk %d:"
-		"time=%lu, "
-		"tsec=%u, "
+		"time=%.1lf, "
 		"temp=%.1lf, "
 		"pwr=%u, "
 		"spd=%.3lf, "
 		"cad=%u, "
 		"hr=%u ",
 		data->cused,
-		chunk->time,
-		chunk->tsec,
+		(double)chunk->time/10,
 		chunk->temp,
 		chunk->pwr,
 		chunk->speed,
@@ -230,8 +228,7 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 		srm_chunk_t prev = data->chunks[i-1];
 		srm_chunk_t this = data->chunks[i];
 
-		if( prev->time + data->recint / 10 != this->time
-			|| prev->tsec + data->recint % 10 != this->tsec ){
+		if( prev->time + data->recint != this->time ){
 
 			if( used >= avail ){
 				srm_marker_t *tmp;

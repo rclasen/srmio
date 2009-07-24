@@ -767,7 +767,7 @@ int srmpc_get_recint( srmpc_conn_t conn )
 	return recint;
 }
 
-int srmpc_set_recint( srmpc_conn_t conn, int recint )
+int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
 {
 	char raw;
 
@@ -890,7 +890,7 @@ static int _srmpc_parse_block( char *buf, srmpc_chunk_callback_t cbfunc, void *d
 	int temp;	
 	int num;
 	struct _srm_chunk_t chunk; /* TODO: hack? should use srm_chunk_new()? */
-	unsigned int recint;
+	srm_time_t recint;
 
 	DUMPHEX( "_srmpc_parse_block", buf, 64 );
 
@@ -898,7 +898,7 @@ static int _srmpc_parse_block( char *buf, srmpc_chunk_callback_t cbfunc, void *d
 		return 0;
 
 	/* get current year */
-	time( &bstart );
+	time( &bstart ); /* TODO: get year from PC */
 	localtime_r( &bstart, &btm );
 
 	/* parse timestamp */
@@ -944,12 +944,11 @@ static int _srmpc_parse_block( char *buf, srmpc_chunk_callback_t cbfunc, void *d
 		DUMPHEX( "_srmpc_parse_block chunk", cbuf, 5 );
 
 		if( 0 == memcmp( cbuf, "\0\0\0\0\0", 5 )){
-			DPRINTF( "_srmpc_parse_block: skipping empty hunk#%d", num );
+			DPRINTF( "_srmpc_parse_block: skipping empty chunk#%d", num );
 			continue;
 		}
 
-		chunk.time = bstart + num * recint / 10;
-		chunk.tsec = num * recint % 10;
+		chunk.time = (srm_time_t)10 * bstart + num * recint;
 		chunk.temp = temp;
 		chunk.pwr = ( ( (unsigned char)(cbuf[0]) & 0x0f) << 8 ) 
 			| (unsigned char)(cbuf[1]);
@@ -1132,7 +1131,7 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
 
 static int _srmpc_chunk_data_cb( 
 	srm_chunk_t chunk, 
-	int recint,
+	srm_time_t recint,
 	unsigned int dist,
 	int mfirst,
 	int mcont,
