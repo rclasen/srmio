@@ -882,7 +882,8 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
  *
  * returns -1 on failure, 0 on success
  */
-static int _srmpc_parse_block( char *buf, srmpc_chunk_callback_t cbfunc, void *data )
+static int _srmpc_parse_block( srmpc_conn_t conn, char *buf, 
+	srmpc_chunk_callback_t cbfunc, void *data )
 {
 	time_t bstart;
 	struct tm btm;
@@ -963,7 +964,8 @@ static int _srmpc_parse_block( char *buf, srmpc_chunk_callback_t cbfunc, void *d
 		/* TODO: verify data when display is non-metric */
 		/* TODO: verify temperature < 0°C */
 
-		if( (*cbfunc)( &chunk, recint, dist, 
+		if( (*cbfunc)( conn, 
+			&chunk, num, recint, dist, 
 			mfirst,
 			mcont,
 			data ) )
@@ -1069,7 +1071,7 @@ int srmpc_get_chunks(
 
 		} else {
 			retries = 0;
-			if( 0 > _srmpc_parse_block( buf, cbfunc, data ))
+			if( 0 > _srmpc_parse_block( conn, buf, cbfunc, data ))
 				return -1;
 
 			--blocks;
@@ -1119,6 +1121,61 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
 }
 
 
+/************************************************************
+ *
+ * synthesize some chunks with average data to fill small gaps at block
+ * boundaries.
+ *
+ ************************************************************/
+
+static int _srmpc_chunk_data_gapfill( srmpc_conn_t conn,
+	srm_data_t clist, srm_chunk_t nck )
+{
+	srm_chunk_t lck;
+	srm_time_t delta;
+	size_t fillnum, num;
+
+	if( ! clist->cused )
+		return 0;
+
+	lck = clist->chunks[clist->cused-1];
+	delta = nck->time - lck->time;
+
+	/* no gap */
+	if( delta <= clist->recint )
+		return 0;
+	
+	delta -= clist->recint;
+	if( delta > 20 )
+		return 0; /* too large */
+
+	fillnum = delta / clist->recint;
+	_srm_log( conn, "inserting %d chunks to fill micro-gap at chunk#%d",
+		fillnum, clist->cused );
+
+	for( num = 1; num <= fillnum; ++num ){
+		srm_chunk_t fill;
+		double part = (double)num / (fillnum +1 );
+
+		if( NULL == (fill = srm_chunk_new() ))
+			return -1;
+
+		fill->time = lck->time + (num * clist->recint);
+		fill->temp = part * (nck->temp - lck->temp) + lck->temp;
+		fill->pwr = part * (nck->pwr - lck->pwr) + lck->pwr;
+		fill->speed = part * (nck->speed - lck->speed) + lck->speed;
+		fill->cad = part * (nck->cad - lck->cad) + lck->cad;
+		fill->hr = part * (nck->hr - lck->hr) + lck->hr;
+		fill->ele = part * (nck->ele - lck->ele) + lck->ele;
+
+		if( 0 > srm_data_add_chunkp( clist, fill ) ){
+			srm_chunk_free(fill);
+			return -1;
+		}
+	}
+
+	return 0;
+}
 
 
 /************************************************************
@@ -1130,7 +1187,9 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
  ************************************************************/
 
 static int _srmpc_chunk_data_cb( 
+	srmpc_conn_t conn,
 	srm_chunk_t chunk, 
+	size_t num,
 	srm_time_t recint,
 	unsigned int dist,
 	int mfirst,
@@ -1145,10 +1204,10 @@ static int _srmpc_chunk_data_cb(
 	if( ! clist->recint )
 		clist->recint = recint;
 
-	/* TODO: is it ok to use the current recint or do we have to
-	 * deduce it from two blocks' timestamps? */
-
-	/* TODO: fill small gaps (<= 2sec) at block boundaries with averaged data? */
+	/* fill small gaps (<= 2sec) at block boundaries with averaged data? */
+	if( num == 0 )
+		if( 0 > _srmpc_chunk_data_gapfill( conn, clist, chunk ) )
+			return -1;
 
 	if( 0 > srm_data_add_chunk( clist, chunk ) )
 		return -1;

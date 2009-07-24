@@ -150,7 +150,9 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint );
 
 
 typedef int (*srmpc_chunk_callback_t)( 
+	srmpc_conn_t conn,
 	srm_chunk_t chunk, 
+	size_t num,
 	srm_time_t recint,
 	unsigned int dist,
 	int mfirst,
