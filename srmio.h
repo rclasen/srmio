@@ -82,6 +82,7 @@ struct _srm_data_t {
 
 	/* hack for _get_chunk_cb */
 	int		mfirst;
+	int		fillgaps;
 };
 typedef struct _srm_data_t *srm_data_t;
 
@@ -162,7 +163,7 @@ int srmpc_get_chunks( srmpc_conn_t conn, int getall, srmpc_chunk_callback_t cfun
 
 int srmpc_clear_chunks( srmpc_conn_t conn );
 
-srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall );
+srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fillgaps );
 
 
 

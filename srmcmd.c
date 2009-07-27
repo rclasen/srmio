@@ -76,6 +76,7 @@ int main( int argc, char **argv )
 	char *fname = NULL;
 	int opt_all = 0;
 	int opt_clear = 0;
+	int opt_fixup = 0;
 	int opt_force = 0;
 	int opt_get = 0;
 	int opt_help = 0;
@@ -97,11 +98,12 @@ int main( int argc, char **argv )
 		{ "time", no_argument, NULL, 't' },
 		{ "verbose", no_argument, NULL, 'v' },
 		{ "write", required_argument, NULL, 'w' },
+		{ "fixup", no_argument, NULL, 'x' },
 	};
 	char c;
 	srmpc_conn_t srm;
 
-	while( -1 != ( c = getopt_long( argc, argv, "cfg::h:i:nrtvw:", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "cfg::h:i:nrtvw:x", lopts, NULL ))){
 		switch(c){
 		  case 'c':
 			++opt_clear;
@@ -143,6 +145,10 @@ int main( int argc, char **argv )
 
 		  case 'w':
 		  	opt_write = optarg;
+			break;
+
+		  case 'x':
+			++opt_fixup;
 			break;
 
 		  default:
@@ -214,7 +220,7 @@ int main( int argc, char **argv )
 		srm_data_t srmdata;
 
 		/* get new/all chunks */
-		if( NULL == (srmdata = srmpc_get_data( srm, opt_all ))){
+		if( NULL == (srmdata = srmpc_get_data( srm, opt_all, opt_fixup ))){
 			perror( "srmpc_get_data failed" );
 			return(1);
 		}
@@ -270,7 +276,8 @@ static void usage( char *name )
 "options: (are processed in this order)\n"
 " --name              get athlete name\n"
 " --get[=all]|-g      download data from SRM and dump it to stdout\n"
-" --write=<fname>|-w   save data as specified .srm file\n" 
+" --fixup|-x          try to fix time-glitches in retrieved data\n"
+" --write=<fname>|-w  save data as specified .srm file\n" 
 " --read|-r           dump srm file to stdout\n"
 " --clear|-c          clear data on SRM\n"
 " --time|-t           set current time\n"

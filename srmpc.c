@@ -1209,7 +1209,7 @@ static int _srmpc_chunk_data_cb(
 		if( 0 > _srmpc_chunk_data_gapfill( conn, clist, chunk ) )
 			return -1;
 
-	if( 0 > srm_data_add_chunk( clist, chunk ) )
+	if( clist->fillgaps && 0 > srm_data_add_chunk( clist, chunk ) )
 		return -1;
 
 	/* finish previous marker */
@@ -1228,13 +1228,14 @@ static int _srmpc_chunk_data_cb(
 	return 0;
 }
 
-srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall )
+srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fillgaps )
 {
 	srm_data_t data;
 	srm_marker_t mk;
 
 	if( NULL == (data = srm_data_new()))
 		return NULL;
+	data->fillgaps = fillgaps;
 
 	if( 0 > (data->slope = srmpc_get_slope( conn ) ))
 		goto clean1;

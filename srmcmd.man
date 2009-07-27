@@ -21,6 +21,13 @@ command:
 Delete data on PC. Well, actually just mark it as deleted. You're still
 able to get it with --get=all.
 .TP
+\fB\-x\fR, \fB\-\-fixup\fR
+Try to fix time glitches in retrieved data. The PCV sends 11 Tuples in
+one 64Byte block. Timestamps are only sent per Block - with a granularity
+of 1 sec. Unfortunatly these timestamps often mismatch the time covered by
+the tuples. With this option set, gaps at block boundaries of up to 2sec are
+filled with averaged data. That's what srmwin is doing, wko doesn't ...
+.TP
 \fB\-g\fR, \fB\-\-get\fR[=all]
 download newly recorded data from PC. If \fIall\fR is specified, all data
 is retrieved including what was "deleted" before. By default data is
