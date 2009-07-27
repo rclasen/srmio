@@ -1162,10 +1162,10 @@ static int _srmpc_chunk_data_gapfill( srmpc_conn_t conn,
 
 		fill->time = lck->time + (num * clist->recint);
 		fill->temp = part * (nck->temp - lck->temp) + lck->temp;
-		fill->pwr = part * (nck->pwr - lck->pwr) + lck->pwr;
+		fill->pwr = part * ( (int)nck->pwr - lck->pwr) + lck->pwr;
 		fill->speed = part * (nck->speed - lck->speed) + lck->speed;
-		fill->cad = part * (nck->cad - lck->cad) + lck->cad;
-		fill->hr = part * (nck->hr - lck->hr) + lck->hr;
+		fill->cad = part * ( (int)nck->cad - lck->cad) + lck->cad;
+		fill->hr = part * ( (int)nck->hr - lck->hr) + lck->hr;
 		fill->ele = part * (nck->ele - lck->ele) + lck->ele;
 
 		if( 0 > srm_data_add_chunkp( clist, fill ) ){
