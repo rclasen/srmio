@@ -896,21 +896,20 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 
 	DUMPHEX( "_srmpc_parse_block", buf, 64 );
 
-	/* get current year */
-	time( &gh->bstart ); /* TODO: get year from PC */
-	localtime_r( &gh->bstart, &btm );
-
 	/* parse timestamp */
+	btm.tm_year = gh->pctime.tm_year;
 	btm.tm_isdst = -1;
 	btm.tm_mday = TIMEDEC( (unsigned char)(buf[0]) & 0x3f );
-	if( btm.tm_mon < (btm.tm_mon 
-		= TIMEDEC( (unsigned char)(buf[1]) & 0x1f ) -1 ))
-
-		-- btm.tm_year;
+	btm.tm_mon = TIMEDEC( (unsigned char)(buf[1]) & 0x1f ) -1;
 	btm.tm_hour = TIMEDEC( (unsigned char)(buf[2] & 0x3f ) );
 	btm.tm_min = TIMEDEC( (unsigned char)(buf[3]) );
 	btm.tm_sec = TIMEDEC( (unsigned char)(buf[4]) );
-	gh->bstart = mktime( &btm );
+
+	if( btm.tm_mon < gh->pctime.tm_mon )
+		-- btm.tm_year;
+
+	gh->bstart = (srm_time_t)10 * mktime( &btm );
+
 	/* TODO: with recint <1sec the timestamp's resolution isn't
 	 * sufficient. Try to guess tsec from previous block */
 
@@ -950,7 +949,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 			continue;
 		}
 
-		gh->chunk.time = (srm_time_t)10 * gh->bstart 
+		gh->chunk.time = gh->bstart 
 			+ gh->chunknum * gh->recint;
 		gh->chunk.temp = gh->temp;
 		gh->chunk.pwr = ( ( (unsigned char)(cbuf[0]) & 0x0f) << 8 ) 
@@ -999,6 +998,9 @@ int srmpc_get_chunks(
 
 	if( ! cbfunc )
 		return 0;
+
+	if( 0 > srmpc_get_time( conn, &gh.pctime ))
+		return -1;
 
 	if( _srmpc_msg_send( conn, cmd, NULL, 0 ) )
 		return -1;

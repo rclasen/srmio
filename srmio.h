@@ -149,11 +149,12 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint );
 struct _srmpc_get_chunk_t {
 	/* whole downlad */
 	srmpc_conn_t		conn;
+	struct tm		pctime;
 	size_t			blocks;
 
 	/* current block */
 	size_t			blocknum;
-	time_t			bstart;
+	srm_time_t		bstart;
 	unsigned int		dist;
 	int			temp;	
 	srm_time_t		recint;
