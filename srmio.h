@@ -79,10 +79,6 @@ struct _srm_data_t {
 	srm_marker_t	 *marker;
 	size_t		mused;
 	size_t		mavail;
-
-	/* hack for _get_chunk_cb */
-	int		mfirst;
-	int		fillgaps;
 };
 typedef struct _srm_data_t *srm_data_t;
 

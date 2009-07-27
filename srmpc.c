@@ -36,13 +36,21 @@ static const char *_srmpc_whitelist[] = {
 	NULL,
 };
 
-srmpc_conn_t foo;
+
+/* TODO: struct _srmpc_get_chunk_t */
+
+struct _srmpc_get_data_t {
+	int		mfirst;
+	int		fillgaps;
+	srm_data_t	data;
+};
 
 static int _srmpc_msg_decode( 
 	char *out, size_t olen,
 	const char *in, size_t ilen );
 
-static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const char *arg, size_t alen );
+static int _srmpc_msg_send( srmpc_conn_t conn, 
+	char cmd, const char *arg, size_t alen );
 
 
 
@@ -1129,29 +1137,29 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
  ************************************************************/
 
 static int _srmpc_chunk_data_gapfill( srmpc_conn_t conn,
-	srm_data_t clist, srm_chunk_t nck )
+	struct _srmpc_get_data_t *gdat, srm_chunk_t nck )
 {
 	srm_chunk_t lck;
 	srm_time_t delta;
 	size_t fillnum, num;
 
-	if( ! clist->cused )
+	if( ! gdat->data->cused )
 		return 0;
 
-	lck = clist->chunks[clist->cused-1];
+	lck = gdat->data->chunks[gdat->data->cused-1];
 	delta = nck->time - lck->time;
 
 	/* no gap */
-	if( delta <= clist->recint )
+	if( delta <= gdat->data->recint )
 		return 0;
 	
-	delta -= clist->recint;
+	delta -= gdat->data->recint;
 	if( delta > 20 )
 		return 0; /* too large */
 
-	fillnum = delta / clist->recint;
+	fillnum = delta / gdat->data->recint;
 	_srm_log( conn, "inserting %d chunks to fill micro-gap at chunk#%d",
-		fillnum, clist->cused );
+		fillnum, gdat->data->cused );
 
 	for( num = 1; num <= fillnum; ++num ){
 		srm_chunk_t fill;
@@ -1160,7 +1168,7 @@ static int _srmpc_chunk_data_gapfill( srmpc_conn_t conn,
 		if( NULL == (fill = srm_chunk_new() ))
 			return -1;
 
-		fill->time = lck->time + (num * clist->recint);
+		fill->time = lck->time + (num * gdat->data->recint);
 		fill->temp = part * (nck->temp - lck->temp) + lck->temp;
 		fill->pwr = part * ( (int)nck->pwr - lck->pwr) + lck->pwr;
 		fill->speed = part * (nck->speed - lck->speed) + lck->speed;
@@ -1168,7 +1176,7 @@ static int _srmpc_chunk_data_gapfill( srmpc_conn_t conn,
 		fill->hr = part * ( (int)nck->hr - lck->hr) + lck->hr;
 		fill->ele = part * (nck->ele - lck->ele) + lck->ele;
 
-		if( 0 > srm_data_add_chunkp( clist, fill ) ){
+		if( 0 > srm_data_add_chunkp( gdat->data, fill ) ){
 			srm_chunk_free(fill);
 			return -1;
 		}
@@ -1196,33 +1204,34 @@ static int _srmpc_chunk_data_cb(
 	int mcont,
 	void *data )
 {
-	srm_data_t clist = (srm_data_t)data;
+	struct _srmpc_get_data_t *gdat = (struct _srmpc_get_data_t *)data;
 
 	(void)dist; /* ignore; */
 
 	/* TODO: start new file on recint change */
-	if( ! clist->recint )
-		clist->recint = recint;
+	if( ! gdat->data->recint )
+		gdat->data->recint = recint;
 
 	/* fill small gaps (<= 2sec) at block boundaries with averaged data? */
 	if( num == 0 )
-		if( 0 > _srmpc_chunk_data_gapfill( conn, clist, chunk ) )
+		if( 0 > _srmpc_chunk_data_gapfill( conn, gdat, chunk ) )
 			return -1;
 
-	if( clist->fillgaps && 0 > srm_data_add_chunk( clist, chunk ) )
+	if( gdat->fillgaps && 0 > srm_data_add_chunk( gdat->data, chunk ) )
 		return -1;
 
 	/* finish previous marker */
-	if( clist->mfirst >= 0 && ( ! mcont || mfirst ) )
-		srm_data_add_marker( clist, clist->mfirst, clist->cused -1 );
+	if( gdat->mfirst >= 0 && ( ! mcont || mfirst ) )
+		srm_data_add_marker( gdat->data, gdat->mfirst,
+		gdat->data->cused -1 );
 
 	if( mfirst ){
-		clist->mfirst = (int)clist->cused;
+		gdat->mfirst = (int)gdat->data->cused;
 		DPRINTF( "_srmpc_chunk_data_cb: new marker at %d",
-			clist->mfirst );
+			gdat->mfirst );
 
 	} else if( ! mcont )
-		clist->mfirst = -1;
+		gdat->mfirst = -1;
 	
 
 	return 0;
@@ -1230,20 +1239,22 @@ static int _srmpc_chunk_data_cb(
 
 srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fillgaps )
 {
-	srm_data_t data;
+	struct _srmpc_get_data_t gdat;
 	srm_marker_t mk;
 
-	if( NULL == (data = srm_data_new()))
+	gdat.fillgaps = fillgaps;
+	gdat.mfirst = -1;
+
+	if( NULL == (gdat.data = srm_data_new()))
 		return NULL;
-	data->fillgaps = fillgaps;
 
-	if( 0 > (data->slope = srmpc_get_slope( conn ) ))
+	if( 0 > (gdat.data->slope = srmpc_get_slope( conn ) ))
 		goto clean1;
 
-	if( 0 > (data->zeropos = srmpc_get_zeropos( conn ) ))
+	if( 0 > (gdat.data->zeropos = srmpc_get_zeropos( conn ) ))
 		goto clean1;
 
-	if( 0 > (data->circum = srmpc_get_circum( conn ) ))
+	if( 0 > (gdat.data->circum = srmpc_get_circum( conn ) ))
 		goto clean1;
 
 	if( NULL == (mk = srm_marker_new() ))
@@ -1252,24 +1263,24 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fillgaps )
 	if( NULL == (mk->notes = srmpc_get_athlete( conn ) ))
 		goto clean2;
 
-	if( 0 > srm_data_add_markerp( data, mk ))
+	if( 0 > srm_data_add_markerp( gdat.data, mk ))
 		goto clean2;
 
-	if( 0 > srmpc_get_chunks(conn, getall, _srmpc_chunk_data_cb, data ) )
+	if( 0 > srmpc_get_chunks(conn, getall, _srmpc_chunk_data_cb, &gdat ) )
 		goto clean2;
 
-	data->marker[0]->last = data->cused-1;
+	gdat.data->marker[0]->last = gdat.data->cused-1;
 
-	if( data->mfirst >= 0 )
-		srm_data_add_marker( data, data->mfirst, data->cused );
+	if( gdat.mfirst >= 0 )
+		srm_data_add_marker( gdat.data, gdat.mfirst, gdat.data->cused );
 
-	return data;
+	return gdat.data;
 
 clean2:
 	srm_marker_free(mk);
 
 clean1:
-	free(data);
+	free(gdat.data);
 	return NULL;
 }
 

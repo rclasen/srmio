@@ -98,7 +98,6 @@ srm_data_t srm_data_new( void )
 	if( NULL == (data = malloc( sizeof( struct _srm_data_t) )) )
 		return NULL;
 	memset( data, 0, sizeof(struct _srm_data_t));
-	data->mfirst = -1;
 
 	if( NULL == (data->chunks = malloc(sizeof(srm_chunk_t *))))
 		goto clean1;
