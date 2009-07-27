@@ -149,6 +149,7 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint );
 struct _srmpc_get_chunk_t {
 	/* whole downlad */
 	srmpc_conn_t		conn;
+	int			fixup;
 	struct tm		pctime;
 	size_t			blocks;
 
@@ -170,12 +171,12 @@ struct _srmpc_get_chunk_t {
 typedef struct _srmpc_get_chunk_t *srmpc_get_chunk_t;
 
 typedef int (*srmpc_chunk_callback_t)( srmpc_get_chunk_t gh );
-int srmpc_get_chunks( srmpc_conn_t conn, int getall, 
+int srmpc_get_chunks( srmpc_conn_t conn, int getall, int fixup,
 	srmpc_chunk_callback_t cfunc, void *cbdata );
 
 int srmpc_clear_chunks( srmpc_conn_t conn );
 
-srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fillgaps );
+srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup );
 
 
 

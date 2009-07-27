@@ -5,8 +5,9 @@ srmio (0.0.2) unstable; urgency=low
   * optionally fill mini-gaps at block-bounaries as srmin does.
   * internal: srmpc_get_data/-_chunks now pass parameters as struct
   * use PCV time to guess "current" year when downloading data
+  * first attempt to fix timestamps for subsecond recints
 
- -- Rainer Clasen <bj@zuto.de>  Mon, 27 Jul 2009 19:36:37 +0200
+ -- Rainer Clasen <bj@zuto.de>  Mon, 27 Jul 2009 20:42:07 +0200
 
 srmio (0.0.1) unstable; urgency=low
 

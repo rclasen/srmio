@@ -39,7 +39,6 @@ static const char *_srmpc_whitelist[] = {
 
 struct _srmpc_get_data_t {
 	int		mfirst;
-	int		fillgaps;
 	srm_data_t	data;
 };
 
@@ -893,6 +892,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	srmpc_chunk_callback_t	cbfunc )
 {
 	struct tm btm;
+	srm_time_t bstart, lnext;
 
 	DUMPHEX( "_srmpc_parse_block", buf, 64 );
 
@@ -908,10 +908,24 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	if( btm.tm_mon < gh->pctime.tm_mon )
 		-- btm.tm_year;
 
-	gh->bstart = (srm_time_t)10 * mktime( &btm );
+	bstart = (srm_time_t)10 * mktime( &btm );
 
-	/* TODO: with recint <1sec the timestamp's resolution isn't
-	 * sufficient. Try to guess tsec from previous block */
+	/* adjust block timestamp based on previous one */
+	lnext = gh->bstart + 11 * gh->recint;
+	if( gh->fixup && gh->recint && lnext 
+		&& lnext < bstart && bstart - lnext <= 20 ){
+
+		size_t cspans = (bstart - lnext) / gh->recint;
+		gh->bstart = lnext + gh->recint * cspans;
+		DPRINTF( "_srmpc_parse_block adj. timestamp %.1lf > %.1lf",
+			(double)bstart/10,
+			(double)gh->bstart/10);
+
+	} else {
+		gh->bstart = bstart;
+
+	}
+
 
 	gh->dist = ( (unsigned char)(buf[5]) << 16 
 		| (unsigned char)(buf[6]) << 8
@@ -982,12 +996,16 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 int srmpc_get_chunks( 
 	srmpc_conn_t conn, 
 	int getall,
+	int fixup,
 	srmpc_chunk_callback_t cbfunc, 
 	void *cbdata )
 {
 	struct _srmpc_get_chunk_t gh = {
 		.conn		= conn,
+		.fixup		= fixup,
+		.bstart		= 0,
 		.blocknum	= 0,
+		.recint		= 0,
 		.cbdata		= cbdata,
 	};
 	char buf[SRM_BUFSIZE];
@@ -1203,7 +1221,7 @@ static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 		if( 0 > _srmpc_chunk_data_gapfill( gh ))
 			return -1;
 
-	if( gdat->fillgaps && 0 > srm_data_add_chunk( gdat->data, &gh->chunk ) )
+	if( gh->fixup && 0 > srm_data_add_chunk( gdat->data, &gh->chunk ) )
 		return -1;
 
 	/* finish previous marker */
@@ -1223,12 +1241,11 @@ static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 	return 0;
 }
 
-srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fillgaps )
+srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup )
 {
 	struct _srmpc_get_data_t gdat;
 	srm_marker_t mk;
 
-	gdat.fillgaps = fillgaps;
 	gdat.mfirst = -1;
 
 	if( NULL == (gdat.data = srm_data_new()))
@@ -1252,7 +1269,7 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fillgaps )
 	if( 0 > srm_data_add_markerp( gdat.data, mk ))
 		goto clean2;
 
-	if( 0 > srmpc_get_chunks(conn, getall, _srmpc_chunk_data_cb, &gdat ) )
+	if( 0 > srmpc_get_chunks(conn, getall, fixup, _srmpc_chunk_data_cb, &gdat ) )
 		goto clean2;
 
 	gdat.data->marker[0]->last = gdat.data->cused-1;
