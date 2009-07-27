@@ -37,8 +37,6 @@ static const char *_srmpc_whitelist[] = {
 };
 
 
-/* TODO: struct _srmpc_get_chunk_t */
-
 struct _srmpc_get_data_t {
 	int		mfirst;
 	int		fillgaps;
@@ -890,47 +888,41 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
  *
  * returns -1 on failure, 0 on success
  */
-static int _srmpc_parse_block( srmpc_conn_t conn, char *buf, 
-	srmpc_chunk_callback_t cbfunc, void *data )
+static int _srmpc_parse_block( srmpc_get_chunk_t gh,
+	char *buf,
+	srmpc_chunk_callback_t	cbfunc )
 {
-	time_t bstart;
 	struct tm btm;
-	unsigned int dist;
-	int temp;	
-	int num;
-	struct _srm_chunk_t chunk; /* TODO: hack? should use srm_chunk_new()? */
-	srm_time_t recint;
 
 	DUMPHEX( "_srmpc_parse_block", buf, 64 );
 
-	if( ! cbfunc )
-		return 0;
-
 	/* get current year */
-	time( &bstart ); /* TODO: get year from PC */
-	localtime_r( &bstart, &btm );
+	time( &gh->bstart ); /* TODO: get year from PC */
+	localtime_r( &gh->bstart, &btm );
 
 	/* parse timestamp */
 	btm.tm_isdst = -1;
 	btm.tm_mday = TIMEDEC( (unsigned char)(buf[0]) & 0x3f );
-	if( btm.tm_mon < (btm.tm_mon = TIMEDEC( (unsigned char)(buf[1]) & 0x1f ) -1 ))
+	if( btm.tm_mon < (btm.tm_mon 
+		= TIMEDEC( (unsigned char)(buf[1]) & 0x1f ) -1 ))
+
 		-- btm.tm_year;
 	btm.tm_hour = TIMEDEC( (unsigned char)(buf[2] & 0x3f ) );
 	btm.tm_min = TIMEDEC( (unsigned char)(buf[3]) );
 	btm.tm_sec = TIMEDEC( (unsigned char)(buf[4]) );
-	bstart = mktime( &btm );
+	gh->bstart = mktime( &btm );
 	/* TODO: with recint <1sec the timestamp's resolution isn't
 	 * sufficient. Try to guess tsec from previous block */
 
-	dist = ( (unsigned char)(buf[5]) << 16 
+	gh->dist = ( (unsigned char)(buf[5]) << 16 
 		| (unsigned char)(buf[6]) << 8
 		| (unsigned char)(buf[7]) ) / 3.9;
 
- 	temp = buf[8];
-	recint = ( ((unsigned char)(buf[1]) & 0xe0) >> 5)
+ 	gh->temp = buf[8];
+	gh->recint = ( ((unsigned char)(buf[1]) & 0xe0) >> 5)
 		| ( ((unsigned char)(buf[0]) & 0x40) >> 3);
 	if( ! (buf[2] & 0x40) )
-		recint *= 10;
+		gh->recint *= 10;
 
 	DPRINTF( "_srmpc_parse_block mon=%d day=%d hour=%d min=%d sec=%d "
 		"dist=%d temp=%d recint=%d na0=%x na2=%x", 
@@ -939,45 +931,42 @@ static int _srmpc_parse_block( srmpc_conn_t conn, char *buf,
 		btm.tm_hour,
 		btm.tm_min,
 		btm.tm_sec,
-		dist,
-		temp,
-		recint,
+		gh->dist,
+		gh->temp,
+		gh->recint,
 		(int)( ( (unsigned char)(buf[0]) & 0x80) >> 7 ),
 		(int)( ( (unsigned char)(buf[2]) & 0x80) >> 7 ) );
 
-	for( num=0; num < 11; ++num ){
-		char * cbuf = &buf[9 + 5*num];
-		int mfirst = ((unsigned char)(cbuf[0]) & 0x40);
-		int mcont = ((unsigned char)(cbuf[0]) & 0x80);
+	for( gh->chunknum=0; gh->chunknum < 11; ++gh->chunknum ){
+		char *cbuf = &buf[9 + 5*gh->chunknum];
+		gh->isfirst = ((unsigned char)(cbuf[0]) & 0x40);
+		gh->iscont = ((unsigned char)(cbuf[0]) & 0x80);
 
 		DUMPHEX( "_srmpc_parse_block chunk", cbuf, 5 );
 
 		if( 0 == memcmp( cbuf, "\0\0\0\0\0", 5 )){
-			DPRINTF( "_srmpc_parse_block: skipping empty chunk#%d", num );
+			DPRINTF( "_srmpc_parse_block: skipping empty chunk#%d", 
+				gh->chunknum );
 			continue;
 		}
 
-		chunk.time = (srm_time_t)10 * bstart + num * recint;
-		chunk.temp = temp;
-		chunk.pwr = ( ( (unsigned char)(cbuf[0]) & 0x0f) << 8 ) 
+		gh->chunk.time = (srm_time_t)10 * gh->bstart 
+			+ gh->chunknum * gh->recint;
+		gh->chunk.temp = gh->temp;
+		gh->chunk.pwr = ( ( (unsigned char)(cbuf[0]) & 0x0f) << 8 ) 
 			| (unsigned char)(cbuf[1]);
-		chunk.speed =  (double)0.2 * ( 
+		gh->chunk.speed =  (double)0.2 * ( 
 			( ( (unsigned char)(cbuf[0]) & 0x30) << 4) 
 			| (unsigned char)(cbuf[2]) );
-		chunk.cad = (unsigned char)(cbuf[3]);
-		chunk.hr = (unsigned char)(cbuf[4]);
-		chunk.ele = 0;
+		gh->chunk.cad = (unsigned char)(cbuf[3]);
+		gh->chunk.hr = (unsigned char)(cbuf[4]);
+		gh->chunk.ele = 0;
 
 
 		/* TODO: verify data when display is non-metric */
 		/* TODO: verify temperature < 0°C */
 
-		if( (*cbfunc)( conn, 
-			&chunk, num, recint, dist, 
-			mfirst,
-			mcont,
-			data ) )
-
+		if( (*cbfunc)( gh ) )
 			return -1;
 
 	}
@@ -995,14 +984,21 @@ int srmpc_get_chunks(
 	srmpc_conn_t conn, 
 	int getall,
 	srmpc_chunk_callback_t cbfunc, 
-	void *data )
+	void *cbdata )
 {
+	struct _srmpc_get_chunk_t gh = {
+		.conn		= conn,
+		.blocknum	= 0,
+		.cbdata		= cbdata,
+	};
 	char buf[SRM_BUFSIZE];
 	int ret;
-	int blocks;
 	int retries = 0;
 	char cmd = (getall ? 'y' : 'A');
 
+
+	if( ! cbfunc )
+		return 0;
 
 	if( _srmpc_msg_send( conn, cmd, NULL, 0 ) )
 		return -1;
@@ -1023,7 +1019,7 @@ int srmpc_get_chunks(
 			return -1;
 		}
 
-		blocks = ( (unsigned char)(buf[2]) << 8) |  (unsigned char)(buf[3]);
+		gh.blocks = ( (unsigned char)(buf[2]) << 8) |  (unsigned char)(buf[3]);
 	
 	} else {
 		if( ret < 2 ){
@@ -1031,26 +1027,23 @@ int srmpc_get_chunks(
 			return -1;
 
 		} else if( ret > 2 ){
-			blocks = ( (unsigned char)(buf[1]) << 8) 
+			gh.blocks = ( (unsigned char)(buf[1]) << 8) 
 				|  (unsigned char)(buf[2]);
 
 		} else {
-			blocks = (unsigned char)(buf[1]);
+			gh.blocks = (unsigned char)(buf[1]);
 
 		}
 
 	}
 	DPRINTF( "srmpc_get_chunks expecting %d blocks (max %d chunks)",
-		blocks, 11*blocks  );
-
-	/* TODO: pass number of blocks + current block to callback for
-	 * progress indication */
+		gh.blocks, 11*gh.blocks  );
 
 	/* read 64byte blocks, each with header + 11 chunks */
-	while( blocks > 0 ){
+	while( gh.blocknum < gh.blocks ){
 		char	resp = ACK;
 
-		_srm_log( conn, "remaining blocks: %d", blocks);
+		_srm_log( conn, "processing block %d/%d", gh.blocknum, gh.blocks);
 
 		ret = _srmpc_read( conn, buf, 64 );
 		DPRINTF( "srmpc_get_chunks: got %d chars", ret );
@@ -1079,21 +1072,20 @@ int srmpc_get_chunks(
 
 		} else {
 			retries = 0;
-			if( 0 > _srmpc_parse_block( conn, buf, cbfunc, data ))
+			if( 0 > _srmpc_parse_block( &gh, buf, cbfunc ))
 				return -1;
 
-			--blocks;
+			++gh.blocknum;
 		}
 
 		/* ACK / NAK this block */
 		if( 0 > _srmpc_write( conn, &resp, 1 ) )
 			return -1;
 
-		DPRINTF( "srmpc_get_chunks: %d blocks left", blocks );
 	}
 	
 	/* read (and ignore) trailing ETX */
-	if( blocks == 0 && conn->stxetx ){
+	if( gh.blocknum == gh.blocks && conn->stxetx ){
 		if( 1 == _srmpc_read( conn, buf, 1 ) )
 			DPRINTF( "srmpc_get_chunks final ETX: %02x",
 				(unsigned char)*buf );
@@ -1136,9 +1128,10 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
  *
  ************************************************************/
 
-static int _srmpc_chunk_data_gapfill( srmpc_conn_t conn,
-	struct _srmpc_get_data_t *gdat, srm_chunk_t nck )
+static int _srmpc_chunk_data_gapfill( srmpc_get_chunk_t gh )
 {
+	struct _srmpc_get_data_t *gdat = gh->cbdata;
+	srm_chunk_t nck = &gh->chunk;
 	srm_chunk_t lck;
 	srm_time_t delta;
 	size_t fillnum, num;
@@ -1158,7 +1151,7 @@ static int _srmpc_chunk_data_gapfill( srmpc_conn_t conn,
 		return 0; /* too large */
 
 	fillnum = delta / gdat->data->recint;
-	_srm_log( conn, "inserting %d chunks to fill micro-gap at chunk#%d",
+	_srm_log( gh->conn, "inserting %d chunks to fill micro-gap at chunk#%d",
 		fillnum, gdat->data->cused );
 
 	for( num = 1; num <= fillnum; ++num ){
@@ -1194,43 +1187,34 @@ static int _srmpc_chunk_data_gapfill( srmpc_conn_t conn,
  *
  ************************************************************/
 
-static int _srmpc_chunk_data_cb( 
-	srmpc_conn_t conn,
-	srm_chunk_t chunk, 
-	size_t num,
-	srm_time_t recint,
-	unsigned int dist,
-	int mfirst,
-	int mcont,
-	void *data )
+static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 {
-	struct _srmpc_get_data_t *gdat = (struct _srmpc_get_data_t *)data;
+	struct _srmpc_get_data_t *gdat = (struct _srmpc_get_data_t *)gh->cbdata;
 
-	(void)dist; /* ignore; */
 
 	/* TODO: start new file on recint change */
 	if( ! gdat->data->recint )
-		gdat->data->recint = recint;
+		gdat->data->recint = gh->recint;
 
 	/* fill small gaps (<= 2sec) at block boundaries with averaged data? */
-	if( num == 0 )
-		if( 0 > _srmpc_chunk_data_gapfill( conn, gdat, chunk ) )
+	if( gh->chunknum == 0 )
+		if( 0 > _srmpc_chunk_data_gapfill( gh ))
 			return -1;
 
-	if( gdat->fillgaps && 0 > srm_data_add_chunk( gdat->data, chunk ) )
+	if( gdat->fillgaps && 0 > srm_data_add_chunk( gdat->data, &gh->chunk ) )
 		return -1;
 
 	/* finish previous marker */
-	if( gdat->mfirst >= 0 && ( ! mcont || mfirst ) )
+	if( gdat->mfirst >= 0 && ( ! gh->iscont || gh->isfirst ) )
 		srm_data_add_marker( gdat->data, gdat->mfirst,
 		gdat->data->cused -1 );
 
-	if( mfirst ){
+	if( gh->isfirst ){
 		gdat->mfirst = (int)gdat->data->cused;
 		DPRINTF( "_srmpc_chunk_data_cb: new marker at %d",
 			gdat->mfirst );
 
-	} else if( ! mcont )
+	} else if( ! gh->iscont )
 		gdat->mfirst = -1;
 	
 

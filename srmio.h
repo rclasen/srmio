@@ -146,16 +146,31 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint );
 
 
 
-typedef int (*srmpc_chunk_callback_t)( 
-	srmpc_conn_t conn,
-	srm_chunk_t chunk, 
-	size_t num,
-	srm_time_t recint,
-	unsigned int dist,
-	int mfirst,
-	int mcont,
-	void *data );
-int srmpc_get_chunks( srmpc_conn_t conn, int getall, srmpc_chunk_callback_t cfunc, void *data );
+struct _srmpc_get_chunk_t {
+	/* whole downlad */
+	srmpc_conn_t		conn;
+	size_t			blocks;
+
+	/* current block */
+	size_t			blocknum;
+	time_t			bstart;
+	unsigned int		dist;
+	int			temp;	
+	srm_time_t		recint;
+
+	/* current chunk */
+	size_t			chunknum;	/* within block */
+	int			isfirst;	/* ... of marker */
+	int			iscont;		/* ... of marker */
+	struct _srm_chunk_t	chunk; /* TODO: hack? should use srm_chunk_new()? */
+
+	void			*cbdata;
+};
+typedef struct _srmpc_get_chunk_t *srmpc_get_chunk_t;
+
+typedef int (*srmpc_chunk_callback_t)( srmpc_get_chunk_t gh );
+int srmpc_get_chunks( srmpc_conn_t conn, int getall, 
+	srmpc_chunk_callback_t cfunc, void *cbdata );
 
 int srmpc_clear_chunks( srmpc_conn_t conn );
 

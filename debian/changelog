@@ -1,5 +1,6 @@
 srmio (0.0.2) unstable; urgency=low
 
+  * internal: srmpc_get_data/-_chunks now pass parameters as struct
   * optionally fill mini-gaps at block-bounaries as srmin does.
   * changed internal time representation to srm_time_t. got rid of ->tsec.
   * don't skip complete block on empty chunk.
