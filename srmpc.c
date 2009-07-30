@@ -174,26 +174,33 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 		goto clean3;
 
 	ret = _srmpc_read( conn, buf, 20 );
+	DPRINTF( "srmpc_open ret %d", ret );
 	if( ret < 0 )
 		goto clean3;
+
+	if( ret < 1 ){
+		_srm_log( conn, "got no opening response" );
+		errno = EHOSTDOWN;
+		goto clean3;
+	}
 
 	DUMPHEX( "srmpc_open got ", buf, ret );
 
 	/* autodetect communcitation type */
 	if( *buf == STX ){
 		if( ret < 7 ){
-			_srm_log( conn, "failed to receive opening response" );
+			_srm_log( conn, "opening response is garbled" );
 			errno = EPROTO;
-			return NULL;
+			goto clean3;
 		}
 
 		_srmpc_msg_decode( ver, 2, &buf[2], 4 );
 
 	} else {
 		if( ret < 3 ){
-			_srm_log( conn, "failed to receive opening response" );
+			_srm_log( conn, "opening response is garbled" );
 			errno = EPROTO;
-			return NULL;
+			goto clean3;
 		}
 
 		conn->stxetx = 0;
