@@ -30,12 +30,37 @@
  * broken settings within the SRM. Seems the SRM's input checking is
  * limited.
  */
-static const char *_srmpc_whitelist[] = {
-	"\x6b\x09",	/* fw 6b.09 - uses stxetx */
-	"\x43\x09",	/* fw 43.09 - no stxetx, fw was upgraded 04/2009 */
-	NULL,
+static const int _srmpc_whitelist[] = {
+	0x6b09,		/* fw 6b.09 - uses stxetx */
+	0x4309,		/* fw 43.09 - no stxetx, fw was upgraded 04/2009 */
+	0,
 };
 
+/*
+ * supported baudrates in order to try
+ * default is 9600 8n1, no handshake
+ */
+typedef enum {
+	_srmpc_baud_9600,
+	_srmpc_baud_19200,
+	_srmpc_baud_4800,
+	_srmpc_baud_2400,
+	_srmpc_baud_max
+} _srmpc_baudrate_t;
+
+static const tcflag_t _srmpc_baudrates[_srmpc_baud_max] = {
+	B9600,
+	B19200,
+	B4800,
+	B2400,
+};
+
+static const int _srmpc_baudnames[_srmpc_baud_max] = {
+	9600,
+	19200,
+	4800,
+	2400,
+};
 
 struct _srmpc_get_data_t {
 	int		mfirst;
@@ -86,8 +111,6 @@ static int _srmpc_write( srmpc_conn_t conn, const char *buf, size_t blen )
 {
 	DUMPHEX( "_srmpc_write", buf, blen );
 
-	/* TODO: re-init? ... */
-
 	if( tcflush( conn->fd, TCIOFLUSH ) )
 		return -1;
 
@@ -96,7 +119,6 @@ static int _srmpc_write( srmpc_conn_t conn, const char *buf, size_t blen )
 
 /*
  * read specified number of bytes
- * automagically take care of pending IOFLUSH
  *
  * returns number of chars read
  * on error errno is set and returns -1
@@ -120,78 +142,71 @@ static int _srmpc_read( srmpc_conn_t conn, char *buf, size_t want )
 	return got;
 }
 
-
 /*
- * allocate internal data structures,
- * open serial device
- * set serial device properties
- * 
- * communication uses 9600 8n1, no handshake
- *
- * on error errno is set and returns NULL
+ * set serial parameter
+ * wake up PCV
+ * send "hello"
+ * check returned version
+ * decode version
+ * return detected version (or -1 on error)
  */
-srmpc_conn_t srmpc_open( const char *fname, int force,
-	srmpc_log_callback_t lfunc )
+static int _srmpc_init(
+	srmpc_conn_t conn,
+	_srmpc_baudrate_t baudrate,
+	int parity )
 {
-	srmpc_conn_t	conn;
 	struct termios	ios;
+	int		ret;
 	char		buf[20];
 	char		ver[2];
-	int		ret;
 
-	DPRINTF( "srmpc_open %s", fname );
+	if( baudrate >= _srmpc_baud_max ){
+		errno = EINVAL;
+		return -1;
+	}
 
-	if( NULL == (conn = malloc(sizeof(struct _srmpc_conn_t))))
-		return NULL;
 	conn->stxetx = 1;
-	conn->lfunc = lfunc;
-
-	/* TODO: uucp style lockfils */
-
-	if( 0 > (conn->fd = open( fname, O_RDWR | O_NOCTTY )))
-		goto clean2;
-
-	/* get/set serial comm parameter */
-	if( tcgetattr( conn->fd, &conn->oldios ) )
-		goto clean3;
+	_srm_log( conn, "trying comm %d/8%c1", 
+		_srmpc_baudnames[baudrate], 
+		parity ? 'e' : 'n' );
 
 	memset(&ios, 0, sizeof(struct termios));
-	ios.c_cflag = B9600 | CS8 | CLOCAL | CREAD;
+	ios.c_cflag = CS8 | CLOCAL | CREAD | _srmpc_baudrates[baudrate];
+	if( parity ) ios.c_cflag |= PARENB;
 	ios.c_cc[VMIN] = 0;
 	ios.c_cc[VTIME] = 10;
 
 	if( tcflush( conn->fd, TCIOFLUSH ) )
-		goto clean3;
+		return -1;
 
 	if( tcsetattr( conn->fd, TCSANOW, &ios ) )
-		goto clean3;
+		return -1;
 
 	tcsendbreak( conn->fd, 0 );
 
 	/* send opening 'P' to verify communication works */
 	ret = _srmpc_msg_send( conn, 'P', NULL, 0 );
 	if( ret < 0 )
-		goto clean3;
+		return -1;
 
 	ret = _srmpc_read( conn, buf, 20 );
-	DPRINTF( "srmpc_open ret %d", ret );
+	DPRINTF( "srmpc_init ret %d", ret );
 	if( ret < 0 )
-		goto clean3;
-
-	if( ret < 1 ){
+		return -1;
+	if( ret == 0 ){
 		_srm_log( conn, "got no opening response" );
 		errno = EHOSTDOWN;
-		goto clean3;
+		return -1;
 	}
 
-	DUMPHEX( "srmpc_open got ", buf, ret );
+	DUMPHEX( "_srmpc_init got ", buf, ret );
 
 	/* autodetect communcitation type */
 	if( *buf == STX ){
 		if( ret < 7 ){
 			_srm_log( conn, "opening response is garbled" );
 			errno = EPROTO;
-			goto clean3;
+			return -1;
 		}
 
 		_srmpc_msg_decode( ver, 2, &buf[2], 4 );
@@ -200,7 +215,7 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 		if( ret < 3 ){
 			_srm_log( conn, "opening response is garbled" );
 			errno = EPROTO;
-			goto clean3;
+			return -1;
 		}
 
 		conn->stxetx = 0;
@@ -209,23 +224,83 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 		memcpy( ver, &buf[1], 2 );
 	}
 
-	/* TODO: retry sending, try other speeds + parity + x787878 */
+	return ( (unsigned char)ver[0] << 8 ) | (unsigned char)ver[1];
+}
+
+
+static int _srmpc_init_all( srmpc_conn_t conn )
+{
+	_srmpc_baudrate_t baudrate;
+
+	for( baudrate = 0; baudrate < _srmpc_baud_max; ++baudrate ){
+		int parity;
+
+		for( parity = 0; parity < 2; ++parity ){
+			int	ret;
+
+			ret = _srmpc_init( conn, baudrate, parity );
+			if( ret >= 0 ){
+				_srm_log( conn, "found PCV version 0x%x at %d/8%c1", 
+					ret, _srmpc_baudnames[baudrate], 
+					parity ? 'e' : 'n' );
+
+				return ret;
+			}
+		}
+	}
+
+	return -1;
+}
+
+
+/*
+ * allocate internal data structures,
+ * open serial device
+ * set serial device properties
+ * 
+ * on error errno is set and returns NULL
+ */
+srmpc_conn_t srmpc_open( const char *fname, int force,
+	srmpc_log_callback_t lfunc )
+{
+	srmpc_conn_t	conn;
+	int		pcv;
+
+	DPRINTF( "srmpc_open %s", fname );
+
+	if( NULL == (conn = malloc(sizeof(struct _srmpc_conn_t))))
+		return NULL;
+	conn->lfunc = lfunc;
+
+	/* TODO: uucp style lockfils */
+
+	if( 0 > (conn->fd = open( fname, O_RDWR | O_NOCTTY )))
+		goto clean2;
+
+	/* get serial comm parameter for restore on close*/
+	if( tcgetattr( conn->fd, &conn->oldios ) )
+		goto clean3;
+
+	/* set serial parameter and get PCV version */
+	/* TODO: allow user to specify baudrate+parity */
+	if( 0 > ( pcv = _srmpc_init_all( conn ))) 
+		goto clean3;
+
 
 	/* verify it's a known/supported PCV */
 	if( ! force ){
 		int known = 0;
-		const char **white;
+		const int *white;
 
-		DUMPHEX( "srmpc_open whitelist", ver, 2 );
 		for( white = _srmpc_whitelist; *white; ++white ){
-			if( 0 == memcmp( ver, *white, 2 )){
+			if( pcv == *white ){
 				++known;
 				break;
 			}
 		}
 		if( ! known ){
-			_srm_log( conn, "PC Version %x.%x not whitelisted",
-				ver[0], ver[1] );
+			_srm_log( conn, "PC Version 0x%x not whitelisted",
+				pcv );
 			errno = ENOTSUP;
 			goto clean3;
 		}
