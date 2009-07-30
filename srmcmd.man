@@ -9,8 +9,8 @@ srmcmd \- download/access your SRM PowerControl
 .SH DESCRIPTION
 .B srmcmd
 implemets the serial protocol for SRM's PowerControl V. It allows you to
-download data from the PC attached to \fIpath\fR and adjust the most
-important settings.
+download data from the PC attached to the serial device at \fIpath\fR and 
+adjust the most important settings.
 
 .SH OPTIONS
 Options available for the
@@ -21,12 +21,20 @@ command:
 Delete data on PC. Well, actually just mark it as deleted. You're still
 able to get it with --get=all.
 .TP
+\fB\-F\fR, \fB\-\-force\fR
+Ignore builtin whitelist of known working PCV Firmware versions. This
+options might be quite DANGEROUSE if an unknown Firmware expects 
+to be addressed differently. Writing unexpected stuff to PCV proved to be
+a *BAD* Idea.
+.TP
 \fB\-x\fR, \fB\-\-fixup\fR
 Try to fix time glitches in retrieved data. The PCV sends 11 Tuples in
 one 64Byte block. Timestamps are only sent per Block - with a granularity
-of 1 sec. Unfortunatly these timestamps often mismatch the time covered by
-the tuples. With this option set, gaps at block boundaries of up to 2sec are
-filled with averaged data. That's what srmwin is doing, wko doesn't ...
+of 1 sec - so they're always off with recints < 1sec. In addition these 
+timestamps often mismatch the time covered by the tuples. With this option
+set, timestamps are adjusted to fit the recint and gaps at block boundaries
+of up to 2sec are filled with averaged data. That's what srmwin is doing,
+It seems wko doesn't ...
 .TP
 \fB\-g\fR, \fB\-\-get\fR[=all]
 download newly recorded data from PC. If \fIall\fR is specified, all data
@@ -41,7 +49,7 @@ Set recording interval. Interval is specified *10. so "10" means 1 sec.
 Supported values: 1 to 9 and 10 to 150 in steps of 10.
 .TP
 \fB\-n\fR, \fB\-\-name\fR
-Show name stored on the PC.
+Show athlete name (initials) stored on the PC.
 .TP
 \fB\-r\fR, \fB\-\-read\fR
 instead of accessing the PC, the specified file is read. By default data
@@ -66,7 +74,11 @@ Show name configured in PC:
 Download data to out.srm, delete data on PC, adjust clock and set recint
 to 1sec:
 
- srmcmd -g -t -r 10 -w out.srm /dev/ttyUSB0
+ srmcmd -g -t -i 10 -w out.srm /dev/ttyUSB0
+
+Dump file contents as tab-seperated list:
+
+ srmcmd -r foo.srm
 
 .SH "SEE ALSO"
 This is just a very simplistic frontend for the lib. Please check the

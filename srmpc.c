@@ -993,6 +993,8 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	bstart = (srm_time_t)10 * mktime( &btm );
 
 	/* adjust block timestamp based on previous one */
+	/* TODO: postprocess data for fixup *after* download, move to
+	 * srmdata.c */
 	lnext = gh->bstart + 11 * gh->recint;
 	if( gh->fixup && gh->recint && lnext 
 		&& lnext < bstart && bstart - lnext <= 20 ){
@@ -1297,6 +1299,9 @@ static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 	/* TODO: start new file on recint change */
 	if( ! gdat->data->recint )
 		gdat->data->recint = gh->recint;
+
+	/* TODO: postprocess data for fixup *after* download, move to
+	 * srmdata.c */
 
 	/* fill small gaps (<= 2sec) at block boundaries with averaged data? */
 	if( gh->chunknum == 0 )

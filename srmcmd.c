@@ -89,7 +89,7 @@ int main( int argc, char **argv )
 	int needhelp = 0;
 	struct option lopts[] = {
 		{ "clear", no_argument, NULL, 'c' },
-		{ "force", no_argument, NULL, 'f' },
+		{ "force", no_argument, NULL, 'F' },
 		{ "get", optional_argument, NULL, 'g' },
 		{ "help", no_argument, NULL, 'h' },
 		{ "int", required_argument, NULL, 'i' },
@@ -109,7 +109,7 @@ int main( int argc, char **argv )
 			++opt_clear;
 			break;
 
-		  case 'f':
+		  case 'F':
 			++opt_force;
 			break;
 
@@ -276,6 +276,7 @@ static void usage( char *name )
 "options: (are processed in this order)\n"
 " --name              get athlete name\n"
 " --get[=all]|-g      download data from SRM and dump it to stdout\n"
+" --force|-F          ignore whitelist. Might be DANGEROUS\n"
 " --fixup|-x          try to fix time-glitches in retrieved data\n"
 " --write=<fname>|-w  save data as specified .srm file\n" 
 " --read|-r           dump srm file to stdout\n"

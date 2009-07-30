@@ -1,13 +1,15 @@
 srmio (0.0.2) unstable; urgency=low
 
+  * added option to override PCV Version whitelist
   * don't skip complete block on empty chunk.
   * changed internal time representation to srm_time_t. got rid of ->tsec.
   * optionally fill mini-gaps at block-bounaries as srmin does.
   * internal: srmpc_get_data/-_chunks now pass parameters as struct
   * use PCV time to guess "current" year when downloading data
   * first attempt to fix timestamps for subsecond recints
+  * try other baudrates/parity in srmpc_open
 
- -- Rainer Clasen <bj@zuto.de>  Mon, 27 Jul 2009 20:42:07 +0200
+ -- Rainer Clasen <bj@zuto.de>  Thu, 30 Jul 2009 14:59:29 +0200
 
 srmio (0.0.1) unstable; urgency=low
 
