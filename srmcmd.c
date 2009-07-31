@@ -103,7 +103,7 @@ int main( int argc, char **argv )
 	char c;
 	srmpc_conn_t srm;
 
-	while( -1 != ( c = getopt_long( argc, argv, "cfg::h:i:nrtvw:x", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "cFg::hi:nrtvw:x", lopts, NULL ))){
 		switch(c){
 		  case 'c':
 			++opt_clear;
