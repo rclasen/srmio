@@ -997,13 +997,31 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	 * srmdata.c */
 	lnext = gh->bstart + 11 * gh->recint;
 	if( gh->fixup && gh->recint && lnext 
-		&& lnext < bstart && bstart - lnext <= 20 ){
+		&& (lnext != bstart) ){
 
-		size_t cspans = (bstart - lnext) / gh->recint;
-		gh->bstart = lnext + gh->recint * cspans;
-		DPRINTF( "_srmpc_parse_block adj. timestamp %.1lf > %.1lf",
+		/* overlapping < 1sec */
+		if( bstart < lnext && lnext - bstart < 10 ){
+			gh->bstart = lnext;
+
+		/* gap < 2sec */
+		} else if ( bstart > lnext && bstart - lnext <= 20 ){
+			size_t cspans = (bstart - lnext) / gh->recint;
+			gh->bstart = lnext + gh->recint * cspans;
+
+		/* bigger difference */
+		} else {
+			gh->bstart = bstart;
+		}
+
+#ifdef DEBUG
+		if( gh->bstart != bstart ){
+		DPRINTF( "_srmpc_parse_block adj. timestamp %.1lf > (%.1lf) > %.1lf",
 			(double)bstart/10,
+			(double)lnext/10,
 			(double)gh->bstart/10);
+		}
+#endif
+
 
 	} else {
 		gh->bstart = bstart;
