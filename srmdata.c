@@ -242,6 +242,12 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 				avail = ns;
 			}
 
+			DPRINTF("srm_data_blocks found gap @%u "
+				"%.1lf - %.1lf = %.1lf", i,
+				(double)prev->time/10, 
+				(double)this->time/10,
+				(double)(this->time - prev->time)/10);
+
 			if( NULL == (blocks[used] = srm_marker_new() ) )
 				goto clean2;
 				
