@@ -38,7 +38,10 @@ static const int _srmpc_whitelist[] = {
 
 /*
  * supported baudrates in order to try
- * default is 9600 8n1, no handshake
+ * default is 9600 8n1
+ * srmwin tries:
+ *  9600,4800,19200,2400 Baud
+ *  each baudrate with none, then with even parity
  */
 typedef enum {
 	_srmpc_baud_9600,
@@ -109,12 +112,26 @@ static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
  */
 static int _srmpc_write( srmpc_conn_t conn, const char *buf, size_t blen )
 {
+	int ret;
+
 	DUMPHEX( "_srmpc_write", buf, blen );
 
 	if( tcflush( conn->fd, TCIOFLUSH ) )
 		return -1;
 
-	return write( conn->fd, buf, blen );
+	ret = write( conn->fd, buf, blen );
+	if( ret < 0 )
+		return -1;
+
+	if( (size_t)ret < blen ){
+		errno = EIO;
+		return -1;
+	}
+
+	if( 0 > tcdrain( conn->fd ) )
+		return -1;
+
+	return ret;
 }
 
 /*
@@ -170,11 +187,23 @@ static int _srmpc_init(
 		_srmpc_baudnames[baudrate], 
 		parity ? 'e' : 'n' );
 
+#ifdef HAVE_CFMAKERAW
+	cfmakeraw( &ios );
+#else
 	memset(&ios, 0, sizeof(struct termios));
-	ios.c_cflag = CS8 | CLOCAL | CREAD | _srmpc_baudrates[baudrate];
+#endif
+	ios.c_cflag = CS8 | CLOCAL | CREAD;
 	if( parity ) ios.c_cflag |= PARENB;
+	if( 0 > cfsetispeed( &ios, _srmpc_baudrates[baudrate] ) )
+		return -1;
+	if( 0 > cfsetospeed( &ios, _srmpc_baudrates[baudrate] ) )
+		return -1;
+
+	ios.c_iflag = IGNPAR;
+
 	ios.c_cc[VMIN] = 0;
 	ios.c_cc[VTIME] = 10;
+
 
 	if( tcflush( conn->fd, TCIOFLUSH ) )
 		return -1;
@@ -219,7 +248,7 @@ static int _srmpc_init(
 		}
 
 		conn->stxetx = 0;
-		DPRINTF( "srmpc_open: disabling stx/etx" );
+		DPRINTF( "_srmpc_init: disabling stx/etx" );
 
 		memcpy( ver, &buf[1], 2 );
 	}
@@ -504,7 +533,7 @@ static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const char *arg, size_t
 
 	} else if( ret < len ){
 		_srm_log( conn, "failed to get complete response from PC");
-		errno = ECOMM;
+		errno = EIO;
 		return -1;
 	}
 
@@ -599,9 +628,12 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, char *rbuf, size_t rsize, size_t 
 		}
 		rlen -= 3; /* stx, cmd, etx */
 
-		if( rbuf )
-			rlen = _srmpc_msg_decode(rbuf, rsize, &buf[2], rlen );
-		else
+		if( rbuf ){
+			ret = _srmpc_msg_decode(rbuf, rsize, &buf[2], rlen );
+			if( ret < 0 )
+				return -1;
+			rlen = ret;
+		} else
 			rlen /= 2;
 
 	} else {
@@ -785,7 +817,7 @@ double srmpc_get_slope( srmpc_conn_t conn )
 
 	slope = (double)(( (unsigned char)(buf[0])<<8) 
 		| ( (unsigned char)(buf[1]) ) ) / 10;
-	DPRINTF( "srmpc_get_slope slope=%.1lf", slope );
+	DPRINTF( "srmpc_get_slope slope=%.1f", slope );
 	return slope;
 }
 
@@ -975,6 +1007,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 {
 	struct tm btm;
 	srm_time_t bstart, lnext;
+	int ret;
 
 	DUMPHEX( "_srmpc_parse_block", buf, 64 );
 
@@ -990,7 +1023,11 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	if( btm.tm_mon < gh->pctime.tm_mon )
 		-- btm.tm_year;
 
-	bstart = (srm_time_t)10 * mktime( &btm );
+	ret = mktime( &btm );
+	if( 0 > ret )
+		return -1;
+
+	bstart = (srm_time_t)ret *10;
 
 	/* adjust block timestamp based on previous one */
 	/* TODO: postprocess data for fixup *after* download, move to
@@ -1015,7 +1052,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 
 #ifdef DEBUG
 		if( gh->bstart != bstart ){
-		DPRINTF( "_srmpc_parse_block adj. timestamp %.1lf > (%.1lf) > %.1lf",
+		DPRINTF( "_srmpc_parse_block adj. timestamp %.1f > (%.1f) > %.1f",
 			(double)bstart/10,
 			(double)lnext/10,
 			(double)gh->bstart/10);
@@ -1040,7 +1077,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 		gh->recint *= 10;
 
 	DPRINTF( "_srmpc_parse_block mon=%d day=%d hour=%d min=%d sec=%d "
-		"dist=%d temp=%d recint=%d na0=%x na2=%x", 
+		"dist=%d temp=%d recint=%.1f na0=%x na2=%x", 
 		btm.tm_mon,
 		btm.tm_mday,
 		btm.tm_hour,
@@ -1048,7 +1085,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 		btm.tm_sec,
 		gh->dist,
 		gh->temp,
-		gh->recint,
+		(double)gh->recint/10,
 		(int)( ( (unsigned char)(buf[0]) & 0x80) >> 7 ),
 		(int)( ( (unsigned char)(buf[2]) & 0x80) >> 7 ) );
 
@@ -1102,22 +1139,25 @@ int srmpc_get_chunks(
 	srmpc_chunk_callback_t cbfunc, 
 	void *cbdata )
 {
-	struct _srmpc_get_chunk_t gh = {
-		.conn		= conn,
-		.fixup		= fixup,
-		.bstart		= 0,
-		.blocknum	= 0,
-		.recint		= 0,
-		.cbdata		= cbdata,
-	};
+	struct _srmpc_get_chunk_t gh;
 	char buf[SRM_BUFSIZE];
 	int ret;
 	int retries = 0;
-	char cmd = (getall ? 'y' : 'A');
+	char cmd;
 
 
 	if( ! cbfunc )
 		return 0;
+
+	if( getall )
+		cmd = 'y';
+	else
+		cmd = 'A';
+
+	memset(&gh, 0, sizeof( struct _srmpc_get_chunk_t ));
+	gh.conn = conn;
+	gh.fixup = fixup;
+	gh.cbdata = cbdata;
 
 	if( 0 > srmpc_get_time( conn, &gh.pctime ))
 		return -1;
@@ -1322,11 +1362,11 @@ static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 	 * srmdata.c */
 
 	/* fill small gaps (<= 2sec) at block boundaries with averaged data? */
-	if( gh->chunknum == 0 )
+	if( gh->fixup && gh->chunknum == 0 )
 		if( 0 > _srmpc_chunk_data_gapfill( gh ))
 			return -1;
 
-	if( gh->fixup && 0 > srm_data_add_chunk( gdat->data, &gh->chunk ) )
+	if( 0 > srm_data_add_chunk( gdat->data, &gh->chunk ) )
 		return -1;
 
 	/* finish previous marker */

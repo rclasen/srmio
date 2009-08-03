@@ -120,10 +120,10 @@ clean1:
 int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
 {
 	DPRINTF( "srm_data_add_chunk %d:"
-		"time=%.1lf, "
-		"temp=%.1lf, "
+		"time=%.1f, "
+		"temp=%.1f, "
 		"pwr=%u, "
-		"spd=%.3lf, "
+		"spd=%.3f, "
 		"cad=%u, "
 		"hr=%u ",
 		data->cused,
@@ -186,7 +186,7 @@ int srm_data_add_marker( srm_data_t data, size_t first, size_t last )
 	DPRINTF( "srm_data_add_marker: %d to %d", first, last );
 
 	if( first >= data->cused || first > last ){
-		errno = ERANGE;
+		errno = EINVAL;
 		return -1;
 	}
 
@@ -212,8 +212,10 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 	size_t used = 1;
 	size_t i;
 
-	if( data->cused < 1 )
+	if( data->cused < 1 ){
+		errno = EINVAL;
 		return NULL;
+	}
 
 	if( NULL == (blocks = malloc( (1+ avail) * (sizeof(srm_marker_t)))))
 		return NULL;
@@ -243,7 +245,7 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 			}
 
 			DPRINTF("srm_data_blocks found gap @%u "
-				"%.1lf - %.1lf = %.1lf", i,
+				"%.1f - %.1f = %.1f", i,
 				(double)prev->time/10, 
 				(double)this->time/10,
 				(double)(this->time - prev->time)/10);

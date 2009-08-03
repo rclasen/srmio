@@ -69,7 +69,10 @@ destination file. Files are written using the SRM7 format.
 .SH EXAMPLES
 Show name configured in PC:
 
- srmcmd -n /dev/ttyUSB0
+ srmcmd -n /dev/ttyUSB0		# linux
+ srmcmd -n /dev/ttyS1		# cygwin, com1
+ srmcmd -n /dev/cu.usbserial*	# Mac OS X, prolific driver (good luck)
+ srmcmd -n /dev/cu.PL2303-*	# Mac OS X with http://osx-pl2303.sourceforge.net/
 
 Download data to out.srm, delete data on PC, adjust clock and set recint
 to 1sec:

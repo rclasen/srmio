@@ -29,7 +29,7 @@ static int _xread( int fd, unsigned char *buf, size_t len )
 		return -1;
 
 	if( ret < (int)len ){
-		errno = EPIPE;
+		errno = EIO;
 		return -1;
 	}
 
@@ -56,15 +56,13 @@ static int _xread( int fd, unsigned char *buf, size_t len )
 /* convert "days since 1880-01-01" to srm_time_t */
 static srm_time_t _srm_mktime( int days )
 {
-	struct tm t = {
-		.tm_sec = 0,
-		.tm_min = 0,
-		.tm_hour = 0,
-		.tm_mday = 1,
-		.tm_mon = 0,
-		.tm_year = 70,
-		.tm_isdst = -1,
-	};
+	time_t ret;
+	struct tm t;
+
+	memset( &t, 0, sizeof(struct tm));
+	t.tm_mday = 1;
+	t.tm_year = 70;
+	t.tm_isdst = -1;
 
 	DPRINTF( "_srm_mktime %d", days );
 	if( days < SRM2EPOCH ){
@@ -75,7 +73,11 @@ static srm_time_t _srm_mktime( int days )
 	}
 	t.tm_mday += days - SRM2EPOCH;
 
-	return (srm_time_t)10 * mktime( &t );
+	ret = mktime( &t );
+	if( ret == (time_t) -1 )
+		return (srm_time_t)-1;
+
+	return (srm_time_t)ret * 10;
 }
 
 
@@ -123,7 +125,7 @@ srm_data_t srm_data_read( const char *fname )
 	unsigned char buf[1024];
 	srm_time_t timerefday;
 	srm_data_read_cfunc cfunc = NULL;
-	size_t clen;
+	size_t chunklen;
 	size_t bcnt;
 	struct _srm_block_t **blocks;
 	size_t mcnt;
@@ -143,11 +145,11 @@ srm_data_t srm_data_read( const char *fname )
 	DUMPHEX( "srm_data_read head", (char*)buf, 86 );
 
 	if( 0 == strncmp( (char*)buf, "SRM6", 4 )){
-		clen = 5;
+		chunklen = 5;
 		cfunc = _srm_data_chunk_srm6;
 
 	} else if( 0 == strncmp( (char*)buf, "SRM7", 4 )){
-		clen = 14;
+		chunklen = 14;
 		cfunc = _srm_data_chunk_srm7;
 
 	} else {
@@ -155,12 +157,12 @@ srm_data_t srm_data_read( const char *fname )
 		goto clean2;
 	}
 
-	if( 0 > (timerefday = _srm_mktime( CINT16(buf,4) )))
+	if( (srm_time_t)-1 == (timerefday = _srm_mktime( CINT16(buf,4) )))
 		goto clean2;
 #ifdef DEBUG
 	{ 
 	time_t t = timerefday / 10;
-	DPRINTF( "srm_data_read timerefday %u %.1lf %s", CINT16(buf,4), 
+	DPRINTF( "srm_data_read timerefday %u %.1f %s", CINT16(buf,4), 
 		(double)timerefday/10, ctime( &t));
 	}
 #endif
@@ -169,10 +171,13 @@ srm_data_t srm_data_read( const char *fname )
 	tmp->recint = 10 * buf[8] / buf[9];
 	bcnt = CINT16(buf,10);
 	mcnt = CINT16(buf,12) +1;
-
-	if( NULL == (tmp->notes = strndup( (char*)&buf[16], 70 ) ) )
-		goto clean2;
 	DPRINTF( "srm_data_read bcnt=%d mcnt=%d,", bcnt, mcnt );
+
+	/* "notes" is preceeded by length + zero padded. Ignore length... */
+	if( NULL == (tmp->notes = malloc(71) ))
+		goto clean2;
+	memcpy( tmp->notes, (char*)&buf[16], 70 );
+	tmp->notes[70] = 0;
 
 	/* marker */
 	if( NULL == (tmp->marker = malloc( (mcnt +1) * sizeof(srm_marker_t *))))
@@ -195,8 +200,11 @@ srm_data_t srm_data_read( const char *fname )
 
 		tm->first = CINT16(buf,256)-1;
 		tm->last = CINT16(buf,258)-1;
-		if( NULL == (tm->notes = strndup( (char*)buf, 255 ) ))
+
+		if( NULL == (tm->notes = malloc(256)))
 			goto clean2;
+		memcpy( tm->notes, (char*)buf, 255 );
+		tm->notes[255] = 0;
 
 		DPRINTF( "srm_data_read marker %d %d %s", tm->first,
 			tm->last, tm->notes );
@@ -226,7 +234,7 @@ srm_data_t srm_data_read( const char *fname )
 #ifdef DEBUG
 		{
 		time_t t = (timerefday + tb->daydelta) / 10;
-		DPRINTF( "srm_data_read block %.1lf %u %s", 
+		DPRINTF( "srm_data_read block %.1f %u %s", 
 			(double)tb->daydelta/10,
 			tb->chunks, ctime( &t) );
 		}
@@ -242,7 +250,7 @@ srm_data_t srm_data_read( const char *fname )
 	tmp->zeropos = CINT16(buf, 0);
 	tmp->slope = (double)(CINT16(buf, 2) * 140) / 42781;
 	/* ccnt = CINT16(buf, 2) */;
-	DPRINTF( "srm_data_read cal zpos=%d slope=%.1lf",
+	DPRINTF( "srm_data_read cal zpos=%d slope=%.1f",
 		tmp->zeropos, tmp->slope );
 	
 
@@ -252,7 +260,7 @@ srm_data_t srm_data_read( const char *fname )
 		for( ci = 0; ci < blocks[i]->chunks; ++ci ){
 			srm_chunk_t ck;
 
-			if( 0 > _xread( fd, buf, clen ))
+			if( 0 > _xread( fd, buf, chunklen ))
 				goto clean3;
 
 			if( NULL == (ck = (*cfunc)( buf )))
@@ -295,7 +303,7 @@ static int _xwrite( int fd, unsigned char *buf, size_t len )
 		return -1;
 
 	if( ret < (int)len ){
-		errno = EPIPE;
+		errno = EIO;
 		return -1;
 	}
 
@@ -312,14 +320,25 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 	srm_time_t timerefday;
 	size_t i;
 
-	if( ! data )
-		return 0;
-
-	if( data->mused < 1 ){
+	if( ! data ){
 		errno = EINVAL;
 		return -1;
 	}
 
+	if( data->notes && strlen(data->notes) > 255 ){
+		errno = EINVAL;
+		return -1;
+	}
+
+	if( data->cused < 1 || data->cused > 0xffff ){
+		errno = EINVAL;
+		return -1;
+	}
+
+	if( data->mused < 1 || data->mused > 0xffff ){
+		errno = EINVAL;
+		return -1;
+	}
 
 	if( NULL == (blocks = srm_data_blocks( data )))
 		return -1;
@@ -331,18 +350,15 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 		for( bcnt = 0; blocks[bcnt] ; ++bcnt );
 	
-		if( bcnt > 0xffff 
-			|| data->mused > 0xffff 
-			|| data->cused > 0xffff ){
-
-			errno = ERANGE;
+		if( bcnt > 0xffff ){
+			errno = EINVAL;
 			goto clean1;
 		}
 
 		days = data->chunks[0]->time / ( 10 * 24 * 3600 ) + SRM2EPOCH;
 		timerefday = _srm_mktime( days  );
 		DPRINTF( "srm_data_write mcnt=%u bcnt=%u days=%u "
-			"timerefday=%.1lf '%s'",
+			"timerefday=%.1f '%s'",
 			mcnt, bcnt, days, (double)timerefday/10, data->notes );
 
 
@@ -382,7 +398,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		int last = mk->last+1;
 
 		strncpy( (char*)buf, mk->notes ? mk->notes : "", 255 );
-		buf[255] = 1;
+		buf[255] = 1; /* active */
 		DINT16(buf, 256, first );
 		DINT16(buf, 258, last );
 		memset( &buf[260], 0, 10 );
@@ -402,7 +418,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		unsigned int blockdelta = (ck->time - timerefday) * 10;
 		int len = bk->last - bk->first +1;
 
-		DPRINTF( "srm_data_write block @%x %.1lf %lu",
+		DPRINTF( "srm_data_write block @%x %.1f %u",
 			(int)lseek( fd, 0, SEEK_CUR),
 			(double)ck->time/10, blockdelta );
 		DINT32(buf, 0, blockdelta);

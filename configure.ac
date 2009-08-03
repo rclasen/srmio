@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([srmio], [0.0.2], [bj@zuto.de])
+AC_INIT([srmio], [0.0.3], [bj@zuto.de])
 AM_INIT_AUTOMAKE([-Wall -Werror])
 AC_CONFIG_SRCDIR([srmio.h])
 AC_CONFIG_HEADER([config.h])
@@ -28,7 +28,7 @@ AC_FUNC_MALLOC
 AC_FUNC_MEMCMP
 AC_FUNC_MKTIME
 AC_FUNC_REALLOC
-AC_CHECK_FUNCS([localtime_r memset strdup strndup])
+AC_CHECK_FUNCS([localtime_r memset strdup ])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

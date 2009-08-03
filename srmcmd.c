@@ -7,8 +7,6 @@
  *
  */
 
-/* version: 0.000002 - 2009-07-17 07:00 CET */
-
 /************************************************************
  *
  *        !!!!! WARNING !!!!!
@@ -45,16 +43,16 @@ static void csvdump( srm_data_t data )
 		"\n");
 	for( ck=data->chunks; *ck; ++ck ){
 		printf(
-			"%.1lf\t"	/* "time\t" */
+			"%.1f\t"	/* "time\t" */
 			"%.1f\t"	/* "dur\t" */
-			"%.1lf\t"	/* "temp\t" */
+			"%.1f\t"	/* "temp\t" */
 			"%d\t"		/* "pwr\t" */
-			"%.2lf\t"	/* "speed\t" */
+			"%.2f\t"	/* "speed\t" */
 			"%d\t"		/* "cad\t" */
 			"%d\t"		/* "hr\t" */
 			"\n",
 			(double)(*ck)->time / 10,
-			(float)data->recint / 10,
+			(double)data->recint / 10,
 			(*ck)->temp,
 			(*ck)->pwr,
 			(*ck)->speed,
@@ -178,13 +176,16 @@ int main( int argc, char **argv )
 		srm_data_t srmdata;
 
 		if( NULL == (srmdata = srm_data_read( fname ))){
-			fprintf( stderr, "srm_data_read(%s) failed: %m\n", fname );
+			fprintf( stderr, "srm_data_read(%s) failed: %s\n",
+				fname, strerror(errno) );
 			return 1;
 		}
 
 		if( opt_write ){
+			/* TODO: check there's data */
 			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
-				fprintf( stderr, "srm_data_write(%s) failed: %m\n", opt_write );
+				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
+					opt_write, strerror(errno) );
 				return -1;
 			}
 
@@ -200,7 +201,8 @@ int main( int argc, char **argv )
 	if( NULL == (srm = srmpc_open( fname, opt_force, 
 		opt_verb ? logfunc : NULL  ))){
 
-		fprintf( stderr, "srmpc_open(%s) failed: %m\n", fname );
+		fprintf( stderr, "srmpc_open(%s) failed: %s\n",
+			fname, strerror(errno) );
 		return(1);
 	}
 
@@ -226,8 +228,10 @@ int main( int argc, char **argv )
 		}
 
 		if( opt_write ){
+			/* TODO: check there's data */
 			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
-				fprintf( stderr, "srm_data_write(%s) failed: %m\n", opt_write  );
+				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
+					opt_write, strerror(errno) );
 				return -1;
 			}
 

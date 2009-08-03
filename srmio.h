@@ -69,7 +69,7 @@ struct _srm_data_t {
 	srm_time_t	recint;
 	double		slope;
 	int		zeropos;
-	int		circum;;
+	int		circum;
 	char		*notes;
 
 	srm_chunk_t	 *chunks;
