@@ -1334,11 +1334,14 @@ static int _srmpc_chunk_data_gapfill( srmpc_get_chunk_t gh )
 
 		fill->time = lck->time + (num * gdat->data->recint);
 		fill->temp = part * (nck->temp - lck->temp) + lck->temp;
-		fill->pwr = part * ( (int)nck->pwr - lck->pwr) + lck->pwr;
+		fill->pwr = part * (int)( nck->pwr - lck->pwr ) 
+			+ lck->pwr + 0.5;
 		fill->speed = part * (nck->speed - lck->speed) + lck->speed;
-		fill->cad = part * ( (int)nck->cad - lck->cad) + lck->cad;
-		fill->hr = part * ( (int)nck->hr - lck->hr) + lck->hr;
-		fill->ele = part * (nck->ele - lck->ele) + lck->ele;
+		fill->cad = part * (int)( nck->cad - lck->cad ) 
+			+ lck->cad + 0.5;
+		fill->hr = part * (int)( nck->hr - lck->hr ) + lck->hr;
+		fill->ele = part * (nck->ele - lck->ele) 
+			+ lck->ele + 0.5;
 
 		if( 0 > srm_data_add_chunkp( gdat->data, fill ) ){
 			srm_chunk_free(fill);
