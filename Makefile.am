@@ -21,7 +21,6 @@ include_HEADERS= \
 
 lib_LTLIBRARIES=libsrmio.la
 libsrmio_la_SOURCES= \
-	out.h \
 	common.h \
 	\
 	srmdata.c \
@@ -33,5 +32,3 @@ bin_PROGRAMS=srmcmd
 srmcmd_LDFLAGS= -lsrmio
 srmcmd_SOURCES= \
 	srmcmd.c
-
-out.h: genconfheader.sh
