@@ -5,6 +5,8 @@ AUTOMAKE_OPTIONS=foreign
 man1_MANS=srmcmd.man
 EXTRA_DIST=$(MANS) \
 	Changes \
+	LICENSE \
+	README \
 	debian/docs \
 	debian/compat \
 	debian/copyright \
@@ -12,8 +14,7 @@ EXTRA_DIST=$(MANS) \
 	debian/changelog \
 	debian/dirs \
 	debian/control \
-	LICENSE \
-	README
+	genconfheader.sh
 
 include_HEADERS= \
 	srmio.h \

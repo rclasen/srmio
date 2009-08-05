@@ -1,9 +1,8 @@
-This package was debianized by Rainer Clasen <bj@zuto.de> on
-Sat, 18 Jul 2009 20:22:30 +0200.
+This package comes with debian build infrastructure by default.
 
 It was downloaded from http://www.zuto.de/project/srmio
 
-Upstream Author(s):
+Author:
 
     Rainer Clasen <bj@zuto.de>
 
