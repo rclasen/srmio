@@ -7,14 +7,10 @@
  *
  */
 
+
+#include "common.h"
 #include <stdarg.h>
 
-#include "srmio.h"
-#include "debug.h"
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
 
 #define SRM_BUFSIZE	1024
 
@@ -71,11 +67,11 @@ struct _srmpc_get_data_t {
 };
 
 static int _srmpc_msg_decode( 
-	char *out, size_t olen,
-	const char *in, size_t ilen );
+	unsigned char *out, size_t olen,
+	const unsigned char *in, size_t ilen );
 
 static int _srmpc_msg_send( srmpc_conn_t conn, 
-	char cmd, const char *arg, size_t alen );
+	char cmd, const unsigned char *arg, size_t alen );
 
 
 
@@ -110,7 +106,7 @@ static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
  * returns number of chars written
  * on error errno is set and returns -1
  */
-static int _srmpc_write( srmpc_conn_t conn, const char *buf, size_t blen )
+static int _srmpc_write( srmpc_conn_t conn, const unsigned char *buf, size_t blen )
 {
 	int ret;
 
@@ -140,7 +136,7 @@ static int _srmpc_write( srmpc_conn_t conn, const char *buf, size_t blen )
  * returns number of chars read
  * on error errno is set and returns -1
  */
-static int _srmpc_read( srmpc_conn_t conn, char *buf, size_t want )
+static int _srmpc_read( srmpc_conn_t conn, unsigned char *buf, size_t want )
 {
 	size_t got = 0;
 	int ret;
@@ -174,8 +170,8 @@ static int _srmpc_init(
 {
 	struct termios	ios;
 	int		ret;
-	char		buf[20];
-	char		ver[2];
+	unsigned char	buf[20];
+	unsigned char	verbuf[2];
 
 	if( baudrate >= _srmpc_baud_max ){
 		errno = EINVAL;
@@ -238,7 +234,7 @@ static int _srmpc_init(
 			return -1;
 		}
 
-		_srmpc_msg_decode( ver, 2, &buf[2], 4 );
+		_srmpc_msg_decode( verbuf, 2, &buf[2], 4 );
 
 	} else {
 		if( ret < 3 ){
@@ -250,10 +246,10 @@ static int _srmpc_init(
 		conn->stxetx = 0;
 		DPRINTF( "_srmpc_init: disabling stx/etx" );
 
-		memcpy( ver, &buf[1], 2 );
+		memcpy( verbuf, &buf[1], 2 );
 	}
 
-	return ( (unsigned char)ver[0] << 8 ) | (unsigned char)ver[1];
+	return ( verbuf[0] << 8 ) | verbuf[1];
 }
 
 
@@ -270,7 +266,8 @@ static int _srmpc_init_all( srmpc_conn_t conn )
 			ret = _srmpc_init( conn, baudrate, parity );
 			if( ret >= 0 ){
 				_srm_log( conn, "found PCV version 0x%x at %d/8%c1", 
-					ret, _srmpc_baudnames[baudrate], 
+					(unsigned)ret, 
+					_srmpc_baudnames[baudrate], 
 					parity ? 'e' : 'n' );
 
 				return ret;
@@ -423,21 +420,23 @@ void srmpc_close( srmpc_conn_t conn )
  * on error errno is set and returns -1
  */
 static int _srmpc_msg_encode( 
-	char *out, size_t olen,
-	const char *in, size_t ilen ) 
+	unsigned char *out, size_t olen,
+	const unsigned char *in, size_t ilen ) 
 {
 	size_t i;
 	size_t o=0;
 
 	if( olen < 2 * ilen ){
-		DPRINTF( "_srmpc_msg_encode: dst buffer too small %d/%d", ilen, olen);
+		DPRINTF( "_srmpc_msg_encode: dst buffer too small %lu/%lu", 
+			(unsigned long)ilen, 
+			(unsigned long)olen);
 		errno = ERANGE;
 		return -1;
 	}
 
 	for( i=0; i < ilen; ++i ){
-		out[o++] = (((unsigned char)(in[i]) & 0xf0 ) >> 4) | 0x30;
-		out[o++] = ((unsigned char)(in[i]) & 0x0f ) | 0x30;
+		out[o++] = ((in[i] & 0xf0 ) >> 4) | 0x30;
+		out[o++] = (in[i] & 0x0f ) | 0x30;
 	}
 
 	DUMPHEX( "_srmpc_msg_encode", out, o );
@@ -452,26 +451,29 @@ static int _srmpc_msg_encode(
  * on error errno is set and returns -1
  */
 static int _srmpc_msg_decode( 
-	char *out, size_t olen,
-	const char *in, size_t ilen ) 
+	unsigned char *out, size_t olen,
+	const unsigned char *in, size_t ilen ) 
 {
 	int o=0;
 
 	if( ilen % 2 ){
-		DPRINTF( "_srmpc_msg_decode: uneven input size: %d", ilen );
+		DPRINTF( "_srmpc_msg_decode: uneven input size: %lu",
+			(unsigned long)ilen );
 		errno = EINVAL;
 		return -1;
 	}
 
 	if( olen * 2 < ilen ){
-		DPRINTF( "_srmpc_msg_decode: dst buffer too small %d/%d", ilen, olen);
+		DPRINTF( "_srmpc_msg_decode: dst buffer too small %lu/%lu",
+			(unsigned long)ilen,
+			(unsigned long)olen);
 		errno = ERANGE;
 		return -1;
 	}
 
 	while( ilen > 1 ){
-		out[o] = (((unsigned char)(in[0]) - 0x30) << 4);
-		out[o] |= ((unsigned char)(in[1]) - 0x30);
+		out[o] = ((in[0] - 0x30) << 4)
+			| (in[1] - 0x30);
 		ilen -= 2;
 		in += 2;
 		++o;
@@ -490,9 +492,9 @@ static int _srmpc_msg_decode(
  * returns 0 on success
  * on error errno is set and returns -1
  */
-static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const char *arg, size_t alen )
+static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const unsigned char *arg, size_t alen )
 {
-	char buf[SRM_BUFSIZE];
+	unsigned char buf[SRM_BUFSIZE];
 	int len = 0;
 	int ret;
 
@@ -550,14 +552,16 @@ static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const char *arg, size_t
  * returns 0 on success
  * on error errno is set and returns -1
  */
-static int _srmpc_msg_recv( srmpc_conn_t conn, char *rbuf, size_t rsize, size_t want )
+static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize, size_t want )
 {
-	char	buf[SRM_BUFSIZE];
+	unsigned char	buf[SRM_BUFSIZE];
 	size_t	rlen = 0;
 	int	ret;
 
 	if( rbuf && want > rsize ){
-		DPRINTF( "_srmpc_msg_recv rbuf too small want %d rsize %d", want, rsize);
+		DPRINTF( "_srmpc_msg_recv rbuf too small want %lu rsize %lu",
+			(unsigned long)want,
+			(unsigned long)rsize);
 		errno = ERANGE;
 		return -1;
 	}
@@ -569,10 +573,11 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, char *rbuf, size_t rsize, size_t 
  	/* cmd char */
 	++want;
 
-	DPRINTF( "_srmpc_msg_recv will read %d ", want );
+	DPRINTF( "_srmpc_msg_recv will read %lu ", (unsigned long)want );
 
 	if( want >= SRM_BUFSIZE ){
-		DPRINTF( "_srmpc_msg_recv tmp buf too small for rsize=%d", rsize );
+		DPRINTF( "_srmpc_msg_recv tmp buf too small for rsize=%lu",
+			(unsigned long)rsize );
 		errno = ERANGE;
 		return -1;
 	}
@@ -606,7 +611,7 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, char *rbuf, size_t rsize, size_t 
 		}
 
 	}
-	DPRINTF( "_srmpc_msg_recv got %u chars", rlen );
+	DPRINTF( "_srmpc_msg_recv got %lu chars", (unsigned long)rlen );
 	DUMPHEX( "_srmpc_msg_recv", buf, rlen );
 	
 	if( conn->stxetx ){
@@ -659,9 +664,9 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, char *rbuf, size_t rsize, size_t 
  * on error errno is set and returns -1
  */
 static int _srmpc_msg( srmpc_conn_t conn, char cmd, 
-	const char *arg,
+	const unsigned char *arg,
 	size_t alen, 
-	char *buf,
+	unsigned char *buf,
 	size_t blen,
 	size_t want )
 {
@@ -696,10 +701,10 @@ static int _srmpc_msg( srmpc_conn_t conn, char cmd,
  */
 char *srmpc_get_athlete( srmpc_conn_t conn )
 {
-	char buf[20];
+	unsigned char buf[20];
 	int ret;
 
-	ret = _srmpc_msg( conn, 'N', "\x0", 1, buf, 20, 8 );
+	ret = _srmpc_msg( conn, 'N', (unsigned char*)"\x0", 1, buf, 20, 8 );
 	if( ret < 0 )
 		return NULL;
 	if( ret < 6 ){
@@ -708,8 +713,8 @@ char *srmpc_get_athlete( srmpc_conn_t conn )
 	}
 
 	buf[6] = 0;
-	DPRINTF( "srmpc_get_athlete got=%s", buf );
-	return strdup( buf );
+	DPRINTF( "srmpc_get_athlete got=%s", (char*)buf );
+	return strdup( (char*)buf );
 }
 
 /*
@@ -722,10 +727,10 @@ char *srmpc_get_athlete( srmpc_conn_t conn )
  */
 int srmpc_get_time( srmpc_conn_t conn, struct tm *timep )
 {
-	char buf[20];
+	unsigned char buf[20];
 	int ret;
 
-	ret = _srmpc_msg( conn, 'M', "\x0", 1, buf, 20, 6 );
+	ret = _srmpc_msg( conn, 'M', (unsigned char*)"\x0", 1, buf, 20, 6 );
 	if( ret < 0 )
 		return -1;
 	if( ret < 6 ){
@@ -733,12 +738,12 @@ int srmpc_get_time( srmpc_conn_t conn, struct tm *timep )
 		return -1;
 	}
 
-	timep->tm_mday = TIMEDEC( (unsigned char)(buf[0]) );
-	timep->tm_mon = TIMEDEC( (unsigned char)(buf[1]) ) -1;
-	timep->tm_year = TIMEDEC( (unsigned char)(buf[2]) ) + 100;
-	timep->tm_hour = TIMEDEC( (unsigned char)(buf[3]) );
-	timep->tm_min = TIMEDEC( (unsigned char)(buf[4]) );
-	timep->tm_sec = TIMEDEC( (unsigned char)(buf[5]) );
+	timep->tm_mday = TIMEDEC( buf[0] );
+	timep->tm_mon = TIMEDEC( buf[1] ) -1;
+	timep->tm_year = TIMEDEC( buf[2] ) + 100;
+	timep->tm_hour = TIMEDEC( buf[3] );
+	timep->tm_min = TIMEDEC( buf[4] );
+	timep->tm_sec = TIMEDEC( buf[5] );
 	timep->tm_isdst = -1;
 
 	DPRINTF( "srmpc_get_time time=%s", asctime( timep ) );
@@ -748,7 +753,7 @@ int srmpc_get_time( srmpc_conn_t conn, struct tm *timep )
 
 int srmpc_set_time( srmpc_conn_t conn, struct tm *timep )
 {
-	char buf[6];
+	unsigned char buf[6];
 
 	buf[0] = TIMEENC( timep->tm_mday );
 	buf[1] = TIMEENC( timep->tm_mon +1 );
@@ -775,11 +780,11 @@ int srmpc_set_time( srmpc_conn_t conn, struct tm *timep )
  */
 int srmpc_get_circum( srmpc_conn_t conn )
 {
-	char buf[20];
+	unsigned char buf[20];
 	int ret;
 	int circum;
 
-	ret = _srmpc_msg( conn, 'G', "\x0\x0", 2, buf, 20, 2 );
+	ret = _srmpc_msg( conn, 'G', (unsigned char*)"\x0\x0", 2, buf, 20, 2 );
 	if( ret < 0 )
 		return -1;
 	if( ret < 2 ){
@@ -787,8 +792,8 @@ int srmpc_get_circum( srmpc_conn_t conn )
 		return -1;
 	}
 
-	circum = ( (unsigned char)(buf[0])<<8) 
-		| ( (unsigned char)(buf[1]) );
+	circum = ( buf[0] << 8 ) 
+		| ( buf[1] );
 	DPRINTF( "srmpc_get_circum circum=%d", circum );
 	return circum;
 }
@@ -803,11 +808,11 @@ int srmpc_get_circum( srmpc_conn_t conn )
  */
 double srmpc_get_slope( srmpc_conn_t conn )
 {
-	char buf[20];
+	unsigned char buf[20];
 	int ret;
 	double slope;
 
-	ret = _srmpc_msg( conn, 'E', "\x0\x0", 2, buf, 20, 2 );
+	ret = _srmpc_msg( conn, 'E', (unsigned char*)"\x0\x0", 2, buf, 20, 2 );
 	if( ret < 0 )
 		return -1;
 	if( ret < 2 ){
@@ -815,8 +820,7 @@ double srmpc_get_slope( srmpc_conn_t conn )
 		return -1;
 	}
 
-	slope = (double)(( (unsigned char)(buf[0])<<8) 
-		| ( (unsigned char)(buf[1]) ) ) / 10;
+	slope = (double)(( buf[0] <<8 ) | buf[1]  ) / 10;
 	DPRINTF( "srmpc_get_slope slope=%.1f", slope );
 	return slope;
 }
@@ -832,11 +836,11 @@ double srmpc_get_slope( srmpc_conn_t conn )
  */
 int srmpc_get_zeropos( srmpc_conn_t conn )
 {
-	char buf[20];
+	unsigned char buf[20];
 	int ret;
 	int zeropos;
 
-	ret = _srmpc_msg( conn, 'F', "\x0\x0", 2, buf, 20, 2 );
+	ret = _srmpc_msg( conn, 'F', (unsigned char*)"\x0\x0", 2, buf, 20, 2 );
 	if( ret < 0 )
 		return -1;
 	if( ret < 2 ){
@@ -844,8 +848,7 @@ int srmpc_get_zeropos( srmpc_conn_t conn )
 		return -1;
 	}
 
-	zeropos = ( (unsigned char)(buf[0])<<8) 
-		| ( (unsigned char)(buf[1]) );
+	zeropos = ( buf[0] << 8) | buf[1];
 	DPRINTF( "srmpc_get_zeropos zeropos=%d", zeropos );
 	return zeropos;
 }
@@ -866,11 +869,11 @@ int srmpc_get_zeropos( srmpc_conn_t conn )
  */
 int srmpc_get_recint( srmpc_conn_t conn )
 {
-	char buf[10];
+	unsigned char buf[10];
 	int ret;
 	int recint;
 
-	ret = _srmpc_msg( conn, 'R', "\x0", 1, buf, 10, 1 );
+	ret = _srmpc_msg( conn, 'R', (unsigned char*)"\x0", 1, buf, 10, 1 );
 	if( ret < 0 )
 		return -1;
 	if( ret < 1 ){
@@ -879,7 +882,7 @@ int srmpc_get_recint( srmpc_conn_t conn )
 	}
 	
 	recint = ( *buf & 0x80 ) 
-		? (unsigned char)(*buf) & 0x80 
+		? *buf & 0x80 
 		: *buf * 10;
 
 	DPRINTF( "srmpc_get_recint raw=0x%02x recint=%d", *buf, recint);
@@ -888,7 +891,7 @@ int srmpc_get_recint( srmpc_conn_t conn )
 
 int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
 {
-	char raw;
+	unsigned char raw;
 
 	if( recint <= 0 ){
 		errno = ENOTSUP;
@@ -1002,7 +1005,7 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
  * returns -1 on failure, 0 on success
  */
 static int _srmpc_parse_block( srmpc_get_chunk_t gh,
-	char *buf,
+	unsigned char *buf,
 	srmpc_chunk_callback_t	cbfunc )
 {
 	struct tm btm;
@@ -1014,11 +1017,11 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	/* parse timestamp */
 	btm.tm_year = gh->pctime.tm_year;
 	btm.tm_isdst = -1;
-	btm.tm_mday = TIMEDEC( (unsigned char)(buf[0]) & 0x3f );
-	btm.tm_mon = TIMEDEC( (unsigned char)(buf[1]) & 0x1f ) -1;
-	btm.tm_hour = TIMEDEC( (unsigned char)(buf[2] & 0x3f ) );
-	btm.tm_min = TIMEDEC( (unsigned char)(buf[3]) );
-	btm.tm_sec = TIMEDEC( (unsigned char)(buf[4]) );
+	btm.tm_mday = TIMEDEC( buf[0] & 0x3f );
+	btm.tm_mon = TIMEDEC( buf[1] & 0x1f ) -1;
+	btm.tm_hour = TIMEDEC( buf[2] & 0x3f );
+	btm.tm_min = TIMEDEC( buf[3] );
+	btm.tm_sec = TIMEDEC( buf[4] );
 
 	if( btm.tm_mon < gh->pctime.tm_mon )
 		-- btm.tm_year;
@@ -1032,6 +1035,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	/* adjust block timestamp based on previous one */
 	/* TODO: postprocess data for fixup *after* download, move to
 	 * srmdata.c */
+	/* TODO: fixup overlapping block timestamps */
 	lnext = gh->bstart + 11 * gh->recint;
 	if( gh->fixup && gh->recint && lnext 
 		&& (lnext != bstart) ){
@@ -1042,7 +1046,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 
 		/* gap < 2sec */
 		} else if ( bstart > lnext && bstart - lnext <= 20 ){
-			size_t cspans = (bstart - lnext) / gh->recint;
+			unsigned cspans = (bstart - lnext) / gh->recint;
 			gh->bstart = lnext + gh->recint * cspans;
 
 		/* bigger difference */
@@ -1066,38 +1070,39 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	}
 
 
-	gh->dist = ( (unsigned char)(buf[5]) << 16 
-		| (unsigned char)(buf[6]) << 8
-		| (unsigned char)(buf[7]) ) / 3.9;
+	gh->dist = ( (buf[5] << 16 )
+		| ( buf[6] << 8 )
+		| buf[7] )
+		/ 3.9;
 
  	gh->temp = buf[8];
-	gh->recint = ( ((unsigned char)(buf[1]) & 0xe0) >> 5)
-		| ( ((unsigned char)(buf[0]) & 0x40) >> 3);
+	gh->recint = ( (buf[1] & 0xe0) >> 5)
+		| ( (buf[0] & 0x40) >> 3);
 	if( ! (buf[2] & 0x40) )
 		gh->recint *= 10;
 
-	DPRINTF( "_srmpc_parse_block mon=%d day=%d hour=%d min=%d sec=%d "
-		"dist=%d temp=%d recint=%.1f na0=%x na2=%x", 
-		btm.tm_mon,
-		btm.tm_mday,
-		btm.tm_hour,
-		btm.tm_min,
-		btm.tm_sec,
+	DPRINTF( "_srmpc_parse_block mon=%u day=%u hour=%u min=%u sec=%u "
+		"dist=%u temp=%d recint=%.1f na0=%x na2=%x", 
+		(unsigned)btm.tm_mon,
+		(unsigned)btm.tm_mday,
+		(unsigned)btm.tm_hour,
+		(unsigned)btm.tm_min,
+		(unsigned)btm.tm_sec,
 		gh->dist,
 		gh->temp,
 		(double)gh->recint/10,
-		(int)( ( (unsigned char)(buf[0]) & 0x80) >> 7 ),
-		(int)( ( (unsigned char)(buf[2]) & 0x80) >> 7 ) );
+		(int)( ( buf[0] & 0x80) >> 7 ),
+		(int)( ( buf[2] & 0x80) >> 7 ) );
 
-	for( gh->chunknum=0; gh->chunknum < 11; ++gh->chunknum ){
-		char *cbuf = &buf[9 + 5*gh->chunknum];
-		gh->isfirst = ((unsigned char)(cbuf[0]) & 0x40);
-		gh->iscont = ((unsigned char)(cbuf[0]) & 0x80);
+	for( gh->chunknum=0; gh->chunknum < 11u; ++gh->chunknum ){
+		unsigned char *cbuf = &buf[9 + 5*gh->chunknum];
+		gh->isfirst = cbuf[0] & 0x40;
+		gh->iscont = cbuf[0] & 0x80;
 
 		DUMPHEX( "_srmpc_parse_block chunk", cbuf, 5 );
 
 		if( 0 == memcmp( cbuf, "\0\0\0\0\0", 5 )){
-			DPRINTF( "_srmpc_parse_block: skipping empty chunk#%d", 
+			DPRINTF( "_srmpc_parse_block: skipping empty chunk#%u", 
 				gh->chunknum );
 			continue;
 		}
@@ -1105,13 +1110,12 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 		gh->chunk.time = gh->bstart 
 			+ gh->chunknum * gh->recint;
 		gh->chunk.temp = gh->temp;
-		gh->chunk.pwr = ( ( (unsigned char)(cbuf[0]) & 0x0f) << 8 ) 
-			| (unsigned char)(cbuf[1]);
+		gh->chunk.pwr = ( ( cbuf[0] & 0x0f) << 8 ) | cbuf[1];
 		gh->chunk.speed =  (double)0.2 * ( 
-			( ( (unsigned char)(cbuf[0]) & 0x30) << 4) 
-			| (unsigned char)(cbuf[2]) );
-		gh->chunk.cad = (unsigned char)(cbuf[3]);
-		gh->chunk.hr = (unsigned char)(cbuf[4]);
+			( ( cbuf[0] & 0x30) << 4) 
+			| cbuf[2] );
+		gh->chunk.cad = cbuf[3];
+		gh->chunk.hr = cbuf[4];
 		gh->chunk.ele = 0;
 
 
@@ -1140,7 +1144,7 @@ int srmpc_get_chunks(
 	void *cbdata )
 {
 	struct _srmpc_get_chunk_t gh;
-	char buf[SRM_BUFSIZE];
+	unsigned char buf[SRM_BUFSIZE];
 	int ret;
 	int retries = 0;
 	char cmd;
@@ -1181,7 +1185,7 @@ int srmpc_get_chunks(
 			return -1;
 		}
 
-		gh.blocks = ( (unsigned char)(buf[2]) << 8) |  (unsigned char)(buf[3]);
+		gh.blocks = ( buf[2] << 8) | buf[3];
 	
 	} else {
 		if( ret < 2 ){
@@ -1189,23 +1193,27 @@ int srmpc_get_chunks(
 			return -1;
 
 		} else if( ret > 2 ){
-			gh.blocks = ( (unsigned char)(buf[1]) << 8) 
-				|  (unsigned char)(buf[2]);
+			gh.blocks = ( buf[1] << 8 ) | buf[2];
 
 		} else {
-			gh.blocks = (unsigned char)(buf[1]);
+			gh.blocks = buf[1];
 
 		}
 
 	}
-	DPRINTF( "srmpc_get_chunks expecting %d blocks (max %d chunks)",
-		gh.blocks, 11*gh.blocks  );
+	DPRINTF( "srmpc_get_chunks expecting %u blocks", gh.blocks );
+	if( (unsigned long)gh.blocks * 11u > 0xffff ){
+		errno = EPROTO;
+		return -1;
+	}
 
 	/* read 64byte blocks, each with header + 11 chunks */
 	while( gh.blocknum < gh.blocks ){
-		char	resp = ACK;
+		unsigned char resp = ACK;
 
-		_srm_log( conn, "processing block %d/%d", gh.blocknum, gh.blocks);
+		_srm_log( conn, "processing block %u/%u",
+			gh.blocknum,
+			gh.blocks);
 
 		ret = _srmpc_read( conn, buf, 64 );
 		DPRINTF( "srmpc_get_chunks: got %d chars", ret );
@@ -1250,7 +1258,7 @@ int srmpc_get_chunks(
 	if( gh.blocknum == gh.blocks && conn->stxetx ){
 		if( 1 == _srmpc_read( conn, buf, 1 ) )
 			DPRINTF( "srmpc_get_chunks final ETX: %02x",
-				(unsigned char)*buf );
+				*buf );
 	}
 
 	sleep(1); /* need to wait or next cmd fails */
@@ -1296,9 +1304,9 @@ static int _srmpc_chunk_data_gapfill( srmpc_get_chunk_t gh )
 	srm_chunk_t nck = &gh->chunk;
 	srm_chunk_t lck;
 	srm_time_t delta;
-	size_t fillnum, num;
+	unsigned fillnum, num;
 
-	if( ! gdat->data->cused )
+	if( gdat->data->cused < 1 )
 		return 0;
 
 	lck = gdat->data->chunks[gdat->data->cused-1];
@@ -1313,8 +1321,9 @@ static int _srmpc_chunk_data_gapfill( srmpc_get_chunk_t gh )
 		return 0; /* too large */
 
 	fillnum = delta / gdat->data->recint;
-	_srm_log( gh->conn, "inserting %d chunks to fill micro-gap at chunk#%d",
-		fillnum, gdat->data->cused );
+	_srm_log( gh->conn, "inserting %u chunks to fill micro-gap at chunk#%u",
+		fillnum,
+		gdat->data->cused );
 
 	for( num = 1; num <= fillnum; ++num ){
 		srm_chunk_t fill;

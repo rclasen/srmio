@@ -10,25 +10,61 @@ AC_CONFIG_HEADER([config.h])
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_LIBTOOL
+AC_PROG_CPP
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_RANLIB
 
 # Checks for libraries.
 # FIXME: Replace `main' with a function in `-lsrmio':
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h stdlib.h string.h termios.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h getopt.h inttypes.h memory.h stddef.h stdint.h stdlib.h string.h sys/time.h termios.h unistd.h])
+
+
+AC_SYS_POSIX_TERMIOS
+
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_TYPE_SIZE_T
 AC_STRUCT_TM
+AC_TYPE_UINT64_T
+
 
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_MEMCMP
 AC_FUNC_MKTIME
 AC_FUNC_REALLOC
-AC_CHECK_FUNCS([localtime_r memset strdup ])
+AC_CHECK_FUNCS([memset strdup strerror getopt_long ])
+
+for func in memset strdup strerror getopt_long; do
+	eval have_func=\$ac_cv_func_$func
+	if test "x$have_func" != xyes; then
+		AC_MSG_ERROR([missing working $func])
+	fi
+done
+
+# TODO: getopt_long alternatives (FreeBSD)
+# TODO: provide alternative implementations, use gnulib?
+
+AC_CHECK_FUNC([cfmakeraw],
+	[AC_DEFINE([HAVE_CFMAKERAW],[1], [Define if cfmakeraw exists.])],)
+
 
 AC_CONFIG_FILES([Makefile])
+
+AC_CONFIG_COMMANDS([srmio_config.h],[
+. genconfheader.sh > srmio_config.h
+],[
+HEADER_STDINT_H=$ac_cv_header_stdint_h
+HEADER_INTTYPES_H=$ac_cv_header_inttypes_h
+HEADER_TIME_WITH_SYS_TIME=$ac_cv_header_time
+HEADER_SYS_TIME_H=$ac_cv_header_sys_time_h
+HEADER_TERMIOS_H=$ac_cv_header_termios_h
+])
+
 AC_OUTPUT

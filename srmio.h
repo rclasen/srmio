@@ -10,23 +10,12 @@
 #ifndef _SRMIO_H
 #define _SRMIO_H
 
-#define _GNU_SOURCE
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <termios.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <string.h>
-#include <errno.h>
-#include <time.h>
-#include <getopt.h>
-#include <stdint.h>
-#ifdef DEBUG
-#include <ctype.h>
-#endif
+#include "srmio_config.h"
 
+# ifdef __cplusplus
+extern "C"
+{
+# endif
 
 /************************************************************
  *
@@ -39,10 +28,10 @@ typedef uint64_t srm_time_t;	/* seconds since epoch * 10 */
 struct _srm_chunk_t {
 	srm_time_t	time;	/* chunk end time */
 	double		temp;	/* temperature °C */
-	unsigned int	pwr;	/* avg power W */
+	unsigned	pwr;	/* avg power W */
 	double		speed;	/* avg speed km/h */
-	unsigned int	cad;	/* avg cadence 1/min */
-	unsigned int	hr;	/* avg hr 1/min */
+	unsigned	cad;	/* avg cadence 1/min */
+	unsigned	hr;	/* avg hr 1/min */
 	int		ele;	/* elevation in meter */
 };
 typedef struct _srm_chunk_t *srm_chunk_t;
@@ -54,9 +43,9 @@ void srm_chunk_free( srm_chunk_t chunk );
 
 
 struct _srm_marker_t {
-	size_t	first;
-	size_t	last;
-	char	*notes;
+	unsigned	first;
+	unsigned	last;
+	char		*notes;
 };
 typedef struct _srm_marker_t *srm_marker_t;
 
@@ -73,12 +62,12 @@ struct _srm_data_t {
 	char		*notes;
 
 	srm_chunk_t	 *chunks;
-	size_t		cused;
-	size_t		cavail;
+	unsigned	cused;
+	unsigned	cavail;
 
 	srm_marker_t	 *marker;
-	size_t		mused;
-	size_t		mavail;
+	unsigned	mused;
+	unsigned	mavail;
 };
 typedef struct _srm_data_t *srm_data_t;
 
@@ -88,7 +77,7 @@ srm_data_t srm_data_new( void );
 int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk );
 int srm_data_add_chunk( srm_data_t data, srm_chunk_t chunk );
 int srm_data_add_markerp( srm_data_t data, srm_marker_t mark );
-int srm_data_add_marker( srm_data_t data, size_t first, size_t last );
+int srm_data_add_marker( srm_data_t data, unsigned first, unsigned last );
 srm_marker_t *srm_data_blocks( srm_data_t data );
 
 /* free the list: */
@@ -151,17 +140,17 @@ struct _srmpc_get_chunk_t {
 	srmpc_conn_t		conn;
 	int			fixup;
 	struct tm		pctime;
-	size_t			blocks;
+	unsigned		blocks;
 
 	/* current block */
-	size_t			blocknum;
+	unsigned		blocknum;
 	srm_time_t		bstart;
-	unsigned int		dist;
+	unsigned		dist;
 	int			temp;	
 	srm_time_t		recint;
 
 	/* current chunk */
-	size_t			chunknum;	/* within block */
+	unsigned		chunknum;	/* within block */
 	int			isfirst;	/* ... of marker */
 	int			iscont;		/* ... of marker */
 	struct _srm_chunk_t	chunk; /* TODO: hack? should use srm_chunk_new()? */
@@ -178,6 +167,10 @@ int srmpc_clear_chunks( srmpc_conn_t conn );
 
 srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup );
 
+
+# ifdef __cplusplus
+}
+# endif
 
 
 #endif /* _SRMIO_H */

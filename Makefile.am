@@ -4,13 +4,26 @@ AUTOMAKE_OPTIONS=foreign
 
 man1_MANS=srmcmd.man
 EXTRA_DIST=$(MANS) \
-	debug.h
+	Changes \
+	debian/docs \
+	debian/compat \
+	debian/copyright \
+	debian/rules \
+	debian/changelog \
+	debian/dirs \
+	debian/control \
+	LICENSE \
+	README
 
 include_HEADERS= \
-	srmio.h
+	srmio.h \
+	srmio_config.h
 
 lib_LTLIBRARIES=libsrmio.la
 libsrmio_la_SOURCES= \
+	out.h \
+	common.h \
+	\
 	srmdata.c \
 	srmfile.c \
 	srmpc.c
@@ -18,5 +31,7 @@ libsrmio_la_SOURCES= \
 bin_PROGRAMS=srmcmd
 
 srmcmd_LDFLAGS= -lsrmio
-srmcmd_SOURCES= srmcmd.c
+srmcmd_SOURCES= \
+	srmcmd.c
 
+out.h: genconfheader.sh

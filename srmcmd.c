@@ -22,11 +22,37 @@
  ************************************************************/
 
 #include "srmio.h"
-#include "debug.h"
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
+
+#include <errno.h>
+#include <stdio.h>
+
+#ifdef HAVE_GETOPT_H
+#include <getopt.h>
 #endif
+
+#ifdef STDC_HEADERS
+# include <stdlib.h>
+# include <stddef.h>
+#else
+# ifdef HAVE_STDLIB_H
+#  include <stdlib.h>
+# endif
+#endif
+
+#ifdef HAVE_STRING_H
+# if !defined STDC_HEADERS && defined HAVE_MEMORY_H
+#  include <memory.h>
+# endif
+# include <string.h>
+#endif
+
+#ifdef HAVE_STRINGS_H
+# include <strings.h>
+#endif
+
+
 
 static void csvdump( srm_data_t data )
 {
@@ -46,10 +72,10 @@ static void csvdump( srm_data_t data )
 			"%.1f\t"	/* "time\t" */
 			"%.1f\t"	/* "dur\t" */
 			"%.1f\t"	/* "temp\t" */
-			"%d\t"		/* "pwr\t" */
+			"%u\t"		/* "pwr\t" */
 			"%.2f\t"	/* "speed\t" */
-			"%d\t"		/* "cad\t" */
-			"%d\t"		/* "hr\t" */
+			"%u\t"		/* "cad\t" */
+			"%u\t"		/* "hr\t" */
 			"\n",
 			(double)(*ck)->time / 10,
 			(double)data->recint / 10,
@@ -258,11 +284,11 @@ int main( int argc, char **argv )
 
 	if( opt_time ){
 		time_t now;
-		struct tm nows;
+		struct tm *nows;
 
 		time( &now );
-		localtime_r( &now, &nows );
-		if( 0 > srmpc_set_time( srm, &nows ) ){
+		nows = localtime( &now );
+		if( 0 > srmpc_set_time( srm, nows ) ){
 			perror( "srmpc_set_time failed" );
 			return 1;
 		}
