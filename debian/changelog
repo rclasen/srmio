@@ -2,8 +2,11 @@ srmio (0.0.3) unstable; urgency=low
 
   * fixed getopt chars
   * srmpc: data fixup also corrects blocks with <1sec overlap
+  * srmpc: fixed calculation of averaged data
   * fix termios baudrate setting
-  * portability: printf formats, replace strndup, use cfset?speed
+  * portability: type cleanups, printf formats
+  * portability: replace strndup, use cfset?speed
+  * start to use configure results
 
  -- Rainer Clasen <bj@zuto.de>  Mon, 03 Aug 2009 22:37:08 +0200
 
