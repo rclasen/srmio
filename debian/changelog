@@ -1,3 +1,9 @@
+srmio (0.0.3.2009081001) unstable; urgency=low
+
+  * fix srm_data_write: pick lowest timestamp (not necessarily the first) 
+
+ -- Rainer Clasen <bj@zuto.de>  Mon, 10 Aug 2009 16:18:39 +0200
+
 srmio (0.0.3) unstable; urgency=low
 
   * fixed getopt chars

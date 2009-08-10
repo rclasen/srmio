@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([srmio], [0.0.3], [bj@zuto.de])
+AC_INIT([srmio], [0.0.3.2009081001], [bj@zuto.de])
 AM_INIT_AUTOMAKE([-Wall -Werror])
 AC_CONFIG_SRCDIR([srmio.h])
 AC_CONFIG_HEADER([config.h])

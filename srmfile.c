@@ -59,7 +59,6 @@ static srm_time_t _srm_mktime( unsigned days )
 	t.tm_year = 70;
 	t.tm_isdst = -1;
 
-	DPRINTF( "_srm_mktime %u", days );
 	if( days < SRM2EPOCH ){
 		/* TODO: SRM2EPOCH is a hack that might cause problems
 		 * with misadjusted SRM clocks or other time glitches */
@@ -72,6 +71,7 @@ static srm_time_t _srm_mktime( unsigned days )
 	if( ret == (time_t) -1 )
 		return (srm_time_t)-1;
 
+	DPRINTF( "_srm_mktime %u days -> %lu", days, (unsigned long)ret );
 	return (srm_time_t)ret * 10;
 }
 
@@ -343,7 +343,10 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 	if( NULL == (blocks = srm_data_blocks( data )))
 		return -1;
 
+	/* header */
 	{
+		srm_chunk_t *ck;
+		srm_time_t mintime = -1;
 		unsigned bcnt;
 		unsigned mcnt = data->mused -1;
 		unsigned days;
@@ -355,16 +358,33 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			goto clean1;
 		}
 
+		/* time-jumps in PCV lead to nonlinear timestamps, find
+		 * lowest one: */
+		for( ck = data->chunks; *ck; ++ck ){
+			if( mintime > (*ck)->time )
+				mintime = (*ck)->time;
+		}
+
 		days = data->chunks[0]->time / ( 10 * 24 * 3600 ) + SRM2EPOCH;
-		timerefday = _srm_mktime( days  );
-		DPRINTF( "srm_data_write mcnt=%u bcnt=%u days=%u "
-			"timerefday=%.1f '%s'",
+		if( (srm_time_t)-1 == (timerefday = _srm_mktime( days  )))
+			goto clean1;
+
+		DPRINTF( "srm_data_write mcnt=%u bcnt=%u "
+			"mintime=%.1f "
+			"days=%u timerefday=%.1f "
+			"'%s'",
 			mcnt,
 			bcnt,
+			(double)mintime/10,
 			days,
 			(double)timerefday/10,
 			data->notes );
 
+		if( timerefday > mintime ){ /* TODO: assert */
+			DPRINTF("srm_data_write: failed to determin time reference" );
+			errno = EOVERFLOW;
+			goto clean1;
+		}
 
 		if( 0 >= (fd = open( fname, O_WRONLY | O_CREAT | O_TRUNC, 
 			S_IRUSR | S_IWUSR |
