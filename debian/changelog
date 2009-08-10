@@ -1,6 +1,7 @@
 srmio (0.0.3.2009081001) unstable; urgency=low
 
   * fix srm_data_write: pick lowest timestamp (not necessarily the first) 
+  * fix srm_data_write: properly determin days since 1880
 
  -- Rainer Clasen <bj@zuto.de>  Mon, 10 Aug 2009 16:18:39 +0200
 

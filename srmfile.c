@@ -46,7 +46,10 @@ static int _xread( int fd, unsigned char *buf, size_t len )
 	buf[pos+2] = (unsigned char)(((x) >> 16) & 0xff); \
 	buf[pos+3] = (unsigned char)(((x) >> 24) & 0xff)
 
-#define SRM2EPOCH 32872
+/* days since 0000-01-01 */
+#define DAYS_SRM 686656u
+#define DAYS_EPOCH 719528u
+#define SRM2EPOCH (DAYS_EPOCH - DAYS_SRM)
 
 /* convert "days since 1880-01-01" to srm_time_t */
 static srm_time_t _srm_mktime( unsigned days )
@@ -75,6 +78,67 @@ static srm_time_t _srm_mktime( unsigned days )
 	return (srm_time_t)ret * 10;
 }
 
+const unsigned cumul_days[12] = {
+	0,	/* begin of jan */
+	31,
+	59,
+	90,
+	120,
+	151,
+	181,
+	212,
+	243,
+	273,
+	304,
+	334	/* begin of dec */
+};
+
+/* convert time_t into "days since 1880-01-01" */
+static unsigned _srm_mkdays( srm_time_t input )
+{
+	time_t tstamp;
+	struct tm tm;
+	unsigned year;
+	unsigned days;
+
+
+	tstamp = input / 10;
+/* TODO:  HAVE_LOCALTIME_R */
+	if( NULL == localtime_r( &tstamp, &tm ) )
+		return -1;
+
+	year = tm.tm_year + 1900;
+
+	days = 365 * year 
+		+ (year - 1)/4 
+		- (year - 1)/100 
+		+ (year - 1)/400
+
+		+ cumul_days[tm.tm_mon]
+		+ tm.tm_mday;
+
+	if( tm.tm_mon >=2 ){
+		if( year % 4 == 0 )
+			++days;
+
+		if( year % 100 == 0 )
+			--days;
+
+		if( year % 400 == 0 )
+			++days;
+	}
+
+	if( days < DAYS_SRM ){
+		errno = ERANGE;
+		return -1;
+	}
+	days -= DAYS_SRM;
+
+	DPRINTF( "_srm_mkdays %.1f -> %u", 
+		(double)input/10,
+		days );
+	return days;
+}
 
 typedef srm_chunk_t (*srm_data_read_cfunc)( const unsigned char *buf );
 
@@ -365,7 +429,8 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 				mintime = (*ck)->time;
 		}
 
-		days = data->chunks[0]->time / ( 10 * 24 * 3600 ) + SRM2EPOCH;
+		if( (unsigned)-1 == ( days = _srm_mkdays( mintime )))
+			goto clean1;
 		if( (srm_time_t)-1 == (timerefday = _srm_mktime( days  )))
 			goto clean1;
 
@@ -380,7 +445,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			(double)timerefday/10,
 			data->notes );
 
-		if( timerefday > mintime ){ /* TODO: assert */
+		if( timerefday > mintime ){
 			DPRINTF("srm_data_write: failed to determin time reference" );
 			errno = EOVERFLOW;
 			goto clean1;
