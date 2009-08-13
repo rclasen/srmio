@@ -103,9 +103,16 @@ static unsigned _srm_mkdays( srm_time_t input )
 
 
 	tstamp = input / 10;
-/* TODO:  HAVE_LOCALTIME_R */
+#ifdef HAVE_LOCALTIME_R
 	if( NULL == localtime_r( &tstamp, &tm ) )
 		return -1;
+#else
+	{ struct tm *tmp;
+	if( NULL == ( tmp = localtime( &tstamp )))
+		return -1;
+	memcpy( &tm, tmp, sizeof(struct tm));
+	}
+#endif
 
 	year = tm.tm_year + 1900;
 

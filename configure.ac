@@ -39,6 +39,7 @@ AC_FUNC_MALLOC
 AC_FUNC_MEMCMP
 AC_FUNC_MKTIME
 AC_FUNC_REALLOC
+AC_CHECK_FUNCS([localtime_r ])
 AC_CHECK_FUNCS([memset strdup strerror getopt_long ])
 
 for func in memset strdup strerror getopt_long; do

@@ -2,8 +2,9 @@ srmio (0.0.3.2009081001) unstable; urgency=low
 
   * fix srm_data_write: pick lowest timestamp (not necessarily the first) 
   * fix srm_data_write: properly determin days since 1880
+  * made autoconf probe for localtime_r
 
- -- Rainer Clasen <bj@zuto.de>  Mon, 10 Aug 2009 16:18:39 +0200
+ -- Rainer Clasen <bj@zuto.de>  Thu, 13 Aug 2009 15:45:39 +0200
 
 srmio (0.0.3) unstable; urgency=low
 
