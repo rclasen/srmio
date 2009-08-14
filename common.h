@@ -66,6 +66,9 @@
 # endif
 #endif
 
+#ifdef HAVE_LIMITS_H
+#include <limits.h>
+#endif
 
 #ifdef DEBUG
 

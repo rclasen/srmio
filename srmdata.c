@@ -132,6 +132,11 @@ int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
 	if( data->cused >= data->cavail ){
 		srm_chunk_t *tmp;
 
+		if( data->cavail > UINT_MAX - 1001 ){
+			errno = EOVERFLOW;
+			return -1;
+		}
+
 		if( NULL == (tmp = realloc( data->chunks, 
 			(data->cavail + 1001) * sizeof(srm_chunk_t))))
 			return -1;
@@ -159,6 +164,11 @@ int srm_data_add_markerp( srm_data_t data, srm_marker_t mk )
 {
 	if( data->mused >= data->mavail ){
 		srm_marker_t *tmp;
+
+		if( data->mavail > UINT_MAX - 11 ){
+			errno = EOVERFLOW;
+			return -1;
+		}
 
 		if( NULL == (tmp = realloc( data->marker, 
 			(data->mavail + 11) * sizeof(srm_marker_t))))
@@ -231,6 +241,11 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 			if( used >= avail ){
 				srm_marker_t *tmp;
 				unsigned ns = avail + 10;
+
+				if( ns < avail ){
+					errno = EOVERFLOW;
+					goto clean2;
+				}
 
 				if( NULL == (tmp = realloc(blocks, (1+ ns) 
 					* (sizeof(srm_marker_t)) )))

@@ -37,14 +37,75 @@ static int _xread( int fd, unsigned char *buf, size_t len )
 	| (buf[pos+1] << 8) \
 	| buf[pos] )
 
-#define DINT16(buf, pos, x) \
-	buf[pos] = (unsigned char)((x) & 0xff); \
-	buf[pos+1] = (unsigned char)(((x) >> 8) & 0xff)
-#define DINT32(buf, pos, x) \
-	buf[pos] = (unsigned char)((x) & 0xff); \
-	buf[pos+1] = (unsigned char)(((x) >> 8) & 0xff); \
-	buf[pos+2] = (unsigned char)(((x) >> 16) & 0xff); \
-	buf[pos+3] = (unsigned char)(((x) >> 24) & 0xff)
+static inline int _setuint8( unsigned char *buf, size_t pos, uint16_t x )
+{
+	if( x > UINT8_MAX ){
+		errno = ERANGE;
+		return -1;
+	}
+
+	buf[pos] = x;
+
+	return 0;
+}
+
+static inline int _setuint16( unsigned char *buf, size_t pos, uint32_t x )
+{
+	if( x > UINT16_MAX ){
+		errno = ERANGE;
+		return -1;
+	}
+
+	buf[pos] = x & 0xff;
+	buf[pos+1] = (x >> 8) & 0xff;
+
+	return 0;
+}
+
+static inline int _setuint32( unsigned char *buf, size_t pos, uint64_t x )
+{
+	if( x > UINT32_MAX ){
+		errno = ERANGE;
+		return -1;
+	}
+
+	buf[pos] = x & 0xff;
+	buf[pos+1] = (x >> 8) & 0xff;
+	buf[pos+2] = (x >> 16) & 0xff;
+	buf[pos+3] = (x >> 24) & 0xff;
+
+	return 0;
+}
+
+
+static inline int _setint16( unsigned char *buf, size_t pos, int32_t x )
+{
+	if( x > INT16_MAX || x < INT16_MIN ){
+		errno = ERANGE;
+		return -1;
+	}
+
+	buf[pos] = x & 0xff;
+	buf[pos+1] = (x >> 8) & 0xff;
+
+	return 0;
+}
+
+static inline int _setint32( unsigned char *buf, size_t pos, int64_t x )
+{
+	if( x > INT32_MAX || x < INT32_MIN ){
+		errno = ERANGE;
+		return -1;
+	}
+
+	buf[pos] = x & 0xff;
+	buf[pos+1] = (x >> 8) & 0xff;
+	buf[pos+2] = (x >> 16) & 0xff;
+	buf[pos+3] = (x >> 24) & 0xff;
+
+	return 0;
+}
+
 
 /* days since 0000-01-01 */
 #define DAYS_SRM 686656u
@@ -193,7 +254,7 @@ srm_data_t srm_data_read( const char *fname )
 	srm_data_read_cfunc cfunc = NULL;
 	unsigned chunklen;
 	unsigned bcnt;
-	struct _srm_block_t **blocks;
+	struct _srm_block_t **blocks = NULL;
 	unsigned mcnt;
 	unsigned i;
 
@@ -339,6 +400,10 @@ srm_data_t srm_data_read( const char *fname )
 
 			ck->time = timerefday + blocks[i]->daydelta +
 				ci * tmp->recint;
+			if( ck->time < timerefday ){
+				errno = EOVERFLOW;
+				goto clean3;
+			}
 
 			if( 0 > srm_data_add_chunkp( tmp, ck ) )
 				goto clean3;
@@ -401,12 +466,12 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		return -1;
 	}
 
-	if( data->cused < 1 || data->cused > 0xffff ){
+	if( data->cused < 1 || data->cused > UINT16_MAX ){
 		errno = EINVAL;
 		return -1;
 	}
 
-	if( data->mused < 1 || data->mused > 0xffff ){
+	if( data->mused < 1 || data->mused > UINT16_MAX ){
 		errno = EINVAL;
 		return -1;
 	}
@@ -418,17 +483,12 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 	{
 		srm_chunk_t *ck;
 		srm_time_t mintime = -1;
-		unsigned bcnt;
+		unsigned long bcnt;
 		unsigned mcnt = data->mused -1;
 		unsigned days;
 
-		for( bcnt = 0; blocks[bcnt] ; ++bcnt );
+		for( bcnt = 0; blocks[bcnt] && bcnt <= ULONG_MAX; ++bcnt );
 	
-		if( bcnt > 0xffff ){
-			errno = EINVAL;
-			goto clean1;
-		}
-
 		/* time-jumps in PCV lead to nonlinear timestamps, find
 		 * lowest one: */
 		for( ck = data->chunks; *ck; ++ck ){
@@ -441,7 +501,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		if( (srm_time_t)-1 == (timerefday = _srm_mktime( days  )))
 			goto clean1;
 
-		DPRINTF( "srm_data_write mcnt=%u bcnt=%u "
+		DPRINTF( "srm_data_write mcnt=%u bcnt=%lu "
 			"mintime=%.1f "
 			"days=%u timerefday=%.1f "
 			"'%s'",
@@ -467,17 +527,22 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 	
 		/* header */
 		memcpy( buf, "SRM7", 4 );
-		DINT16( buf, 4, days );
-		DINT16( buf, 6, data->circum );
+		if( 0 > _setuint16( buf, 4, days ) )
+			goto clean1;
+		if( 0 > _setuint16( buf, 6, data->circum ) )
+			goto clean1;
 		if( data->recint < 10 ){
 			buf[8] = (unsigned char)(data->recint % 10 );
-			buf[9] = 10;
+			buf[9] = 10u;
 		} else {
-			buf[8] = (unsigned char)(data->recint / 10);
-			buf[9] = 1;
+			if( 0 > _setuint8( buf, 8, data->recint / 10 ) )
+				goto clean1;
+			buf[9] = 1u;
 		}
-		DINT16( buf, 10, bcnt );
-		DINT16( buf, 12, mcnt );
+		if( 0 > _setuint16( buf, 10, bcnt ) )
+			goto clean1;
+		if( 0 > _setuint16( buf, 12, mcnt ) )
+			goto clean1;
 		buf[14] = 0;
 		buf[15] = data->notes ? strlen( data->notes) : 0;
 		strncpy( (char*)&buf[16], data->notes ? data->notes : "", 70 );
@@ -495,8 +560,10 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 		strncpy( (char*)buf, mk->notes ? mk->notes : "", 255 );
 		buf[255] = 1; /* active */
-		DINT16(buf, 256, first );
-		DINT16(buf, 258, last );
+		if( 0 > _setuint16( buf, 256, first ) )
+			goto clean1;
+		if( 0 > _setuint16( buf, 258, last ) )
+			goto clean1;
 		memset( &buf[260], 0, 10 );
 
 		DPRINTF( "srm_data_write marker @%x %u %u %s",
@@ -513,15 +580,24 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 	for( i = 0; blocks[i]; ++i ){
 		srm_marker_t bk = blocks[i];
 		srm_chunk_t ck = data->chunks[bk->first];
-		unsigned blockdelta = (ck->time - timerefday) * 10;
+		unsigned blockdelta;
 		unsigned len = bk->last - bk->first +1;
+
+		blockdelta = ck->time - timerefday;
+		if( blockdelta * 10 < blockdelta ){
+			errno = EOVERFLOW;
+			goto clean2;
+		}
+		blockdelta *= 10;
 
 		DPRINTF( "srm_data_write block @%x %.1f %u",
 			(int)lseek( fd, 0, SEEK_CUR),
 			(double)ck->time/10,
 			blockdelta );
-		DINT32(buf, 0, blockdelta);
-		DINT16(buf, 4, len);
+		if( 0 > _setuint32( buf, 0, blockdelta) )
+			goto clean1;
+		if( 0 > _setuint16( buf, 4, len) )
+			goto clean1;
 		
 		if( 0 > _xwrite( fd, buf, 6 ))
 			goto clean2;
@@ -532,11 +608,14 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 	DPRINTF( "srm_data_write cal @%x", 
 		(int)lseek( fd, 0, SEEK_CUR) );
 	{
-		int slope = 0.5 + ( data->slope * 42781) / 140;
+		unsigned slope = 0.5 + ( data->slope * 42781) / 140;
 
-		DINT16( buf, 0, data->zeropos );
-		DINT16( buf, 2, slope );
-		DINT16( buf, 4, data->cused );
+		if( 0 > _setuint16( buf, 0, data->zeropos ) )
+			goto clean1;
+		if( 0 > _setuint16( buf, 2, slope ) )
+			goto clean1;
+		if( 0 > _setuint16( buf, 4, data->cused ) )
+			goto clean1;
 		buf[6] = 0;
 
 		if( 0 > _xwrite( fd, buf, 7 ))
@@ -562,12 +641,18 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			unsigned speed = ( ck->speed * 1000) / 3.6;
 			int temp = ck->temp * 10;
 
-			DINT16(buf, 0, ck->pwr );
-			buf[2] = (unsigned char)ck->cad;
-			buf[3] = (unsigned char)ck->hr;
-			DINT32( buf, 4, speed );
-			DINT32( buf, 8, ck->ele );
-			DINT16( buf, 12, temp );
+			if( 0 > _setuint16( buf, 0, ck->pwr ) )
+				goto clean1;
+			if( 0 > _setuint8( buf, 2, ck->cad ) )
+				goto clean1;
+			if( 0 > _setuint8( buf, 3, ck->hr ) )
+				goto clean1;
+			if( 0 > _setuint32( buf, 4, speed ) )
+				goto clean1;
+			if( 0 > _setint32( buf, 8, ck->ele ) )
+				goto clean1;
+			if( 0 > _setint16( buf, 12, temp ) )
+				goto clean1;
 
 			if( 0 > _xwrite( fd, buf, 14 ))
 				goto clean2;

@@ -26,7 +26,7 @@
  * broken settings within the SRM. Seems the SRM's input checking is
  * limited.
  */
-static const int _srmpc_whitelist[] = {
+static const unsigned _srmpc_whitelist[] = {
 	0x6b09,		/* fw 6b.09 - uses stxetx */
 	0x4309,		/* fw 43.09 - no stxetx, fw was upgraded 04/2009 */
 	0,
@@ -316,10 +316,10 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 	/* verify it's a known/supported PCV */
 	if( ! force ){
 		int known = 0;
-		const int *white;
+		const unsigned *white;
 
 		for( white = _srmpc_whitelist; *white; ++white ){
-			if( pcv == *white ){
+			if( (unsigned)pcv == *white ){
 				++known;
 				break;
 			}
@@ -426,6 +426,11 @@ static int _srmpc_msg_encode(
 	size_t i;
 	size_t o=0;
 
+	if( 2 * ilen < ilen ){
+		errno = EOVERFLOW;
+		return -1;
+	}
+
 	if( olen < 2 * ilen ){
 		DPRINTF( "_srmpc_msg_encode: dst buffer too small %lu/%lu", 
 			(unsigned long)ilen, 
@@ -455,6 +460,11 @@ static int _srmpc_msg_decode(
 	const unsigned char *in, size_t ilen ) 
 {
 	int o=0;
+
+	if( olen * 2 < olen ){
+		errno = EOVERFLOW;
+		return -1;
+	}
 
 	if( ilen % 2 ){
 		DPRINTF( "_srmpc_msg_decode: uneven input size: %lu",
@@ -495,13 +505,18 @@ static int _srmpc_msg_decode(
 static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const unsigned char *arg, size_t alen )
 {
 	unsigned char buf[SRM_BUFSIZE];
-	int len = 0;
+	unsigned len = 0;
 	int ret;
 
 	DPRINTF( "_srmpc_msg_send %c ...", cmd );
 	DUMPHEX( "_srmpc_msg_send", arg, alen );
 
-	/* sledgehammer aproach to prevent overflows: */
+	if( 2 * alen +3 < alen ){
+		errno = EOVERFLOW;
+		return -1;
+	}
+
+	/* sledgehammer aproach to prevent exceeding the buffer: */
 	if( 2 * alen +3 > SRM_BUFSIZE ){
 		errno = ERANGE;
 		return -1;
@@ -533,7 +548,7 @@ static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const unsigned char *ar
 	if( ret < 0 ){
 		return -1;
 
-	} else if( ret < len ){
+	} else if( (unsigned)ret < len ){
 		_srm_log( conn, "failed to get complete response from PC");
 		errno = EIO;
 		return -1;
@@ -566,12 +581,18 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize
 		return -1;
 	}
 
+	if( 2 * want + 3 < want ){
+		errno = EOVERFLOW;
+		return -1;
+	}
+
 	if( conn->stxetx )
 		/* stx, etc, encoding */
 		want = 2*want +2;
 
  	/* cmd char */
 	++want;
+
 
 	DPRINTF( "_srmpc_msg_recv will read %lu ", (unsigned long)want );
 
@@ -755,6 +776,7 @@ int srmpc_set_time( srmpc_conn_t conn, struct tm *timep )
 {
 	unsigned char buf[6];
 
+	/* TODO: check for overflows */
 	buf[0] = TIMEENC( timep->tm_mday );
 	buf[1] = TIMEENC( timep->tm_mon +1 );
 	buf[2] = TIMEENC( timep->tm_year -100 );
@@ -1037,6 +1059,11 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	 * srmdata.c */
 	/* TODO: fixup overlapping block timestamps */
 	lnext = gh->bstart + 11 * gh->recint;
+	if( gh->bstart > lnext ){
+		errno = EOVERFLOW;
+		return -1;
+	}
+
 	if( gh->fixup && gh->recint && lnext 
 		&& (lnext != bstart) ){
 
@@ -1048,6 +1075,10 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 		} else if ( bstart > lnext && bstart - lnext <= 20 ){
 			unsigned cspans = (bstart - lnext) / gh->recint;
 			gh->bstart = lnext + gh->recint * cspans;
+			if( gh->bstart < lnext ){
+				errno = EOVERFLOW;
+				return -1;
+			}
 
 		/* bigger difference */
 		} else {
@@ -1082,7 +1113,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 		gh->recint *= 10;
 
 	DPRINTF( "_srmpc_parse_block mon=%u day=%u hour=%u min=%u sec=%u "
-		"dist=%u temp=%d recint=%.1f na0=%x na2=%x", 
+		"dist=%lu temp=%d recint=%.1f na0=%x na2=%x", 
 		(unsigned)btm.tm_mon,
 		(unsigned)btm.tm_mday,
 		(unsigned)btm.tm_hour,
@@ -1109,6 +1140,10 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 
 		gh->chunk.time = gh->bstart 
 			+ gh->chunknum * gh->recint;
+		if( gh->chunk.time < gh->bstart ){
+			errno = EOVERFLOW;
+			return -1;
+		}
 		gh->chunk.temp = gh->temp;
 		gh->chunk.pwr = ( ( cbuf[0] & 0x0f) << 8 ) | cbuf[1];
 		gh->chunk.speed =  (double)0.2 * ( 
@@ -1202,7 +1237,7 @@ int srmpc_get_chunks(
 
 	}
 	DPRINTF( "srmpc_get_chunks expecting %u blocks", gh.blocks );
-	if( (unsigned long)gh.blocks * 11u > 0xffff ){
+	if( (unsigned long)gh.blocks * 11u > UINT16_MAX ){
 		errno = EPROTO;
 		return -1;
 	}
@@ -1402,6 +1437,7 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup )
 {
 	struct _srmpc_get_data_t gdat;
 	srm_marker_t mk;
+	int ret;
 
 	gdat.mfirst = -1;
 
@@ -1411,11 +1447,13 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup )
 	if( 0 > (gdat.data->slope = srmpc_get_slope( conn ) ))
 		goto clean1;
 
-	if( 0 > (gdat.data->zeropos = srmpc_get_zeropos( conn ) ))
+	if( 0 > ( ret = srmpc_get_zeropos( conn ) ))
 		goto clean1;
+	gdat.data->zeropos = ret;
 
-	if( 0 > (gdat.data->circum = srmpc_get_circum( conn ) ))
+	if( 0 > ( ret = srmpc_get_circum( conn ) ))
 		goto clean1;
+	gdat.data->circum = ret;
 
 	if( NULL == (mk = srm_marker_new() ))
 		goto clean1;

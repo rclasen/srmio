@@ -21,7 +21,7 @@ AC_PROG_RANLIB
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h getopt.h inttypes.h memory.h stddef.h stdint.h stdlib.h string.h sys/time.h termios.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h getopt.h inttypes.h limits.h memory.h stddef.h stdint.h stdlib.h string.h sys/time.h termios.h unistd.h])
 
 
 AC_SYS_POSIX_TERMIOS
@@ -29,9 +29,14 @@ AC_SYS_POSIX_TERMIOS
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
+AC_C_INLINE
+AC_TYPE_INT32_T
+AC_TYPE_INT64_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
 AC_TYPE_SIZE_T
 AC_STRUCT_TM
-AC_TYPE_UINT64_T
 
 
 # Checks for library functions.

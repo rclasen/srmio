@@ -32,7 +32,7 @@ struct _srm_chunk_t {
 	double		speed;	/* avg speed km/h */
 	unsigned	cad;	/* avg cadence 1/min */
 	unsigned	hr;	/* avg hr 1/min */
-	int		ele;	/* elevation in meter */
+	long		ele;	/* elevation in meter */
 };
 typedef struct _srm_chunk_t *srm_chunk_t;
 
@@ -57,8 +57,8 @@ void srm_marker_free( srm_marker_t marker );
 struct _srm_data_t {
 	srm_time_t	recint;
 	double		slope;
-	int		zeropos;
-	int		circum;
+	unsigned	zeropos;
+	unsigned	circum;
 	char		*notes;
 
 	srm_chunk_t	 *chunks;
@@ -145,7 +145,7 @@ struct _srmpc_get_chunk_t {
 	/* current block */
 	unsigned		blocknum;
 	srm_time_t		bstart;
-	unsigned		dist;
+	unsigned long		dist;
 	int			temp;	
 	srm_time_t		recint;
 
