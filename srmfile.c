@@ -9,6 +9,7 @@
 
 #include "common.h"
 
+/* used for list of blocks within SRM files */
 struct _srm_block_t {
 	srm_time_t	daydelta;
 	unsigned	chunks;
@@ -409,8 +410,10 @@ srm_data_t srm_data_read( const char *fname )
 				goto clean3;
 
 		}
-	}
 
+		free( blocks[i] );
+	}
+	free( blocks );
 
 
 	close(fd);
@@ -657,7 +660,10 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			if( 0 > _xwrite( fd, buf, 14 ))
 				goto clean2;
 		}
+
+		srm_marker_free(blocks[i]);
 	}
+	free( blocks );
 
 	return 0;
 
