@@ -33,3 +33,6 @@ bin_PROGRAMS=srmcmd
 srmcmd_LDFLAGS= -lsrmio
 srmcmd_SOURCES= \
 	srmcmd.c
+
+.man_in.man:
+	sed -e 's/%PACKAGE_VERSION%/$(PACKAGE_VERSION)/' $< > $@

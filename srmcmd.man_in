@@ -1,4 +1,4 @@
-.TH SRMCMD 1 "18 Juli 2009" "SRM access tool" "Version 0.0.1"
+.TH SRMCMD 1 "18 Juli 2009" "SRM access tool" "Version %PACKAGE_VERSION%"
 .SH NAME
 srmcmd \- download/access your SRM PowerControl
 
