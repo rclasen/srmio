@@ -17,6 +17,9 @@ extern "C"
 {
 # endif
 
+/* please check the actual source for descriptions of the individual
+ * functions */
+
 /************************************************************
  *
  * from srmdata.c
@@ -25,6 +28,7 @@ extern "C"
 
 typedef uint64_t srm_time_t;	/* seconds since epoch * 10 */
 
+/* actual data tuple as retrieved from PCV or file */
 struct _srm_chunk_t {
 	srm_time_t	time;	/* chunk end time */
 	double		temp;	/* temperature °C */
@@ -41,11 +45,11 @@ srm_chunk_t srm_chunk_clone( srm_chunk_t chunk );
 void srm_chunk_free( srm_chunk_t chunk );
 
 
-
+/* marker within srm_data_t pointing to the relvant chunks */
 struct _srm_marker_t {
-	unsigned	first;
-	unsigned	last;
-	char		*notes;
+	unsigned	first;	/* num. of first marked chunk */
+	unsigned	last;	/* num. of last marked chunk */
+	char		*notes;	/* user's notes for this marker */
 };
 typedef struct _srm_marker_t *srm_marker_t;
 
@@ -54,6 +58,8 @@ void srm_marker_free( srm_marker_t marker );
 
 
 
+/* data structure to hold all information retrieved 
+ * from PCV or file */
 struct _srm_data_t {
 	srm_time_t	recint;
 	double		slope;
@@ -61,17 +67,18 @@ struct _srm_data_t {
 	unsigned	circum;
 	char		*notes;
 
+	/* array of chunks */
 	srm_chunk_t	 *chunks;
 	unsigned	cused;
 	unsigned	cavail;
 
+	/* array of marker */
 	srm_marker_t	 *marker;
 	unsigned	mused;
 	unsigned	mavail;
 };
 typedef struct _srm_data_t *srm_data_t;
 
-/* alloc and initialize empty data */
 srm_data_t srm_data_new( void );
 
 int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk );
@@ -80,7 +87,6 @@ int srm_data_add_markerp( srm_data_t data, srm_marker_t mark );
 int srm_data_add_marker( srm_data_t data, unsigned first, unsigned last );
 srm_marker_t *srm_data_blocks( srm_data_t data );
 
-/* free the list: */
 void srm_data_free( srm_data_t data );
 
 
@@ -104,6 +110,8 @@ int srm_data_write_srm7( srm_data_t data, const char *fname );
  ************************************************************/
 
 typedef void (*srmpc_log_callback_t)( const char *msg );
+
+/* connection handle */
 struct _srmpc_conn_t {
 	int		fd;
 	struct termios	oldios;
@@ -134,7 +142,8 @@ int srmpc_get_recint( srmpc_conn_t conn );
 int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint );
 
 
-
+/* handle that's used within srmpc_get_chunks to hold intermediate
+ * data that's passed to the callback */
 struct _srmpc_get_chunk_t {
 	/* whole downlad */
 	srmpc_conn_t		conn;

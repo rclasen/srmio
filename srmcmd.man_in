@@ -37,9 +37,10 @@ of up to 2sec are filled with averaged data. That's what srmwin is doing,
 It seems wko doesn't ...
 .TP
 \fB\-g\fR, \fB\-\-get\fR[=all]
-download newly recorded data from PC. If \fIall\fR is specified, all data
-is retrieved including what was "deleted" before. By default data is
-written to stdout as tab-seperated list.
+Download newly recorded data from PC. With \fIall\fR specified, the
+"deletion" on the PCV is ignored and all data (that's not yet overwriten)
+is retrieved from the PCV. By default data is written to stdout as
+tab-seperated list.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 A brief message.

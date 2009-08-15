@@ -246,6 +246,12 @@ static srm_chunk_t _srm_data_chunk_srm7( const unsigned char *buf )
 	return ck;
 }
 
+/*
+ * read SRM6/SRM7 files, fill newly allocated data structure.
+ *
+ * on success data pointer is returned.
+ * returns NULL and sets errno on failure.
+ */
 srm_data_t srm_data_read( const char *fname )
 {
 	srm_data_t tmp;
@@ -451,6 +457,9 @@ static int _xwrite( int fd, unsigned char *buf, size_t len )
 
 /* TODO: srm_data_write_srm6 */
 
+/*
+ * write contents of data structure into specified file
+ */
 int srm_data_write_srm7( srm_data_t data, const char *fname )
 {
 	unsigned char buf[1024];

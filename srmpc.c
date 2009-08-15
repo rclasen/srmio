@@ -61,6 +61,7 @@ static const int _srmpc_baudnames[_srmpc_baud_max] = {
 	2400,
 };
 
+/* handle for srm_get_data and related functions */
 struct _srmpc_get_data_t {
 	int		mfirst;
 	srm_data_t	data;
@@ -74,12 +75,12 @@ static int _srmpc_msg_send( srmpc_conn_t conn,
 	char cmd, const unsigned char *arg, size_t alen );
 
 
-
 /************************************************************
  *
- * low level IO (open/read/write/close)
+ * helper / logging
  *
  ************************************************************/
+
 
 static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
 {
@@ -98,6 +99,12 @@ static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
 	
 	(*conn->lfunc)( buf );
 }
+
+/************************************************************
+ *
+ * low level IO (open/read/write/close)
+ *
+ ************************************************************/
 
 /*
  * send data towards SRM, 
@@ -283,7 +290,14 @@ static int _srmpc_init_all( srmpc_conn_t conn )
  * allocate internal data structures,
  * open serial device
  * set serial device properties
+ *
+ * parameter:
+ *  fname: path to serial device
+ *  force: ignore whitelist (when != 0)
+ *  lfunc: function to invoke for verbose status reporting
  * 
+ * returns newly allocated connection handle.
+ *
  * on error errno is set and returns NULL
  */
 srmpc_conn_t srmpc_open( const char *fname, int force,
@@ -345,6 +359,12 @@ clean2:
 /*
  * close serial device
  * and free memory
+ *
+ * parameter:
+ *  conn: connection handle
+ *
+ * returns: nothing
+ *
  */
 void srmpc_close( srmpc_conn_t conn )
 {
@@ -716,7 +736,12 @@ static int _srmpc_msg( srmpc_conn_t conn, char cmd,
  * setting:	athlete name
  * command:	N
  * argument:	cccccc\x20\x20 - it's 6 chars, zero-padded
- * 
+ */
+
+/*
+ * parameter:
+ *  conn: connection handle
+ *
  * returns malloc()ed string on succuess
  * on error errno is set and returns -1
  */
@@ -742,7 +767,15 @@ char *srmpc_get_athlete( srmpc_conn_t conn )
  * setting:	current time
  * command:	M
  * argument:	0xdd 0xmm 0xyy 0xHH 0xMM 0xSS
- * 
+ */
+
+/*
+ * get PCV's current date + time
+ *
+ * parameter:
+ *  conn: connection handle
+ *  timep: upated with PCV time (see "man mktime" for struct tm)
+ *
  * returns 0 on succuess
  * on error errno is set and returns -1
  */
@@ -772,6 +805,16 @@ int srmpc_get_time( srmpc_conn_t conn, struct tm *timep )
 	return 0;
 }
 
+/*
+ * set PCV clock to specified date + time
+ *
+ * parameter:
+ *  conn: connection handle
+ *  timep: time to set (see "man mktime" for struct tm)
+ *
+ * returns 0 on succuess
+ * on error errno is set and returns -1
+ */
 int srmpc_set_time( srmpc_conn_t conn, struct tm *timep )
 {
 	unsigned char buf[6];
@@ -796,7 +839,14 @@ int srmpc_set_time( srmpc_conn_t conn, struct tm *timep )
  * setting:	wheel circumference
  * command:	G
  * argument:	0x0000 - uint16
- * 
+ */
+
+/*
+ * get wheel circumference
+ *
+ * parameter:
+ *  conn: connection handle
+ *
  * returns circumference on succuess
  * on error errno is set and returns -1
  */
@@ -824,7 +874,14 @@ int srmpc_get_circum( srmpc_conn_t conn )
  * setting:	slope
  * command:	E
  * argument:	0x0000 - uint16
- * 
+ */
+
+/*
+ * get slope
+ *
+ * parameter:
+ *  conn: connection handle
+ *
  * returns slope  eg. 17.4
  * on error errno is set and returns < 0
  */
@@ -852,7 +909,14 @@ double srmpc_get_slope( srmpc_conn_t conn )
  * setting:	zero offset
  * command:	F
  * argument:	0x0000 - uint16
- * 
+ */
+
+/*
+ * get zero offset
+ *
+ * parameter:
+ *  conn: connection handle
+ *
  * returns circumference on succuess
  * on error errno is set and returns -1
  */
@@ -885,6 +949,13 @@ int srmpc_get_zeropos( srmpc_conn_t conn )
  * 	bits 0-3 have the actual recint in seconds: 1-15
  * else
  *	bits 0-3 have the digit behind the decimal point: 0.1 - 0.9
+ */
+
+/*
+ * get recording interval
+ *
+ * parameter:
+ *  conn: connection handle
  *
  * returns recint * 10 -> 1sec becomes 10
  * on error errno is set and returns -1
@@ -911,6 +982,16 @@ int srmpc_get_recint( srmpc_conn_t conn )
 	return recint;
 }
 
+/*
+ * set recording interval
+ *
+ * parameter:
+ *  conn: connection handle
+ *  recint: new interval (see srmpc_get_recint for details)
+ *
+ * returns 0 on success
+ * on error errno is set and returns -1
+ */
 int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
 {
 	unsigned char raw;
@@ -1169,6 +1250,13 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
  * get all blocks/chunks off the SRM, parse it and pass the decoded chunks
  * to the callback function.
  *
+ * parameter:
+ *  conn: connection handle
+ *  getall: instruct PCV to send deleted data, too (when != 0)
+ *  fixup: postprocess data (fix timestamps, fill micro-gaps, ...) (when != 0)
+ *  cbfunc: callback to process each retrieved data chunk
+ *  cbdata: passed to cbfunc
+ *
  * on error errno is set and returns -1
  */
 int srmpc_get_chunks( 
@@ -1304,8 +1392,15 @@ int srmpc_get_chunks(
  * setting:	clear recorded data
  * command:	B and T
  * argument:	none
- * 
- * returns true on success
+ */
+
+/*
+ * mark data on PCV as deleted
+ *
+ * parameter:
+ *  conn: connection handle
+ *
+ * returns 0 on success
  * on error errno is set and returns -1
  */
 int srmpc_clear_chunks( srmpc_conn_t conn )
@@ -1325,14 +1420,20 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
 	return 0;
 }
 
-
 /************************************************************
  *
- * synthesize some chunks with average data to fill small gaps at block
- * boundaries.
+ * use srmpc_get_chunks() to fill srm_data_t structure 
+ * with all chunks.
+ *
+ * Also serves as example on how to use the callback.
  *
  ************************************************************/
 
+
+/*
+ * synthesize some chunks with average data to fill small gaps at block
+ * boundaries.
+ */
 static int _srmpc_chunk_data_gapfill( srmpc_get_chunk_t gh )
 {
 	struct _srmpc_get_data_t *gdat = gh->cbdata;
@@ -1387,15 +1488,6 @@ static int _srmpc_chunk_data_gapfill( srmpc_get_chunk_t gh )
 	return 0;
 }
 
-
-/************************************************************
- *
- * get/parse data blocks / list
- *
- * won't be useful beyond serving as a example
- *
- ************************************************************/
-
 static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 {
 	struct _srmpc_get_data_t *gdat = (struct _srmpc_get_data_t *)gh->cbdata;
@@ -1433,6 +1525,17 @@ static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 	return 0;
 }
 
+/*
+ * retrieve recorded data from PC and build  "friendly" srm_data_t structure.
+ *
+ * parameter:
+ *  conn: connection handle
+ *  getall: instruct PCV to send deleted data, too (when != 0)
+ *  fixup: postprocess data (fix timestamps, fill micro-gaps, ...) (when != 0)
+ *
+ * returns pointer to newly allocated srm_data_t structure.
+ * on error NULL is returned and errno is set.
+ */
 srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup )
 {
 	struct _srmpc_get_data_t gdat;

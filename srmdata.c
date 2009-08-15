@@ -31,6 +31,12 @@ void DUMPHEX( const char *prefix, const unsigned char *buf, size_t blen )
 }
 #endif
 
+/*
+ * allocate and initialize new chunk
+ *
+ * on success pointer is returned
+ * returns NULL on error and sets errno.
+ */
 srm_chunk_t srm_chunk_new( void )
 {
 	srm_chunk_t tmp;
@@ -42,6 +48,12 @@ srm_chunk_t srm_chunk_new( void )
 	return tmp;
 }
 
+/*
+ * copy chunk to a newly allocated one.
+ *
+ * on success pointer is returned
+ * returns NULL on error and sets errno.
+ */
 srm_chunk_t srm_chunk_clone( srm_chunk_t chunk )
 {
 	srm_chunk_t tmp;
@@ -53,6 +65,9 @@ srm_chunk_t srm_chunk_clone( srm_chunk_t chunk )
 	return tmp;
 }
 
+/*
+ * free chunk memory
+ */
 void srm_chunk_free( srm_chunk_t chunk )
 {
 	free( chunk );
@@ -62,6 +77,12 @@ void srm_chunk_free( srm_chunk_t chunk )
 
 
 
+/*
+ * allocate and initialize new marker
+ *
+ * on success pointer is returned
+ * returns NULL on error and sets errno.
+ */
 srm_marker_t srm_marker_new( void )
 {
 	srm_marker_t tmp;
@@ -73,6 +94,9 @@ srm_marker_t srm_marker_new( void )
 	return tmp;
 }
 
+/*
+ * free marker memory
+ */
 void srm_marker_free( srm_marker_t block )
 {
 	if( ! block )
@@ -85,7 +109,13 @@ void srm_marker_free( srm_marker_t block )
 
 
 
-
+/*
+ * allocate and initialize new data structure to hold data retrieved
+ * from PCV or file
+ *
+ * on success pointer is returned
+ * returns NULL on error and sets errno.
+ */
 srm_data_t srm_data_new( void )
 {
 	srm_data_t data;
@@ -112,6 +142,13 @@ clean1:
 	return NULL;
 }
 
+/*
+ * add chunk to end of data's chunk list. Extends list when necessary.
+ * Chunk is not copied.
+ *
+ * on success 0 is returned
+ * returns -1 and sets errno on error
+ */
 int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
 {
 	DPRINTF( "srm_data_add_chunk %u:"
@@ -151,6 +188,12 @@ int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
 	return 0;
 }
 
+/*
+ * add copy of chunk to end of data's chunk_list.
+ *
+ * on success 0 is returned
+ * returns -1 and sets errno on error
+ */
 int srm_data_add_chunk( srm_data_t data, srm_chunk_t chunk )
 {
 	srm_chunk_t nc;
@@ -160,6 +203,13 @@ int srm_data_add_chunk( srm_data_t data, srm_chunk_t chunk )
 	return srm_data_add_chunkp( data, nc );
 }
 
+/*
+ * add marker to end of data's marker list. Extends list when necessary.
+ * Marker is not copied.
+ *
+ * on success 0 is returned
+ * returns -1 and sets errno on error
+ */
 int srm_data_add_markerp( srm_data_t data, srm_marker_t mk )
 {
 	if( data->mused >= data->mavail ){
@@ -184,6 +234,17 @@ int srm_data_add_markerp( srm_data_t data, srm_marker_t mk )
 	return 0;
 }
 
+/*
+ * create new marker and add it to data's marker list
+ *
+ * parameters:
+ *  data: the data structure to modify
+ *  first: number of first marked chunk (counts from 0)
+ *  last: number of first marked chunk
+ *
+ * on success 0 is returned
+ * returns -1 and sets errno on error
+ */
 int srm_data_add_marker( srm_data_t data, unsigned first, unsigned last )
 {
 	srm_marker_t mk;
@@ -212,6 +273,16 @@ clean1:
 	return -1;
 }
 
+/*
+ * find gaps in chunklist (non-continuos time), allocate and build list
+ * with marker identifying the continuos blocks.
+ *
+ * parameters:
+ *  data: the data structure to check
+ *
+ * on success pointer to list is returned
+ * returns NULL on error and sets errno.
+ */
 srm_marker_t *srm_data_blocks( srm_data_t data )
 {
 	srm_marker_t *blocks;
@@ -285,6 +356,9 @@ clean1:
 	return NULL;
 }
 
+/*
+ * free all memory held in data structure
+ */
 void srm_data_free( srm_data_t data )
 {
 	unsigned i;
