@@ -28,6 +28,23 @@ If you just want to use it, please check
 Please reade the comments in the source (start with srmio.h) if you want
 to use the lib.
 
+build:
+======
+
+In most cases:
+ ./configure && make 
+ make install
+
+On debian you can do:
+ fakeroot debian/rules binary
+ dpkg --install ../srmio_*.deb
+
+If you use a developer snapshot, you first have use the autotools to build
+a configure script:
+ sh genautomake.sh
+
+
+
 Linux:
 ======
 
@@ -95,6 +112,7 @@ Known Problems:
  - doesn't use UUCP-Style Lockfiles.
  - result of PC in non-metric display mode is untested.
  - negative temperatures are untested.
+ - libary interface should have proper documentation
 
 
 Rainer

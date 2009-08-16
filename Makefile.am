@@ -14,6 +14,7 @@ EXTRA_DIST=$(MANS) \
 	debian/changelog \
 	debian/dirs \
 	debian/control \
+	genautomake.sh \
 	genconfheader.sh
 
 include_HEADERS= \
