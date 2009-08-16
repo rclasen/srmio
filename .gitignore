@@ -2,6 +2,8 @@
 *.la
 *.lo
 *.tar.gz
+*.o
+*.man
 .deps
 .libs
 Makefile

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([srmio], [0.0.3.2009081001], [bj@zuto.de])
+AC_INIT([srmio], [0.0.3.2009081601], [bj@zuto.de])
 AM_INIT_AUTOMAKE([-Wall -Werror])
 AC_CONFIG_SRCDIR([srmio.h])
 AC_CONFIG_HEADER([config.h])
@@ -14,7 +14,6 @@ AC_PROG_CPP
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
-AC_PROG_RANLIB
 
 # Checks for libraries.
 # FIXME: Replace `main' with a function in `-lsrmio':

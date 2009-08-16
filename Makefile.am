@@ -20,6 +20,7 @@ EXTRA_DIST=$(MANS) \
 include_HEADERS= \
 	srmio.h \
 	srmio_config.h
+DISTCLEANFILES=srmio_config.h
 
 lib_LTLIBRARIES=libsrmio.la
 libsrmio_la_SOURCES= \
@@ -35,5 +36,6 @@ srmcmd_LDFLAGS= -lsrmio
 srmcmd_SOURCES= \
 	srmcmd.c
 
+CLEANFILES=$(MANS)
 .man_in.man:
 	sed -e 's/%PACKAGE_VERSION%/$(PACKAGE_VERSION)/' $< > $@

@@ -1,11 +1,16 @@
-srmio (0.0.3.2009081001) unstable; urgency=low
+srmio (0.0.3.2009081601) unstable; urgency=low
 
   * fix srm_data_write: pick lowest timestamp (not necessarily the first) 
   * fix srm_data_write: properly determin days since 1880
   * made autoconf probe for localtime_r
   * catch integer overflows to avoid writing broken data
+  * improved documentation of library interface
+  * fixed memory leak in reading/writing files.
+  * fix srm_data_blocks initialisation.
+  * automatically put package version into man page
+  * added script to run autotools
 
- -- Rainer Clasen <bj@zuto.de>  Fri, 14 Aug 2009 13:53:16 +0200
+ -- Rainer Clasen <bj@zuto.de>  Sun, 16 Aug 2009 02:03:48 +0200
 
 srmio (0.0.3) unstable; urgency=low
 
