@@ -62,8 +62,8 @@ AC_CHECK_FUNC([cfmakeraw],
 
 AC_CONFIG_FILES([Makefile])
 
-AC_CONFIG_COMMANDS([srmio_config.h],[
-. genconfheader.sh > srmio_config.h
+AC_CONFIG_COMMANDS([genconfheader.sh],[
+. $srcdir/genconfheader.sh > srmio_config.h
 ],[
 HEADER_STDINT_H=$ac_cv_header_stdint_h
 HEADER_INTTYPES_H=$ac_cv_header_inttypes_h

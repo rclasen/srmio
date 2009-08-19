@@ -8,7 +8,7 @@
 #
 
 
-# sourced by config.status
+# Must be sourced by config.status to pickup the variables
 
 cat <<EOF
 # ifdef __cplusplus
