@@ -21,6 +21,10 @@ command:
 Delete data on PC. Well, actually just mark it as deleted. You're still
 able to get it with --get=all.
 .TP
+\fB\-d\fR, \fB\-\-date\fR
+Print start date of recorded data as seconds since 1970-01-01. This is
+useful for creating srmwin compatible filenames.
+.TP
 \fB\-F\fR, \fB\-\-force\fR
 Ignore builtin whitelist of known working PCV Firmware versions. This
 options might be quite DANGEROUSE if an unknown Firmware expects 

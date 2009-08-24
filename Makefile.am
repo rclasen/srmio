@@ -15,7 +15,8 @@ EXTRA_DIST=$(MANS) \
 	debian/dirs \
 	debian/control \
 	genautomake.sh \
-	genconfheader.sh
+	genconfheader.sh \
+	srmwinget.sh
 
 include_HEADERS= \
 	srmio.h \

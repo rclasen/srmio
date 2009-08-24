@@ -100,6 +100,7 @@ int main( int argc, char **argv )
 	char *fname = NULL;
 	int opt_all = 0;
 	int opt_clear = 0;
+	int opt_date = 0;
 	int opt_fixup = 0;
 	int opt_force = 0;
 	int opt_get = 0;
@@ -113,6 +114,7 @@ int main( int argc, char **argv )
 	int needhelp = 0;
 	struct option lopts[] = {
 		{ "clear", no_argument, NULL, 'c' },
+		{ "date", no_argument, NULL, 'd' },
 		{ "force", no_argument, NULL, 'F' },
 		{ "get", optional_argument, NULL, 'g' },
 		{ "help", no_argument, NULL, 'h' },
@@ -127,10 +129,14 @@ int main( int argc, char **argv )
 	char c;
 	srmpc_conn_t srm;
 
-	while( -1 != ( c = getopt_long( argc, argv, "cFg::hi:nrtvw:x", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "cdFg::hi:nrtvw:x", lopts, NULL ))){
 		switch(c){
 		  case 'c':
 			++opt_clear;
+			break;
+
+		  case 'd':
+			++opt_date;
 			break;
 
 		  case 'F':
@@ -207,7 +213,25 @@ int main( int argc, char **argv )
 			return 1;
 		}
 
-		if( opt_write ){
+		if( opt_name ){
+			if( ! srmdata->mused ){
+				fprintf( stderr, "no data available\n" );
+				return 1;
+			}
+			printf( "%s\n", srmdata->marker[0]->notes 
+				? srmdata->marker[0]->notes
+				: "" );
+			
+		} else if( opt_date ){
+			if( ! srmdata->cused ){
+				fprintf( stderr, "no data available\n" );
+				return 1;
+			}
+			printf( "%.0f\n", 
+				(double)srmdata->chunks[0]->time / 10 );
+
+
+		} else if( opt_write ){
 			/* TODO: check there's data */
 			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
 				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
@@ -242,9 +266,7 @@ int main( int argc, char **argv )
 		printf( "%s\n", name );
 		free( name );
 	
-	} 
-	
-	if( opt_get ){
+	} else if( opt_get || opt_date ){
 		srm_data_t srmdata;
 
 		/* get new/all chunks */
@@ -253,7 +275,15 @@ int main( int argc, char **argv )
 			return(1);
 		}
 
-		if( opt_write ){
+		if( opt_date ){
+			if( ! srmdata->cused ){
+				fprintf( stderr, "no data available\n" );
+				return 1;
+			}
+			printf( "%.0f\n", 
+				(double)srmdata->chunks[0]->time / 10 );
+
+		} else if( opt_write ){
 			/* TODO: check there's data */
 			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
 				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
