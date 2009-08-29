@@ -115,8 +115,9 @@ typedef void (*srmpc_log_callback_t)( const char *msg );
 struct _srmpc_conn_t {
 	int		fd;
 	struct termios	oldios;
-	int		stxetx;
-	srmpc_log_callback_t	lfunc;
+	int		stxetx;	/* use stx/etx headers + encoding? */
+	time_t		nready;	/* PC accepts next command */
+	srmpc_log_callback_t	lfunc;	/* logging callback */
 };
 typedef struct _srmpc_conn_t *srmpc_conn_t;
 

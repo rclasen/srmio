@@ -698,6 +698,49 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize
 }
 
 /*
+ * Some commands keep the PCV busy after it responded. This 
+ * sets the time to wait until the PC accepts new commands.
+ *
+ * parameters:
+ *  conn: connection handle
+ *  delay: seconds the PCV will be busy
+ *
+ * returns 0 on success
+ * on error errno is set and returns -1
+ */
+static int _srmpc_msg_busy( srmpc_conn_t conn, unsigned delay )
+{
+	time( &conn->nready );
+	conn->nready += delay;
+
+	return 0;
+}
+
+/*
+ * Wait for PCV to finish last command and become ready to 
+ * accept the next one (if necessary)
+ *
+ * returns 0 on success
+ * on error errno is set and returns -1
+ */
+static int _srmpc_msg_ready( srmpc_conn_t conn )
+{
+	time_t now;
+	unsigned delta;
+
+	time( &now );
+	if( conn->nready <= now )
+		return 0;
+
+	delta = conn->nready - now;
+
+	_srm_log( conn, "PC still busy for %usec, waiting...", delta );
+	sleep( delta );
+
+	return 0;
+}
+
+/*
  * process one complete command (send, receive), 
  * retry if necesssary
  *
@@ -712,6 +755,8 @@ static int _srmpc_msg( srmpc_conn_t conn, char cmd,
 	size_t want )
 {
 	/* TODO: retry */
+	if( 0 > _srmpc_msg_ready( conn ))
+		return -1;
 
 	if( _srmpc_msg_send( conn, cmd, arg, alen ) )
 		return -1;
@@ -830,8 +875,8 @@ int srmpc_set_time( srmpc_conn_t conn, struct tm *timep )
 	if( 0 > _srmpc_msg( conn, 'M', buf, 6, NULL, 0, 0 ))
 		return -1;
 		
-	sleep(1); /* need to wait or next cmd fails */
 	DPRINTF( "srmpc_set_time set %s", asctime(timep) );
+	_srmpc_msg_busy( conn, 2 );
 	return 0;
 }
 
@@ -1289,6 +1334,9 @@ int srmpc_get_chunks(
 	if( 0 > srmpc_get_time( conn, &gh.pctime ))
 		return -1;
 
+	if( 0 > _srmpc_msg_ready( conn ))
+		return -1;
+
 	if( _srmpc_msg_send( conn, cmd, NULL, 0 ) )
 		return -1;
 
@@ -1394,7 +1442,7 @@ int srmpc_get_chunks(
 				*buf );
 	}
 
-	sleep(1); /* need to wait or next cmd fails */
+	_srmpc_msg_busy( conn, 2 );
 	return 0;
 }
 

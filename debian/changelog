@@ -11,8 +11,9 @@ srmio (0.0.3.2009081601) unstable; urgency=low
   * added script to run autotools
   * srmcmd: avoid errors when attempting to write empty data
   * fix download with empty PCV that uses stxetx
+  * added srmpc_busy/ready to give PCV time to finish last command
 
- -- Rainer Clasen <bj@zuto.de>  Sat, 29 Aug 2009 19:48:20 +0200
+ -- Rainer Clasen <bj@zuto.de>  Sat, 29 Aug 2009 20:10:56 +0200
 
 srmio (0.0.3) unstable; urgency=low
 
