@@ -9,8 +9,9 @@ srmio (0.0.3.2009081601) unstable; urgency=low
   * fix srm_data_blocks initialisation.
   * automatically put package version into man page
   * added script to run autotools
+  * srmcmd: avoid errors when attempting to write empty data
 
- -- Rainer Clasen <bj@zuto.de>  Sun, 16 Aug 2009 02:03:48 +0200
+ -- Rainer Clasen <bj@zuto.de>  Sat, 29 Aug 2009 19:46:06 +0200
 
 srmio (0.0.3) unstable; urgency=low
 

@@ -129,6 +129,7 @@ int main( int argc, char **argv )
 	char c;
 	srmpc_conn_t srm;
 
+	/* TODO: option to filter data by timerange */
 	while( -1 != ( c = getopt_long( argc, argv, "cdFg::hi:nrtvw:x", lopts, NULL ))){
 		switch(c){
 		  case 'c':
@@ -232,11 +233,14 @@ int main( int argc, char **argv )
 
 
 		} else if( opt_write ){
-			/* TODO: check there's data */
+			if( ! srmdata->cused ){
+				fprintf( stderr, "no data available\n" );
+				return 1;
+			}
 			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
 				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
 					opt_write, strerror(errno) );
-				return -1;
+				return 1;
 			}
 
 		} else {
@@ -253,7 +257,7 @@ int main( int argc, char **argv )
 
 		fprintf( stderr, "srmpc_open(%s) failed: %s\n",
 			fname, strerror(errno) );
-		return(1);
+		return 1;
 	}
 
 	if( opt_name ){
@@ -272,7 +276,7 @@ int main( int argc, char **argv )
 		/* get new/all chunks */
 		if( NULL == (srmdata = srmpc_get_data( srm, opt_all, opt_fixup ))){
 			perror( "srmpc_get_data failed" );
-			return(1);
+			return 1;
 		}
 
 		if( opt_date ){
@@ -284,11 +288,14 @@ int main( int argc, char **argv )
 				(double)srmdata->chunks[0]->time / 10 );
 
 		} else if( opt_write ){
-			/* TODO: check there's data */
+			if( ! srmdata->cused ){
+				fprintf( stderr, "no data available\n" );
+				return 1;
+			}
 			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
 				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
 					opt_write, strerror(errno) );
-				return -1;
+				return 1;
 			}
 
 		} else {
