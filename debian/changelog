@@ -10,8 +10,9 @@ srmio (0.0.3.2009081601) unstable; urgency=low
   * automatically put package version into man page
   * added script to run autotools
   * srmcmd: avoid errors when attempting to write empty data
+  * fix download with empty PCV that uses stxetx
 
- -- Rainer Clasen <bj@zuto.de>  Sat, 29 Aug 2009 19:46:06 +0200
+ -- Rainer Clasen <bj@zuto.de>  Sat, 29 Aug 2009 19:48:20 +0200
 
 srmio (0.0.3) unstable; urgency=low
 

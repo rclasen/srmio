@@ -1300,6 +1300,8 @@ int srmpc_get_chunks(
 	} 
 	DUMPHEX( "srmpc_get_chunks read response", buf, ret ); 
 	if( conn->stxetx ){
+		/* TODO: how to distinguish "3 blocks" and 0 + ETX?
+		 * both: 0x02/  0x41/A 0x00/  0x03/ */
 		if( ret < 4 ){
 			errno = EPROTO;
 			return -1;
@@ -1345,6 +1347,14 @@ int srmpc_get_chunks(
 			return -1;
 
 		} else if( ret < 1 ){
+			/* workaround stxetx + 3 blocks problem */
+			if( conn->stxetx && gh.blocks == 3 && gh.blocknum == 0 ){
+				gh.blocks = 0;
+				DPRINTF( "srmpc_get_chunks stxetx %u blocks",
+					 gh.blocks );
+				break;
+			}
+
 			errno = ETIMEDOUT;
 			return -1;
 
@@ -1378,7 +1388,7 @@ int srmpc_get_chunks(
 	}
 	
 	/* read (and ignore) trailing ETX */
-	if( gh.blocknum == gh.blocks && conn->stxetx ){
+	if( gh.blocks && gh.blocknum == gh.blocks && conn->stxetx ){
 		if( 1 == _srmpc_read( conn, buf, 1 ) )
 			DPRINTF( "srmpc_get_chunks final ETX: %02x",
 				*buf );
