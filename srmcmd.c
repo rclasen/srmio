@@ -110,6 +110,7 @@ int main( int argc, char **argv )
 	int opt_read = 0;
 	int opt_time = 0;
 	int opt_verb = 0;
+	int opt_version = 0;
 	char *opt_write = NULL;
 	int needhelp = 0;
 	struct option lopts[] = {
@@ -123,6 +124,7 @@ int main( int argc, char **argv )
 		{ "read", no_argument, NULL, 'r' },
 		{ "time", no_argument, NULL, 't' },
 		{ "verbose", no_argument, NULL, 'v' },
+		{ "version", no_argument, NULL, 'V' },
 		{ "write", required_argument, NULL, 'w' },
 		{ "fixup", no_argument, NULL, 'x' },
 	};
@@ -130,7 +132,7 @@ int main( int argc, char **argv )
 	srmpc_conn_t srm;
 
 	/* TODO: option to filter data by timerange */
-	while( -1 != ( c = getopt_long( argc, argv, "cdFg::hi:nrtvw:x", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "cdFg::hi:nrtVvw:x", lopts, NULL ))){
 		switch(c){
 		  case 'c':
 			++opt_clear;
@@ -174,6 +176,10 @@ int main( int argc, char **argv )
 			++opt_verb;
 			break;
 
+		  case 'V':
+			++opt_version;
+			break;
+
 		  case 'w':
 		  	opt_write = optarg;
 			break;
@@ -192,6 +198,11 @@ int main( int argc, char **argv )
 		exit( 0 );
 	}
 
+	if( opt_version ){
+		printf( "srmcmd %s\n", PACKAGE_VERSION );
+		return 0;
+	}
+
 	if( optind >= argc ){
 		fprintf( stderr, "missing device/file name\n" );
 		++needhelp;
@@ -202,7 +213,6 @@ int main( int argc, char **argv )
 		fprintf( stderr, "use %s --help for usage info\n", argv[0] );
 		exit(1);
 	}
-
 
 
 	if( opt_read ){

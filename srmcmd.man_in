@@ -67,6 +67,9 @@ Set the PCs time to the current system time.
 \fB\-v\fR, \fB\-\-verbose\fR
 Enable verbose status messages.
 .TP
+\fB\-V\fR, \fB\-\-version\fR
+show srmcmd version number and exit.
+.TP
 \fB\-w\fR, \fB\-\-write\fR=\fIdestination\fR
 Write data retrieved from PC (or with --read from file) to the specified
 destination file. Files are written using the SRM7 format.
