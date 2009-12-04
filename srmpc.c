@@ -805,6 +805,7 @@ char *srmpc_get_athlete( srmpc_conn_t conn )
 
 	buf[6] = 0;
 	DPRINTF( "srmpc_get_athlete got=%s", (char*)buf );
+	/* TODO: iconv cp850 -> internal ?? */
 	return strdup( (char*)buf );
 }
 
@@ -1297,7 +1298,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
  *
  * parameter:
  *  conn: connection handle
- *  getall: instruct PCV to send deleted data, too (when != 0)
+ *  deleted: instruct PCV to send deleted data, too (when != 0)
  *  fixup: postprocess data (fix timestamps, fill micro-gaps, ...) (when != 0)
  *  cbfunc: callback to process each retrieved data chunk
  *  cbdata: passed to cbfunc
@@ -1306,7 +1307,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
  */
 int srmpc_get_chunks( 
 	srmpc_conn_t conn, 
-	int getall,
+	int deleted,
 	int fixup,
 	srmpc_chunk_callback_t cbfunc, 
 	void *cbdata )
@@ -1321,7 +1322,7 @@ int srmpc_get_chunks(
 	if( ! cbfunc )
 		return 0;
 
-	if( getall )
+	if( deleted )
 		cmd = 'y';
 	else
 		cmd = 'A';
@@ -1588,13 +1589,14 @@ static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
  *
  * parameter:
  *  conn: connection handle
- *  getall: instruct PCV to send deleted data, too (when != 0)
+ *  deleted: instruct PCV to send deleted data, too (when != 0). 
+ *          Same as pressing shift while downloading in srmwin.
  *  fixup: postprocess data (fix timestamps, fill micro-gaps, ...) (when != 0)
  *
  * returns pointer to newly allocated srm_data_t structure.
  * on error NULL is returned and errno is set.
  */
-srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup )
+srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 {
 	struct _srmpc_get_data_t gdat;
 	srm_marker_t mk;
@@ -1625,7 +1627,7 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup )
 	if( 0 > srm_data_add_markerp( gdat.data, mk ))
 		goto clean2;
 
-	if( 0 > srmpc_get_chunks(conn, getall, fixup, _srmpc_chunk_data_cb, &gdat ) )
+	if( 0 > srmpc_get_chunks(conn, deleted, fixup, _srmpc_chunk_data_cb, &gdat ) )
 		goto clean2;
 
 	gdat.data->marker[0]->last = gdat.data->cused-1;

@@ -12,8 +12,9 @@ srmio (0.0.3.2009081601) unstable; urgency=low
   * srmcmd: avoid errors when attempting to write empty data
   * fix download with empty PCV that uses stxetx
   * added srmpc_busy/ready to give PCV time to finish last command
+  * renamed srmpc_get_chunks/srmpc_get_data getall parameter for clarification
 
- -- Rainer Clasen <bj@zuto.de>  Sat, 29 Aug 2009 20:10:56 +0200
+ -- Rainer Clasen <bj@zuto.de>  Fri, 04 Dec 2009 12:23:44 +0100
 
 srmio (0.0.3) unstable; urgency=low
 
