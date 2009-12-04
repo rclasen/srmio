@@ -311,6 +311,7 @@ srm_data_t srm_data_read( const char *fname )
 	/* "notes" is preceeded by length + zero padded. Ignore length... */
 	if( NULL == (tmp->notes = malloc(71) ))
 		goto clean2;
+	/* TODO: iconv notes cp850 -> internal */
 	memcpy( tmp->notes, (char*)&buf[16], 70 );
 	tmp->notes[70] = 0;
 
@@ -338,6 +339,7 @@ srm_data_t srm_data_read( const char *fname )
 
 		if( NULL == (tm->notes = malloc(256)))
 			goto clean2;
+		/* TODO: iconv notes cp850 -> internal */
 		memcpy( tm->notes, (char*)buf, 255 );
 		tm->notes[255] = 0;
 
@@ -557,6 +559,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			goto clean1;
 		buf[14] = 0;
 		buf[15] = data->notes ? strlen( data->notes) : 0;
+		/* TODO: iconv notes -> cp850 */
 		strncpy( (char*)&buf[16], data->notes ? data->notes : "", 70 );
 
 		if( 0 > _xwrite( fd, buf, 86 ))
@@ -570,6 +573,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		unsigned first = mk->first+1;
 		unsigned last = mk->last+1;
 
+		/* TODO: iconv notes -> cp850 */
 		strncpy( (char*)buf, mk->notes ? mk->notes : "", 255 );
 		buf[255] = 1; /* active */
 		if( 0 > _setuint16( buf, 256, first ) )
