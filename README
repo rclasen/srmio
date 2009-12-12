@@ -68,17 +68,20 @@ only occasionaly (around 1 of 15 attempts worked). Once the communication
 got established, data transmission worked fine. Reconecting kept working
 until the PCV had to be woken up, again. First waking the PCV up by pushing
 MODE seemed to improve the success-rate but was still very flaky.
+
  device: /dev/cu.usbserial
  kextstat:
   106  0 0x8053e000 0x7000 0x6000 com.prolific.driver.PL2303 (1.2.1) <105 33 12>
 
 Once we've switched to the drivers from http://osx-pl2303.sourceforge.net/
 all Problems were gone.
+
  device: /dev/cu.PL2303-* 
  kextstat:
   108  0 0x8056a000 0x7000 0x6000 nl.bjaelectronics.driver.PL2303 (1.0.0d1) <107 33 12>
 
-
+There's also a driver available from SRM.de. It's reported to work fine,
+too.
 
 Notes:
 ======
