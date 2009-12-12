@@ -654,8 +654,8 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 		for( ci = bk->first; ci <= bk->last; ++ci ){
 			srm_chunk_t ck = data->chunks[ci];
-			unsigned speed = ( ck->speed * 1000) / 3.6;
-			int temp = ck->temp * 10;
+			unsigned speed = 0.5 + ( ck->speed * 1000) / 3.6;
+			int temp = 0.5 + ck->temp * 10;
 
 			if( 0 > _setuint16( buf, 0, ck->pwr ) )
 				goto clean1;
