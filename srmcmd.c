@@ -66,6 +66,7 @@ static void csvdump( srm_data_t data )
 		"speed\t"
 		"cad\t"
 		"hr\t"
+		"ele"
 		"\n");
 	for( ck=data->chunks; *ck; ++ck ){
 		printf(
@@ -76,6 +77,7 @@ static void csvdump( srm_data_t data )
 			"%.2f\t"	/* "speed\t" */
 			"%u\t"		/* "cad\t" */
 			"%u\t"		/* "hr\t" */
+			"%ld"		/* "ele\t" */
 			"\n",
 			(double)(*ck)->time / 10,
 			(double)data->recint / 10,
@@ -83,7 +85,8 @@ static void csvdump( srm_data_t data )
 			(*ck)->pwr,
 			(*ck)->speed,
 			(*ck)->cad,
-			(*ck)->hr
+			(*ck)->hr,
+			(*ck)->ele
 			);
 	}
 }
