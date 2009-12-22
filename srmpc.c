@@ -1633,7 +1633,8 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 	gdat.data->marker[0]->last = gdat.data->cused-1;
 
 	if( gdat.mfirst >= 0 )
-		srm_data_add_marker( gdat.data, gdat.mfirst, gdat.data->cused );
+		srm_data_add_marker( gdat.data, gdat.mfirst,
+			gdat.data->cused -1 );
 
 	return gdat.data;
 
