@@ -1,3 +1,15 @@
+srmio (0.0.5) unstable; urgency=low
+
+  * gitignore: added *.exe
+  * srmpc: log version on device open
+  * README: misc updates
+  * added srmpc_get_version()
+  * srmpc: fix comm errors after downloading data
+  * srmpc: log correct block number during download
+  * genautomake.sh: adjusted to support OSX
+
+ -- Rainer Clasen <bj@zuto.de>  Thu, 21 Jan 2010 08:00:38 +0100
+
 srmio (0.0.4) unstable; urgency=low
 
   * fix srm_data_write: pick lowest timestamp (not necessarily the first) 
