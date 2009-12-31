@@ -119,6 +119,7 @@ int main( int argc, char **argv )
 	struct option lopts[] = {
 		{ "clear", no_argument, NULL, 'c' },
 		{ "date", no_argument, NULL, 'd' },
+		{ "fixup", no_argument, NULL, 'x' },
 		{ "force", no_argument, NULL, 'F' },
 		{ "get", optional_argument, NULL, 'g' },
 		{ "help", no_argument, NULL, 'h' },
@@ -129,7 +130,6 @@ int main( int argc, char **argv )
 		{ "verbose", no_argument, NULL, 'v' },
 		{ "version", no_argument, NULL, 'V' },
 		{ "write", required_argument, NULL, 'w' },
-		{ "fixup", no_argument, NULL, 'x' },
 	};
 	char c;
 	srmpc_conn_t srm;
@@ -353,20 +353,22 @@ static void usage( char *name )
 {
 	printf(
 "usage: %s [options] <device_or_fname>\n"
-"options: (are processed in this order)\n"
-" --name              get athlete name\n"
-" --get[=all]|-g      download data from SRM and dump it to stdout\n"
-" --force|-F          ignore whitelist. Might be DANGEROUS\n"
-" --fixup|-x          try to fix time-glitches in retrieved data\n"
-" --write=<fname>|-w  save data as specified .srm file\n" 
-" --read|-r           dump srm file to stdout\n"
-" --clear|-c          clear data on SRM\n"
-" --time|-t           set current time\n"
-" --int=<interval>|-i\n"
-"                     set recording interval, 10 -> 1sec\n"
+"downloads from PCV or reads SRM files\n"
 "\n"
-" --verbose|-v        increase verbosity\n"
+"options:\n"
+" --clear|-c          clear data on SRM\n"
+" --date|-d           print date of workout\n"
+" --fixup|-x          try to fix time-glitches in retrieved data\n"
+" --force|-F          ignore whitelist. Might be DANGEROUS\n"
+" --get[=all]|-g      download data from SRM and dump it to stdout\n"
 " --help|-h           this cruft\n"
+" --int=<interval>|-i set recording interval, 10 -> 1sec\n"
+" --name              get athlete name\n"
+" --read|-r           dump srm file to stdout\n"
+" --time|-t           set current time\n"
+" --verbose|-v        increase verbosity\n"
+" --version|-V        show version number and exit\n"
+" --write=<fname>|-w  save data as specified .srm file\n" 
 , name );
 }
 
