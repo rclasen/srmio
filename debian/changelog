@@ -1,20 +1,26 @@
-srmio (0.0.3.2009081601) unstable; urgency=low
+srmio (0.0.4) unstable; urgency=low
 
   * fix srm_data_write: pick lowest timestamp (not necessarily the first) 
   * fix srm_data_write: properly determin days since 1880
   * made autoconf probe for localtime_r
   * catch integer overflows to avoid writing broken data
-  * improved documentation of library interface
+  * automatically put package version into man page
   * fixed memory leak in reading/writing files.
   * fix srm_data_blocks initialisation.
-  * automatically put package version into man page
+  * improved documentation of library interface
   * added script to run autotools
+  * srmcmd: added -d option to get workout date.
+  * srmcmd: adjusted -n option to work on files, too.
+  * added example script srmwinget.sh for srmwin-compatible filenames
   * srmcmd: avoid errors when attempting to write empty data
   * fix download with empty PCV that uses stxetx
   * added srmpc_busy/ready to give PCV time to finish last command
-  * renamed srmpc_get_chunks/srmpc_get_data getall parameter for clarification
+  * renamed srmpc_get_chunks/srmpc_get_data getall parameter for clarification.
+  * fixed rounding of values when writing files.
+  * srmcmd: included elevation in CSV dump
+  * fixed retrieving unfinished marker.
 
- -- Rainer Clasen <bj@zuto.de>  Fri, 04 Dec 2009 12:23:44 +0100
+ -- Rainer Clasen <bj@zuto.de>  Thu, 31 Dec 2009 10:19:48 +0100
 
 srmio (0.0.3) unstable; urgency=low
 
