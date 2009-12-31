@@ -2,8 +2,14 @@ AUTOMAKE_OPTIONS=foreign
 
 #AM_CFLAGS=-g -Wall -Wextra -DDEBUG
 
+
+man1_INS=srmcmd.man_in
 man1_MANS=srmcmd.man
-EXTRA_DIST=$(MANS) \
+# TODO: build _MANS automagically
+
+man_INS=$(man1_INS)
+
+EXTRA_DIST= $(man_INS) \
 	Changes \
 	LICENSE \
 	README \
