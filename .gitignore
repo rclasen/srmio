@@ -4,6 +4,7 @@
 *.tar.gz
 *.o
 *.man
+*.exe
 .deps
 .libs
 Makefile
