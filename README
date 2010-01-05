@@ -70,6 +70,7 @@ until the PCV had to be woken up, again. First waking the PCV up by pushing
 MODE seemed to improve the success-rate but was still very flaky.
 
  device: /dev/cu.usbserial
+ driver: /System/Library/Extensions/ProlificUsbSerial.kext
  kextstat:
   106  0 0x8053e000 0x7000 0x6000 com.prolific.driver.PL2303 (1.2.1) <105 33 12>
 
@@ -77,11 +78,29 @@ Once we've switched to the drivers from http://osx-pl2303.sourceforge.net/
 all Problems were gone.
 
  device: /dev/cu.PL2303-* 
+ driver: /System/Library/Extensions/osx-pl2303.kext
  kextstat:
   108  0 0x8056a000 0x7000 0x6000 nl.bjaelectronics.driver.PL2303 (1.0.0d1) <107 33 12>
 
-There's also a driver available from SRM.de. It's reported to work fine,
-too.
+There's also a driver available from SRM.de. It's reported to work:
+
+ device: /dev/cu.usbserial
+ driver: /System/Library/Extensions/ProlificUsbSerial.kext
+
+If you need to remove the generic prolific driver you can do so by  
+entering the following in a terminal:
+
+ sudo mv /System/Library/Extensions/ProlificUsbSerial.kext ~/Desktop
+
+This will move the extension to your Desktop so that you can move it back
+later if need be.
+
+You may need to restart for changes to take effect. After restart verify
+that your device is being recognized by the osx-PL2303 drivers by plugging
+in your download cable and checking the output of
+
+ ls -lrt /dev | tail -n 20
+
 
 Notes:
 ======
@@ -93,11 +112,17 @@ If you experience problems with *your* PCV, please
    (CFLAGS="-g -DDEBUG -Wall -Wextra" ./configure)
 
 If you want to help me adding support for your PCV, please capture the
-communication of some successful connections with srmwin:
+communication:
+ - if possible, compile srmio with debuging.
+ - capture output from 
+   srmcmd -v $your_options > srmcmd.out 2>&1
  - download "portmon" from sysinternals
+   http://technet.microsoft.com/en-us/sysinternals/bb896644.aspx
  - adjust portmon to log function arguments as hex !!!!!. (Options -> Log Hex)
- - send me the portmon logfiles, the resulting .srm files and the output
-   from srmcmd with DEBUG output.
+ - perform same action (download/clear/...) as with srmcmd in srmwin
+ - save portmon logfile.
+ - send me the resulting files and please describe the problems you
+   experience.
 
 Known Problems:
  - might harm an unknown PCV when it sends something the PCV doesn't
@@ -105,6 +130,7 @@ Known Problems:
  - Dates before 1970-1-1 are not supported (SRM usese 1880-1-1 as
    reference). This might lead to problems with bad timestamps or when the
    PC clock is misadjusted.
+ - multiple exercises aren't split automagically
  - when downloading data, the recint is taken from the first chunks. If it
    changes later on, it's ignored. Well, srmwin seems to ignore the
    recorded recint completely and takes the configured one...
@@ -116,6 +142,5 @@ Known Problems:
  - result of PC in non-metric display mode is untested.
  - negative temperatures are untested.
  - libary interface should have proper documentation
-
 
 Rainer
