@@ -312,6 +312,10 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 		return NULL;
 	conn->lfunc = lfunc;
 
+	_srm_log( conn, "%s opening device %s",
+		PACKAGE_STRING,
+		fname );
+
 	/* TODO: uucp style lockfils */
 
 	if( 0 > (conn->fd = open( fname, O_RDWR | O_NOCTTY )))
