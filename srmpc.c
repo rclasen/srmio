@@ -661,6 +661,7 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize
 	
 	if( conn->stxetx ){
 		if( rlen < 3 ){
+			DPRINTF( "_srmpc_msg_recv response is too short" );
 			errno = EBADMSG;
 			return -1;
 		}
@@ -688,6 +689,7 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize
 
 	} else {
 		if( rlen < 1 ){
+			DPRINTF( "_srmpc_msg_recv response is too short" );
 			errno = EBADMSG;
 			return -1;
 		}
@@ -1475,7 +1477,13 @@ int srmpc_get_chunks(
 				*buf );
 	}
 
-	_srmpc_msg_busy( conn, 2 );
+	/* prod PCV to become responsive, again.
+	 * Passively waiting isn't sufficient */
+	for( retries = 5; retries > 0; --retries ){
+		if( 0 < srmpc_get_version( conn ) )
+			break;
+	}
+
 	return 0;
 }
 
