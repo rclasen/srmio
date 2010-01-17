@@ -128,6 +128,7 @@ void srmpc_close( srmpc_conn_t conn );
 
 
 
+int srmpc_get_version( srmpc_conn_t conn );
 char *srmpc_get_athlete( srmpc_conn_t conn );
 
 int srmpc_get_time( srmpc_conn_t conn, struct tm *timep ); 

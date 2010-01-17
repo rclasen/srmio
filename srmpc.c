@@ -782,6 +782,34 @@ static int _srmpc_msg( srmpc_conn_t conn, char cmd,
 	( ((unsigned char)((x) / 10) << 4 ) | ( (x) % 10 ) )
 
 /*
+ * setting:	get Firmware Version, readonly
+ * command:	P
+ */
+
+/*
+ * parameter:
+ *  conn: connection handle
+ *
+ * returns integer firmware version
+ * on error errno is set and returns -1
+ */
+int srmpc_get_version( srmpc_conn_t conn )
+{
+	unsigned char buf[20];
+	int ret;
+
+	ret = _srmpc_msg( conn, 'P', NULL, 0, buf, 20, 2 );
+	if( ret < 0 )
+		return -1;
+	if( ret < 2 ){
+		errno = EPROTO;
+		return -1;
+	}
+
+	return ( buf[0] << 8 ) | buf[1];
+}
+
+/*
  * setting:	athlete name
  * command:	N
  * argument:	cccccc\x20\x20 - it's 6 chars, zero-padded
