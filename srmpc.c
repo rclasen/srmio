@@ -1420,7 +1420,7 @@ int srmpc_get_chunks(
 		unsigned char resp = ACK;
 
 		_srm_log( conn, "processing block %u/%u",
-			gh.blocknum,
+			gh.blocknum +1,
 			gh.blocks);
 
 		ret = _srmpc_read( conn, buf, 64 );
