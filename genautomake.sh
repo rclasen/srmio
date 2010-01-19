@@ -9,7 +9,11 @@
 
 
 aclocal
-libtoolize --copy --force
+libtoolize=libtoolize
+if which glibtoolize > /dev/null 2>&1; then
+	libtoolize=glibtoolize
+fi
+$libtoolize --copy --force
 autoheader
 automake --add-missing --copy --force-missing
 autoconf
