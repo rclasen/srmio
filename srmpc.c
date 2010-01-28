@@ -97,6 +97,7 @@ static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
 		;
 	va_end( ap );
 	
+	DPRINTF("_srm_log: %s", buf );
 	(*conn->lfunc)( buf );
 }
 
