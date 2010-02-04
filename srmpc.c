@@ -1481,9 +1481,11 @@ int srmpc_get_chunks(
 	/* prod PCV to become responsive, again.
 	 * Passively waiting isn't sufficient */
 	for( retries = 5; retries > 0; --retries ){
-		if( 0 < srmpc_get_version( conn ) )
+		if( 0 < (ret = srmpc_get_version( conn ) ) )
 			break;
 	}
+	if( ret > 0 )
+		_srm_log( conn, "PCV doesn't respond after download!");
 
 	return 0;
 }
