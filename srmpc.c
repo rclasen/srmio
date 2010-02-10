@@ -1057,7 +1057,7 @@ int srmpc_get_recint( srmpc_conn_t conn )
 	}
 	
 	recint = ( *buf & 0x80 ) 
-		? *buf & 0x80 
+		? *buf & 0x0f
 		: *buf * 10;
 
 	DPRINTF( "srmpc_get_recint raw=0x%02x recint=%d", *buf, recint);
