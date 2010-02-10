@@ -29,6 +29,7 @@
 static const unsigned _srmpc_whitelist[] = {
 	0x6b09,		/* fw 6b.09 - uses stxetx */
 	0x4309,		/* fw 43.09 - no stxetx, fw was upgraded 04/2009 */
+	0x3404,		/* fw 34.04 - no stxetx, reported by MorganFletcher */
 	0,
 };
 
