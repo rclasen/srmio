@@ -110,9 +110,12 @@ int srm_data_write_srm7( srm_data_t data, const char *fname );
 
 /************************************************************
  *
- * from srmio.c
+ * from srmpc.c
  *
  ************************************************************/
+
+#define SRM_BUFSIZE	1024
+#define SRM_BLOCKCHUNKS	11u
 
 typedef void (*srmpc_log_callback_t)( const char *msg );
 
@@ -149,32 +152,36 @@ int srmpc_get_recint( srmpc_conn_t conn );
 int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint );
 
 
-/* handle that's used within srmpc_get_chunks to hold intermediate
- * data that's passed to the callback */
+/* handle that's used within srmpc_get_chunks* */
 struct _srmpc_get_chunk_t {
 	/* whole downlad */
 	srmpc_conn_t		conn;
 	struct tm		pctime;
 	unsigned		blocks;
+	unsigned char		buf[SRM_BUFSIZE];
+	int			finished;
 
 	/* current block */
-	unsigned		blocknum;
+	unsigned		blocknum;	/* 0..blocks-1 */
 	srm_time_t		bstart;
 	unsigned long		dist;
 	int			temp;	
 	srm_time_t		recint;
 
 	/* current chunk */
-	unsigned		chunknum;	/* within block */
+	unsigned		chunknum;	/* within block 0..10 */
 	int			isfirst;	/* ... of marker */
 	int			iscont;		/* ... of marker */
-	struct _srm_chunk_t	chunk; /* TODO: hack? should use srm_chunk_new()? */
-
-	void			*cbdata;
 };
 typedef struct _srmpc_get_chunk_t *srmpc_get_chunk_t;
 
-typedef int (*srmpc_chunk_callback_t)( srmpc_get_chunk_t gh );
+srmpc_get_chunk_t srmpc_get_chunk_start( srmpc_conn_t conn, int getall );
+srm_chunk_t srmpc_get_chunk_next( srmpc_get_chunk_t handle );
+void srmpc_get_chunk_done( srmpc_get_chunk_t handle );
+
+/* alternative / obsolete callback-based interface: */
+typedef int (*srmpc_chunk_callback_t)( srmpc_get_chunk_t gh,
+	void *cbdata, srm_chunk_t chunk );
 int srmpc_get_chunks( srmpc_conn_t conn, int getall,
 	srmpc_chunk_callback_t cfunc, void *cbdata );
 

@@ -12,8 +12,6 @@
 #include <stdarg.h>
 
 
-#define SRM_BUFSIZE	1024
-
 #define STX	((char)0x2)
 #define ETX	((char)0x3)
 #define ACK	((char)0x6)
@@ -541,6 +539,8 @@ static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const unsigned char *ar
 
 	DPRINTF( "_srmpc_msg_send %c ...", cmd );
 	DUMPHEX( "_srmpc_msg_send", arg, alen );
+
+	/* TODO: refuse to send command while another one is running */
 
 	if( 2 * alen +3 < alen ){
 		errno = EOVERFLOW;
@@ -1120,7 +1120,7 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
 
 /************************************************************
  *
- * get/parse data blocks / callback
+ * get/parse data blocks
  *
  ************************************************************/
 
@@ -1190,27 +1190,91 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
 
 
 /*
- * parse single 64byte data block, invoke callback for each chunk
+ * retrieve next block from PC into buffer
+ * parse block-wide data
+ * and request next block
  *
- * returns -1 on failure, 0 on success
+ * returns
+ *  0 on success
+ *  -1 on error
+ *  1 when there's no block left
  */
-static int _srmpc_parse_block( srmpc_get_chunk_t gh,
-	unsigned char *buf,
-	srmpc_chunk_callback_t	cbfunc )
+static int _srmpc_get_block( srmpc_get_chunk_t gh )
 {
+	int retries;
+	unsigned char response;
 	struct tm btm;
 	int ret;
 
-	DUMPHEX( "_srmpc_parse_block", buf, 64 );
+	_srm_log( gh->conn, "getting block %u/%u",
+		gh->blocknum +1,
+		gh->blocks);
 
-	/* parse timestamp */
+	for( retries = 0; retries < 3; ++retries ){
+		ret = _srmpc_read( gh->conn, gh->buf, 64 );
+		DPRINTF( "_srmpc_get_block: got %d chars", ret );
+
+		if( ret < 0 ){
+			return -1;
+
+		} else if( ret < 1 ){
+			/* workaround stxetx + 3 blocks problem */
+			if( gh->conn->stxetx && gh->blocks == 3 && gh->blocknum == 0 ){
+				DPRINTF( "_srmpc_get_block: stxetx, fixing blocks=0" );
+				gh->blocks = 0;
+				gh->finished++;
+				return 1;
+			}
+
+			errno = ETIMEDOUT;
+			return -1;
+
+		} else if( ret == 1 && gh->buf[0] == ETX ){
+			DPRINTF( "_srmpc_get_block: got ETX" );
+			gh->finished++;
+			return 1;
+
+		} else if( ret < 64 ){
+			DPRINTF( "_srmpc_get_block: requesting retransmit" );
+			sleep(1);
+
+			response = NAK;
+			if( 0 > _srmpc_write( gh->conn, &response, 1 ) )
+				return -1;
+			retries++;
+
+		} else {
+			break;
+		}
+
+	}
+
+	if( retries > 2 ){
+		errno = ETIMEDOUT;
+		return -1;
+	}
+
+
+	/* request next block */
+	response = ACK;
+	if( 0 > _srmpc_write( gh->conn, &response, 1 ) )
+		return -1;
+
+	gh->chunknum = 0;
+	gh->blocknum++;
+
+	/* parse block */
+
+	DUMPHEX( "_srmpc_get_block", gh->buf, 64 );
+
+
 	btm.tm_year = gh->pctime.tm_year;
 	btm.tm_isdst = -1;
-	btm.tm_mday = TIMEDEC( buf[0] & 0x3f );
-	btm.tm_mon = TIMEDEC( buf[1] & 0x1f ) -1;
-	btm.tm_hour = TIMEDEC( buf[2] & 0x3f );
-	btm.tm_min = TIMEDEC( buf[3] );
-	btm.tm_sec = TIMEDEC( buf[4] );
+	btm.tm_mday = TIMEDEC( gh->buf[0] & 0x3f );
+	btm.tm_mon = TIMEDEC( gh->buf[1] & 0x1f ) -1;
+	btm.tm_hour = TIMEDEC( gh->buf[2] & 0x3f );
+	btm.tm_min = TIMEDEC( gh->buf[3] );
+	btm.tm_sec = TIMEDEC( gh->buf[4] );
 
 	if( btm.tm_mon < gh->pctime.tm_mon )
 		-- btm.tm_year;
@@ -1220,19 +1284,19 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 		return -1;
 
 	gh->bstart = (srm_time_t)ret *10;
-	gh->dist = ( (buf[5] << 16 )
-		| ( buf[6] << 8 )
-		| buf[7] )
+	gh->dist = ( (gh->buf[5] << 16 )
+		| ( gh->buf[6] << 8 )
+		| gh->buf[7] )
 		/ 3.9;
 
- 	gh->temp = buf[8];
-	gh->recint = ( (buf[1] & 0xe0) >> 5)
-		| ( (buf[0] & 0x40) >> 3);
-	if( ! (buf[2] & 0x40) )
+	gh->temp = gh->buf[8];
+	gh->recint = ( (gh->buf[1] & 0xe0) >> 5)
+		| ( (gh->buf[0] & 0x40) >> 3);
+	if( ! (gh->buf[2] & 0x40) )
 		gh->recint *= 10;
 
-	DPRINTF( "_srmpc_parse_block mon=%u day=%u hour=%u min=%u sec=%u "
-		"dist=%lu temp=%d recint=%.1f na0=%x na2=%x", 
+	DPRINTF( "_srmpc_get_block mon=%u day=%u hour=%u min=%u sec=%u "
+		"dist=%lu temp=%d recint=%.1f na0=%x na2=%x",
 		(unsigned)btm.tm_mon,
 		(unsigned)btm.tm_mday,
 		(unsigned)btm.tm_hour,
@@ -1241,51 +1305,68 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 		gh->dist,
 		gh->temp,
 		(double)gh->recint/10,
-		(int)( ( buf[0] & 0x80) >> 7 ),
-		(int)( ( buf[2] & 0x80) >> 7 ) );
+		(int)( ( gh->buf[0] & 0x80) >> 7 ),
+		(int)( ( gh->buf[2] & 0x80) >> 7 ) );
 
-	for( gh->chunknum=0; gh->chunknum < 11u; ++gh->chunknum ){
-		unsigned char *cbuf = &buf[9 + 5*gh->chunknum];
-		gh->isfirst = cbuf[0] & 0x40;
-		gh->iscont = cbuf[0] & 0x80;
+	return 0;
+}
 
-		DUMPHEX( "_srmpc_parse_block chunk", cbuf, 5 );
-
-		if( 0 == memcmp( cbuf, "\0\0\0\0\0", 5 )){
-			DPRINTF( "_srmpc_parse_block: skipping empty chunk#%u", 
-				gh->chunknum );
-			continue;
-		}
-
-		gh->chunk.time = gh->bstart 
-			+ gh->chunknum * gh->recint;
-		if( gh->chunk.time < gh->bstart ){
-			errno = EOVERFLOW;
-			return -1;
-		}
-		gh->chunk.temp = gh->temp;
-		gh->chunk.pwr = ( ( cbuf[0] & 0x0f) << 8 ) | cbuf[1];
-		gh->chunk.speed =  (double)0.2 * ( 
-			( ( cbuf[0] & 0x30) << 4) 
-			| cbuf[2] );
-		gh->chunk.cad = cbuf[3];
-		gh->chunk.hr = cbuf[4];
-		gh->chunk.ele = 0;
+/*
+ * allocates and parses next chunk from buffer.
+ *
+ * returns
+ *  0 when chunk was returned
+ *  1 when there's no chunk left in this block
+ *  -1 on error
+ */
+static int _srmpc_get_chunk( srmpc_get_chunk_t gh, srm_chunk_t *chunkp )
+{
+	unsigned char *cbuf;
+	srm_chunk_t chunk;
 
 
-		/* TODO: verify data when display is non-metric */
-		/* TODO: verify temperature < 0°C */
+	cbuf = &gh->buf[9 + 5*gh->chunknum];
+	DUMPHEX( "_srmpc_get_chunk", cbuf, 5 );
 
-		if( (*cbfunc)( gh ) )
-			return -1;
+	if( NULL == (chunk = srm_chunk_new()))
+		return -1;
+	*chunkp = chunk;
 
+	gh->isfirst = cbuf[0] & 0x40;
+	gh->iscont = cbuf[0] & 0x80;
+
+	if( 0 == memcmp( cbuf, "\0\0\0\0\0", 5 )){
+		DPRINTF( "_srmpc_get_chunk: skipping empty chunk#%u",
+			gh->chunknum );
+		++gh->chunknum;
+		return 1;
 	}
+
+	chunk->time = gh->bstart
+		+ gh->chunknum * gh->recint;
+	if( chunk->time < gh->bstart ){
+		errno = EOVERFLOW;
+		return -1;
+	}
+
+	chunk->temp = gh->temp;
+	chunk->pwr = ( ( cbuf[0] & 0x0f) << 8 ) | cbuf[1];
+	chunk->speed =  (double)0.2 * (
+		( ( cbuf[0] & 0x30) << 4)
+		| cbuf[2] );
+	chunk->cad = cbuf[3];
+	chunk->hr = cbuf[4];
+	chunk->ele = 0;
+
+	gh->chunknum++;
+
+	/* TODO: verify data when display is non-metric */
+	/* TODO: verify temperature < 0°C */
 
 	return 0;
 }
 
 
-/* TODO: convert to non-callback interface */
 
 /*
  * get all blocks/chunks off the SRM, parse it and pass the decoded chunks
@@ -1294,155 +1375,187 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
  * parameter:
  *  conn: connection handle
  *  deleted: instruct PCV to send deleted data, too (when != 0)
- *  cbfunc: callback to process each retrieved data chunk
- *  cbdata: passed to cbfunc
  *
- * on error errno is set and returns -1
+ * on error errno is set and returns NULL
  */
-int srmpc_get_chunks( 
-	srmpc_conn_t conn, 
-	int deleted,
-	srmpc_chunk_callback_t cbfunc, 
-	void *cbdata )
+srmpc_get_chunk_t srmpc_get_chunk_start( srmpc_conn_t conn, int deleted )
 {
-	struct _srmpc_get_chunk_t gh;
-	unsigned char buf[SRM_BUFSIZE];
+	srmpc_get_chunk_t gh;
 	int ret;
-	int retries = 0;
 	char cmd;
-
-
-	if( ! cbfunc )
-		return 0;
 
 	if( deleted )
 		cmd = 'y';
 	else
 		cmd = 'A';
 
-	memset(&gh, 0, sizeof( struct _srmpc_get_chunk_t ));
-	gh.conn = conn;
-	gh.cbdata = cbdata;
+	if( NULL == (gh = malloc( sizeof(struct _srmpc_get_chunk_t)) ))
+		return NULL;
 
-	if( 0 > srmpc_get_time( conn, &gh.pctime ))
-		return -1;
+	memset(gh, 0, sizeof( struct _srmpc_get_chunk_t ));
+	gh->conn = conn;
+	gh->chunknum = SRM_BLOCKCHUNKS;
+
+	if( 0 > srmpc_get_time( conn, &gh->pctime ))
+		goto clean1;
 
 	if( 0 > _srmpc_msg_ready( conn ))
-		return -1;
+		goto clean1;
 
 	if( _srmpc_msg_send( conn, cmd, NULL, 0 ) )
-		return -1;
+		goto clean1;
 
 	/* get header + number of blocks to read */
-	ret = _srmpc_read( conn, buf, conn->stxetx ? 4 : 3 );
-	DPRINTF( "srmpc_get_chunks read %d chars", ret ); 
-	if( ret < 0 ){
-		return -1;
-	} 
-	DUMPHEX( "srmpc_get_chunks read response", buf, ret ); 
+	ret = _srmpc_read( conn, gh->buf, conn->stxetx ? 4 : 3 );
+	DPRINTF( "srmpc_get_chunk_start read %d chars", ret );
+	if( ret < 0 )
+		goto clean1;
+
+	DUMPHEX( "srmpc_get_chunk_start read response", gh->buf, ret );
 	if( conn->stxetx ){
 		/* TODO: how to distinguish "3 blocks" and 0 + ETX?
 		 * both: 0x02/  0x41/A 0x00/  0x03/ */
 		if( ret < 4 ){
 			errno = EPROTO;
-			return -1;
-		} else if( buf[0] != STX || buf[1] != cmd ){
+			goto clean1;
+		} else if( gh->buf[0] != STX || gh->buf[1] != cmd ){
 			errno = EPROTO;
-			return -1;
+			goto clean1;
 		}
 
-		gh.blocks = ( buf[2] << 8) | buf[3];
-	
+		gh->blocks = ( gh->buf[2] << 8) | gh->buf[3];
+
 	} else {
 		if( ret < 2 ){
 			errno = EPROTO;
-			return -1;
+			goto clean1;
 
 		} else if( ret > 2 ){
-			gh.blocks = ( buf[1] << 8 ) | buf[2];
+			gh->blocks = ( gh->buf[1] << 8 ) | gh->buf[2];
 
 		} else {
-			gh.blocks = buf[1];
+			gh->blocks = gh->buf[1];
 
 		}
 
 	}
-	DPRINTF( "srmpc_get_chunks expecting %u blocks", gh.blocks );
-	if( (unsigned long)gh.blocks * 11u > UINT16_MAX ){
+	DPRINTF( "srmpc_get_chunk_start expecting %u blocks", gh->blocks );
+	if( (unsigned long)gh->blocks * SRM_BLOCKCHUNKS > UINT16_MAX ){
 		errno = EPROTO;
-		return -1;
+		goto clean1;
 	}
 
-	/* read 64byte blocks, each with header + 11 chunks */
-	while( gh.blocknum < gh.blocks ){
-		unsigned char resp = ACK;
+	return gh;
+clean1:
+	free(gh);
+	return NULL;
+}
 
-		_srm_log( conn, "processing block %u/%u",
-			gh.blocknum +1,
-			gh.blocks);
+/*
+ * retrieve next chunk from PC
+ * automagically fetches next block when last chunk of block was returned.
+ * returns NULL when last chunk was returned
+ */
+srm_chunk_t srmpc_get_chunk_next( srmpc_get_chunk_t gh )
+{
+	srm_chunk_t chunk;
+	int ret;
 
-		ret = _srmpc_read( conn, buf, 64 );
-		DPRINTF( "srmpc_get_chunks: got %d chars", ret );
+	do {
+		if( gh->finished )
+			return NULL;
 
-		if( ret < 0 ){
-			return -1;
+		if( gh->blocknum >= gh->blocks )
+			return NULL;
 
-		} else if( ret < 1 ){
-			/* workaround stxetx + 3 blocks problem */
-			if( conn->stxetx && gh.blocks == 3 && gh.blocknum == 0 ){
-				gh.blocks = 0;
-				DPRINTF( "srmpc_get_chunks stxetx %u blocks",
-					 gh.blocks );
-				break;
-			}
+		if( gh->chunknum >= SRM_BLOCKCHUNKS ){
 
-			errno = ETIMEDOUT;
-			return -1;
+			if( _srmpc_get_block( gh ) )
+				return NULL;
 
-		} else if( ret == 1 && buf[0] == ETX ){
-			DPRINTF( "srmpc_get_chunks: got ETX" );
-			break;
-			
-		} else if( ret < 64 ){
-			if( retries > 2 ){
-				errno = ETIMEDOUT;
-				return -1;
-			}
-
-			DPRINTF( "srmpc_get_chunks: requesting retransmit" );
-			sleep(1);
-			resp = NAK;
-			retries++;
-
-		} else {
-			retries = 0;
-			if( 0 > _srmpc_parse_block( &gh, buf, cbfunc ))
-				return -1;
-
-			++gh.blocknum;
 		}
 
-		/* ACK / NAK this block */
-		if( 0 > _srmpc_write( conn, &resp, 1 ) )
-			return -1;
+		ret = _srmpc_get_chunk( gh, &chunk );
+		if( ret < 0 )
+			return NULL;
 
-	}
-	
+	} while( ret || ! chunk );
+
+	return chunk;
+}
+
+
+
+/*
+ * finalize chunk download
+ * free get_chunk_t handle
+ */
+void srmpc_get_chunk_done( srmpc_get_chunk_t gh )
+{
+	int retries;
+	int ret;
+
 	/* read (and ignore) trailing ETX */
-	if( gh.blocks && gh.blocknum == gh.blocks && conn->stxetx ){
-		if( 1 == _srmpc_read( conn, buf, 1 ) )
-			DPRINTF( "srmpc_get_chunks final ETX: %02x",
-				*buf );
+	if( gh->blocks && gh->blocknum == gh->blocks && gh->conn->stxetx ){
+		if( 1 == _srmpc_read( gh->conn, gh->buf, 1 ) )
+			DPRINTF( "srmpc_get_chunk_done final ETX: %02x",
+				*gh->buf );
 	}
+
 
 	/* prod PCV to become responsive, again.
 	 * Passively waiting isn't sufficient */
-	for( retries = 5; retries > 0; --retries ){
-		if( 0 < (ret = srmpc_get_version( conn ) ) )
+	for( retries = 0; retries < 5; ++retries ){
+		if( 0 < (ret = srmpc_get_version( gh->conn ) ) )
 			break;
+
+		if( retries )
+			sleep(1);
 	}
-	if( ret > 0 )
-		_srm_log( conn, "PCV doesn't respond after download!");
+
+	if( ret < 0 )
+		_srm_log( gh->conn, "Note: PCV doesn't respond after download!");
+	else
+		DPRINTF( "PCV took %d retries to respond after download",
+			retries);
+
+	free(gh);
+}
+
+
+/*
+ * wrapper arround _start(), _next(), _done() for backwards compatible
+ * callback based interface for chunk download.
+ *
+ * parameter:
+ *  conn: connection handle
+ *  deleted: instruct PCV to send deleted data, too (when != 0)
+ *  cbfunc: callback to process each retrieved data chunk
+ *  cbdata: passed to cbfunc
+ *
+ * on error errno is set and returns NULL
+ */
+int srmpc_get_chunks(
+	srmpc_conn_t conn,
+	int deleted,
+	srmpc_chunk_callback_t cbfunc,
+	void *cbdata )
+{
+	srmpc_get_chunk_t gh;
+	srm_chunk_t chunk;
+
+	if( ! cbfunc )
+		return 0;
+
+	if( NULL == (gh = srmpc_get_chunk_start( conn, deleted ) ))
+		return -1;
+
+	while( NULL != ( chunk = srmpc_get_chunk_next( gh ))){
+		if( (*cbfunc)( gh, cbdata, chunk ) )
+			return -1;
+	}
+
+	srmpc_get_chunk_done( gh );
 
 	return 0;
 }
@@ -1489,16 +1602,14 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
  ************************************************************/
 
 
-static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
+static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh,
+	struct _srmpc_get_data_t *gdat, srm_chunk_t chunk )
 {
-	struct _srmpc_get_data_t *gdat = (struct _srmpc_get_data_t *)gh->cbdata;
-
-
 	/* TODO: start new file on recint change */
 	if( ! gdat->data->recint )
 		gdat->data->recint = gh->recint;
 
-	if( 0 > srm_data_add_chunk( gdat->data, &gh->chunk ) )
+	if( 0 > srm_data_add_chunk( gdat->data, chunk ) )
 		return -1;
 
 	/* finish previous marker */
@@ -1513,11 +1624,14 @@ static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 
 	} else if( ! gh->iscont )
 		gdat->mfirst = -1;
-	
+
 
 	return 0;
 }
 
+/*
+ * TODO: convert to non-callback interface
+ */
 /*
  * retrieve recorded data from PC and build  "friendly" srm_data_t structure.
  *
