@@ -85,6 +85,9 @@ int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk );
 int srm_data_add_chunk( srm_data_t data, srm_chunk_t chunk );
 int srm_data_add_markerp( srm_data_t data, srm_marker_t mark );
 int srm_data_add_marker( srm_data_t data, unsigned first, unsigned last );
+
+srm_time_t srm_data_time_start( srm_data_t data );
+srm_time_t srm_data_recint( srm_data_t data );
 srm_marker_t *srm_data_blocks( srm_data_t data );
 
 void srm_data_free( srm_data_t data );

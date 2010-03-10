@@ -242,7 +242,7 @@ int main( int argc, char **argv )
 				return 1;
 			}
 			printf( "%.0f\n", 
-				(double)srmdata->chunks[0]->time / 10 );
+				(double)srm_data_time_start(srmdata) / 10 );
 
 
 		} else if( opt_write ){
@@ -298,7 +298,7 @@ int main( int argc, char **argv )
 				return 1;
 			}
 			printf( "%.0f\n", 
-				(double)srmdata->chunks[0]->time / 10 );
+				(double)srm_data_time_start(srmdata) / 10 );
 
 		} else if( opt_write ){
 			if( ! srmdata->cused ){

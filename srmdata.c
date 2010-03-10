@@ -273,6 +273,28 @@ clean1:
 	return -1;
 }
 
+
+/*
+ * return start time of first chunk
+ */
+srm_time_t srm_data_time_start( srm_data_t data )
+{
+	if( data->cused < 1 )
+		return (srm_time_t) -1;
+
+	return data->chunks[0]->time;
+}
+
+
+/*
+ * return common recording interval
+ */
+srm_time_t srm_data_recint( srm_data_t data )
+{
+	return data->recint;
+}
+
+
 /*
  * find gaps in chunklist (non-continuos time), allocate and build list
  * with marker identifying the continuos blocks.
