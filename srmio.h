@@ -54,6 +54,7 @@ struct _srm_marker_t {
 typedef struct _srm_marker_t *srm_marker_t;
 
 srm_marker_t srm_marker_new( void );
+srm_marker_t srm_marker_clone( srm_marker_t marker );
 void srm_marker_free( srm_marker_t marker );
 
 

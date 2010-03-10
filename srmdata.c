@@ -94,6 +94,34 @@ srm_marker_t srm_marker_new( void )
 	return tmp;
 }
 
+
+/*
+ * copy existing marker
+ *
+ * on success pointer is returned
+ * returns NULL on error and sets errno.
+ */
+srm_marker_t srm_marker_clone( srm_marker_t marker )
+{
+	srm_marker_t tmp;
+
+	if( NULL == (tmp = srm_marker_new()))
+		return NULL;
+
+	tmp->first = marker->first;
+	tmp->last = marker->last;
+
+	if( NULL == (tmp->notes = strdup( marker->notes ) ))
+		goto clean1;
+
+	return tmp;
+
+clean1:
+	srm_marker_free( tmp );
+	return NULL;
+}
+
+
 /*
  * free marker memory
  */
