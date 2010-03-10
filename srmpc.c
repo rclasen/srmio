@@ -297,7 +297,7 @@ static int _srmpc_init_all( srmpc_conn_t conn )
  *  fname: path to serial device
  *  force: ignore whitelist (when != 0)
  *  lfunc: function to invoke for verbose status reporting
- * 
+ *
  * returns newly allocated connection handle.
  *
  * on error errno is set and returns NULL
@@ -329,7 +329,7 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 
 	/* set serial parameter and get PCV version */
 	/* TODO: allow user to specify baudrate+parity */
-	if( 0 > ( pcv = _srmpc_init_all( conn ))) 
+	if( 0 > ( pcv = _srmpc_init_all( conn )))
 		goto clean3;
 
 
@@ -353,7 +353,7 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 	}
 
 	return conn;
-	
+
 clean3:
 	close(conn->fd);
 
@@ -1194,7 +1194,6 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	srmpc_chunk_callback_t	cbfunc )
 {
 	struct tm btm;
-	srm_time_t bstart, lnext;
 	int ret;
 
 	DUMPHEX( "_srmpc_parse_block", buf, 64 );
@@ -1215,55 +1214,7 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	if( 0 > ret )
 		return -1;
 
-	bstart = (srm_time_t)ret *10;
-
-	/* adjust block timestamp based on previous one */
-	/* TODO: postprocess data for fixup *after* download, move to
-	 * srmdata.c */
-	/* TODO: fixup overlapping block timestamps */
-	lnext = gh->bstart + 11 * gh->recint;
-	if( gh->bstart > lnext ){
-		errno = EOVERFLOW;
-		return -1;
-	}
-
-	if( gh->fixup && gh->recint && lnext 
-		&& (lnext != bstart) ){
-
-		/* overlapping < 1sec */
-		if( bstart < lnext && lnext - bstart < 10 ){
-			gh->bstart = lnext;
-
-		/* gap < 2sec */
-		} else if ( bstart > lnext && bstart - lnext <= 20 ){
-			unsigned cspans = (bstart - lnext) / gh->recint;
-			gh->bstart = lnext + gh->recint * cspans;
-			if( gh->bstart < lnext ){
-				errno = EOVERFLOW;
-				return -1;
-			}
-
-		/* bigger difference */
-		} else {
-			gh->bstart = bstart;
-		}
-
-#ifdef DEBUG
-		if( gh->bstart != bstart ){
-		DPRINTF( "_srmpc_parse_block adj. timestamp %.1f > (%.1f) > %.1f",
-			(double)bstart/10,
-			(double)lnext/10,
-			(double)gh->bstart/10);
-		}
-#endif
-
-
-	} else {
-		gh->bstart = bstart;
-
-	}
-
-
+	gh->bstart = (srm_time_t)ret *10;
 	gh->dist = ( (buf[5] << 16 )
 		| ( buf[6] << 8 )
 		| buf[7] )
@@ -1328,6 +1279,9 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 	return 0;
 }
 
+
+/* TODO: convert to non-callback interface */
+
 /*
  * get all blocks/chunks off the SRM, parse it and pass the decoded chunks
  * to the callback function.
@@ -1335,7 +1289,6 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
  * parameter:
  *  conn: connection handle
  *  deleted: instruct PCV to send deleted data, too (when != 0)
- *  fixup: postprocess data (fix timestamps, fill micro-gaps, ...) (when != 0)
  *  cbfunc: callback to process each retrieved data chunk
  *  cbdata: passed to cbfunc
  *
@@ -1344,7 +1297,6 @@ static int _srmpc_parse_block( srmpc_get_chunk_t gh,
 int srmpc_get_chunks( 
 	srmpc_conn_t conn, 
 	int deleted,
-	int fixup,
 	srmpc_chunk_callback_t cbfunc, 
 	void *cbdata )
 {
@@ -1365,7 +1317,6 @@ int srmpc_get_chunks(
 
 	memset(&gh, 0, sizeof( struct _srmpc_get_chunk_t ));
 	gh.conn = conn;
-	gh.fixup = fixup;
 	gh.cbdata = cbdata;
 
 	if( 0 > srmpc_get_time( conn, &gh.pctime ))
@@ -1533,64 +1484,6 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
  ************************************************************/
 
 
-/*
- * synthesize some chunks with average data to fill small gaps at block
- * boundaries.
- */
-static int _srmpc_chunk_data_gapfill( srmpc_get_chunk_t gh )
-{
-	struct _srmpc_get_data_t *gdat = gh->cbdata;
-	srm_chunk_t nck = &gh->chunk;
-	srm_chunk_t lck;
-	srm_time_t delta;
-	unsigned fillnum, num;
-
-	if( gdat->data->cused < 1 )
-		return 0;
-
-	lck = gdat->data->chunks[gdat->data->cused-1];
-	delta = nck->time - lck->time;
-
-	/* no gap */
-	if( delta <= gdat->data->recint )
-		return 0;
-	
-	delta -= gdat->data->recint;
-	if( delta > 20 )
-		return 0; /* too large */
-
-	fillnum = delta / gdat->data->recint;
-	_srm_log( gh->conn, "inserting %u chunks to fill micro-gap at chunk#%u",
-		fillnum,
-		gdat->data->cused );
-
-	for( num = 1; num <= fillnum; ++num ){
-		srm_chunk_t fill;
-		double part = (double)num / (fillnum +1 );
-
-		if( NULL == (fill = srm_chunk_new() ))
-			return -1;
-
-		fill->time = lck->time + (num * gdat->data->recint);
-		fill->temp = part * (nck->temp - lck->temp) + lck->temp;
-		fill->pwr = part * (int)( nck->pwr - lck->pwr ) 
-			+ lck->pwr + 0.5;
-		fill->speed = part * (nck->speed - lck->speed) + lck->speed;
-		fill->cad = part * (int)( nck->cad - lck->cad ) 
-			+ lck->cad + 0.5;
-		fill->hr = part * (int)( nck->hr - lck->hr ) + lck->hr;
-		fill->ele = part * (nck->ele - lck->ele) 
-			+ lck->ele + 0.5;
-
-		if( 0 > srm_data_add_chunkp( gdat->data, fill ) ){
-			srm_chunk_free(fill);
-			return -1;
-		}
-	}
-
-	return 0;
-}
-
 static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 {
 	struct _srmpc_get_data_t *gdat = (struct _srmpc_get_data_t *)gh->cbdata;
@@ -1599,14 +1492,6 @@ static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh )
 	/* TODO: start new file on recint change */
 	if( ! gdat->data->recint )
 		gdat->data->recint = gh->recint;
-
-	/* TODO: postprocess data for fixup *after* download, move to
-	 * srmdata.c */
-
-	/* fill small gaps (<= 2sec) at block boundaries with averaged data? */
-	if( gh->fixup && gh->chunknum == 0 )
-		if( 0 > _srmpc_chunk_data_gapfill( gh ))
-			return -1;
 
 	if( 0 > srm_data_add_chunk( gdat->data, &gh->chunk ) )
 		return -1;
@@ -1671,7 +1556,7 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 	if( 0 > srm_data_add_markerp( gdat.data, mk ))
 		goto clean2;
 
-	if( 0 > srmpc_get_chunks(conn, deleted, fixup, _srmpc_chunk_data_cb, &gdat ) )
+	if( 0 > srmpc_get_chunks(conn, deleted, _srmpc_chunk_data_cb, &gdat ) )
 		goto clean2;
 
 	gdat.data->marker[0]->last = gdat.data->cused-1;
@@ -1679,6 +1564,16 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 	if( gdat.mfirst >= 0 )
 		srm_data_add_marker( gdat.data, gdat.mfirst,
 			gdat.data->cused -1 );
+
+	if( fixup ){
+		srm_data_t fixed;
+
+		if( NULL == ( fixed = srm_data_fixup( gdat.data ) ) )
+			goto clean2;
+
+		srm_data_free( gdat.data );
+		gdat.data = fixed;
+	}
 
 	return gdat.data;
 

@@ -227,6 +227,16 @@ int main( int argc, char **argv )
 			return 1;
 		}
 
+		if( opt_fixup ){
+			srm_data_t fixed;
+
+			if( NULL == ( fixed = srm_data_fixup( srmdata ) ) )
+				return -1;
+
+			srm_data_free( srmdata );
+			srmdata = fixed;
+		}
+
 		if( opt_name ){
 			if( ! srmdata->mused ){
 				fprintf( stderr, "no data available\n" );

@@ -111,7 +111,7 @@ srm_marker_t srm_marker_clone( srm_marker_t marker )
 	tmp->first = marker->first;
 	tmp->last = marker->last;
 
-	if( NULL == (tmp->notes = strdup( marker->notes ) ))
+	if( marker->notes && NULL == (tmp->notes = strdup( marker->notes ) ))
 		goto clean1;
 
 	return tmp;
@@ -169,6 +169,197 @@ clean1:
 	free( data );
 	return NULL;
 }
+
+/*
+ * add chunk to data.
+ * chunk's timestamp is adjusted to fit recint
+ * if there's a gap, it's filled with averaged data
+ *
+ * on success 0 is returned
+ * returns -1 and sets errno on error
+ */
+int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
+{
+	srm_chunk_t last = data->chunks[data->cused-1];
+	srm_time_t lnext = last->time + data->recint;
+	unsigned miss;
+	unsigned i;
+
+	if( chunk->time < lnext ){
+		DPRINTF( "srm_data_add_fillp: data is overlapping, can't add" );
+		errno = EINVAL;
+		return -1;
+	}
+
+	miss = (chunk->time - lnext) / data->recint;
+
+	/* ... adjust current time to fit n*recint */
+	lnext += data->recint * miss;
+	if( chunk->time > lnext ){
+		errno = EOVERFLOW;
+		return -1;
+	}
+
+	if( chunk->time != lnext ){
+		DPRINTF("srm_data_add_fill: adjusting gap %.1f -> %.1f",
+			(double)chunk->time / 10,
+			(double)lnext / 10);
+		chunk->time = lnext;
+	}
+
+	if( ! miss )
+		return 0;
+
+	DPRINTF( "srm_data_add_fill: synthesizing %d chunks @%.1f",
+		miss, (double)lnext / 10 );
+
+	/* ... adjust marker indices */
+	for( i=0; i < data->mused; ++i ){
+		srm_marker_t mark = data->marker[i];
+
+		if( mark->first >= data->cused )
+			mark->first += miss;
+
+		if( mark->last >= data->cused )
+			mark->last += miss;
+	}
+
+	/* ... insert averaged data */
+	for( i = 1; i <= miss; ++i ){
+		srm_chunk_t fill;
+		double part = (double)i / (miss +1 );
+
+		if( NULL == (fill = srm_chunk_new() ))
+			return -1;
+
+		fill->time = last->time + (i * data->recint);
+		fill->temp = part * (chunk->temp
+			- last->temp) + last->temp;
+		fill->pwr = part * (int)( chunk->pwr - last->pwr )
+			+ last->pwr + 0.5;
+		fill->speed = part * (chunk->speed
+			- last->speed) + last->speed;
+		fill->cad = part * (int)( chunk->cad - last->cad )
+			+ last->cad + 0.5;
+		fill->hr = part * (int)( chunk->hr
+			- last->hr ) + last->hr;
+		fill->ele = part * (chunk->ele - last->ele)
+			+ last->ele + 0.5;
+
+		if( 0 > srm_data_add_chunkp( data, fill ) ){
+			srm_chunk_free(fill);
+			return -1;
+		}
+	}
+
+	if( 0 > srm_data_add_chunkp( data, chunk ) )
+		return -1;
+
+	return 0;
+}
+
+
+/*
+ * fix small time leaps at block boundaries
+ * fix timestamps of overlapping chunks
+ * fill small gaps with averaged data
+ * fixed data is copied to a new srm_data_t handle
+ *
+ * returns pointer to newly allocated srm_data
+ * returns NULL on failure
+ */
+srm_data_t srm_data_fixup( srm_data_t data )
+{
+	srm_data_t fixed;
+	srm_time_t delta = 0;
+	unsigned c, m;
+
+	if( data->cused < 1 )
+		return NULL;
+
+	if( NULL == (fixed = srm_data_new() ))
+		return NULL;
+
+	/* copy global data */
+	fixed->recint = data->recint;
+	fixed->slope = data->slope;
+	fixed->zeropos = data->zeropos;
+	if( data->notes && NULL == (fixed->notes = strdup( data->notes ) ))
+		goto clean1;
+
+	/* copy marker */
+	for( m=0; m < data->mused; ++m ){
+		srm_marker_t mark;
+
+		if( NULL == ( mark = srm_marker_clone( data->marker[m]) ) )
+			goto clean1;
+
+		if( 0 > srm_data_add_markerp( fixed, mark ) )
+			goto clean1;
+	}
+
+	/* copy chunks + fix smaller gaps/overlaps */
+
+	if( 0 > srm_data_add_chunk( fixed, data->chunks[0] ) )
+		goto clean1;
+
+	for( c=1; c < data->cused; ++c ){
+		srm_chunk_t last = fixed->chunks[fixed->cused-1];
+		srm_time_t lnext = last->time + fixed->recint;
+		srm_chunk_t this;
+
+		if( NULL == ( this = srm_chunk_clone( data->chunks[c] )))
+			goto clean1;
+
+		/* overlapping < 1sec, adjust this time */
+		if( this->time < lnext && lnext - last->time < 10 ){
+			DPRINTF("srm_data_fixup: adjusting overlap %.1f -> %.1f",
+				(double)this->time / 10,
+				(double)lnext / 10);
+			this->time = lnext;
+
+			if( 0 > srm_data_add_chunkp( fixed, this ) )
+				goto clean1;
+
+		/* gap <= 2sec ... */
+		} else if ( lnext < this->time
+			&& this->time - lnext <= 20) {
+
+			if( 0 > srm_data_add_fillp( fixed, this ))
+				goto clean1;
+
+		/* nothing to fix (yet) */
+		} else {
+			if( 0 > srm_data_add_chunkp( fixed, this ) )
+				goto clean1;
+
+		}
+
+	}
+
+	/* fix "severe" overlaping */
+	for( c = fixed->cused -1; c > 0; --c ){
+		srm_chunk_t this = fixed->chunks[c-1];
+		srm_chunk_t next = fixed->chunks[c];
+		srm_time_t nprev = next->time - fixed->recint - delta;
+
+		if( nprev < this->time ){
+			delta += this->time - nprev;
+			DPRINTF( "srm_data_fixup overlaping blocks @%d, "
+				"new delta: %.1f",
+				c,
+				(double)delta/10 );
+		}
+		this->time -= delta;
+	}
+
+	return fixed;
+
+clean1:
+	srm_data_free( fixed );
+	return NULL;
+}
+
 
 /*
  * add chunk to end of data's chunk list. Extends list when necessary.
