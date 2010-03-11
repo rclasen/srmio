@@ -60,12 +60,6 @@ static const int _srmpc_baudnames[_srmpc_baud_max] = {
 	2400,
 };
 
-/* handle for srm_get_data and related functions */
-struct _srmpc_get_data_t {
-	int		mfirst;
-	srm_data_t	data;
-};
-
 static int _srmpc_msg_decode( 
 	unsigned char *out, size_t olen,
 	const unsigned char *in, size_t ilen );
@@ -1219,23 +1213,29 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 
 		} else if( ret < 1 ){
 			/* workaround stxetx + 3 blocks problem */
-			if( gh->conn->stxetx && gh->blocks == 3 && gh->blocknum == 0 ){
+			if( gh->conn->stxetx
+				&& gh->blocks == 3
+				&& gh->blocknum == 0 ){
+
 				DPRINTF( "_srmpc_get_block: stxetx, fixing blocks=0" );
 				gh->blocks = 0;
 				gh->finished++;
 				return 1;
 			}
 
+			/* TODO: retry */
 			errno = ETIMEDOUT;
 			return -1;
 
 		} else if( ret == 1 && gh->buf[0] == ETX ){
-			DPRINTF( "_srmpc_get_block: got ETX" );
+			_srm_log( gh->conn, "got unexpected end of "
+				"transfer for block %u", gh->blocknum );
 			gh->finished++;
 			return 1;
 
 		} else if( ret < 64 ){
-			DPRINTF( "_srmpc_get_block: requesting retransmit" );
+			_srm_log( gh->conn, "received incomplete block %u, "
+				"requesting retransmit", gh->blocknum );
 			sleep(1);
 
 			response = NAK;
@@ -1255,7 +1255,7 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 	}
 
 
-	/* request next block */
+	/* confirm receival of block */
 	response = ACK;
 	if( 0 > _srmpc_write( gh->conn, &response, 1 ) )
 		return -1;
@@ -1441,7 +1441,8 @@ srmpc_get_chunk_t srmpc_get_chunk_start( srmpc_conn_t conn, int deleted )
 	}
 	DPRINTF( "srmpc_get_chunk_start expecting %u blocks", gh->blocks );
 	if( (unsigned long)gh->blocks * SRM_BLOCKCHUNKS > UINT16_MAX ){
-		errno = EPROTO;
+		_srm_log( conn, "cannot handle that many blocks, sorry" );
+		errno = EOVERFLOW;
 		goto clean1;
 	}
 
@@ -1597,41 +1598,10 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
  * use srmpc_get_chunks() to fill srm_data_t structure 
  * with all chunks.
  *
- * Also serves as example on how to use the callback.
+ * Also serves as example on how to use the download API.
  *
  ************************************************************/
 
-
-static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh,
-	struct _srmpc_get_data_t *gdat, srm_chunk_t chunk )
-{
-	/* TODO: start new file on recint change */
-	if( ! gdat->data->recint )
-		gdat->data->recint = gh->recint;
-
-	if( 0 > srm_data_add_chunk( gdat->data, chunk ) )
-		return -1;
-
-	/* finish previous marker */
-	if( gdat->mfirst >= 0 && ( ! gh->iscont || gh->isfirst ) )
-		srm_data_add_marker( gdat->data, gdat->mfirst,
-		gdat->data->cused -1 );
-
-	if( gh->isfirst ){
-		gdat->mfirst = (int)gdat->data->cused;
-		DPRINTF( "_srmpc_chunk_data_cb: new marker at %d",
-			gdat->mfirst );
-
-	} else if( ! gh->iscont )
-		gdat->mfirst = -1;
-
-
-	return 0;
-}
-
-/*
- * TODO: convert to non-callback interface
- */
 /*
  * retrieve recorded data from PC and build  "friendly" srm_data_t structure.
  *
@@ -1646,61 +1616,101 @@ static int _srmpc_chunk_data_cb( srmpc_get_chunk_t gh,
  */
 srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 {
-	struct _srmpc_get_data_t gdat;
+	int mfirst = -1;
+	srm_data_t data;
+	srmpc_get_chunk_t gh;
+	srm_chunk_t chunk;
 	srm_marker_t mk;
 	int ret;
 
-	gdat.mfirst = -1;
-
-	if( NULL == (gdat.data = srm_data_new()))
+	if( NULL == (data = srm_data_new()))
 		return NULL;
-
-	if( 0 > (gdat.data->slope = srmpc_get_slope( conn ) ))
-		goto clean1;
-
-	if( 0 > ( ret = srmpc_get_zeropos( conn ) ))
-		goto clean1;
-	gdat.data->zeropos = ret;
-
-	if( 0 > ( ret = srmpc_get_circum( conn ) ))
-		goto clean1;
-	gdat.data->circum = ret;
 
 	if( NULL == (mk = srm_marker_new() ))
 		goto clean1;
 
+	if( 0 > srm_data_add_markerp( data, mk )){
+		srm_marker_free( mk );
+		goto clean1;
+	}
+
+
+	/* get metadata */
+
+	if( 0 > (data->slope = srmpc_get_slope( conn ) ))
+		goto clean1;
+
+	if( 0 > ( ret = srmpc_get_zeropos( conn ) ))
+		goto clean1;
+	data->zeropos = ret;
+
+	if( 0 > ( ret = srmpc_get_circum( conn ) ))
+		goto clean1;
+	data->circum = ret;
+
 	if( NULL == (mk->notes = srmpc_get_athlete( conn ) ))
-		goto clean2;
+		goto clean1;
 
-	if( 0 > srm_data_add_markerp( gdat.data, mk ))
-		goto clean2;
 
-	if( 0 > srmpc_get_chunks(conn, deleted, _srmpc_chunk_data_cb, &gdat ) )
-		goto clean2;
+	/* get chunks */
 
-	gdat.data->marker[0]->last = gdat.data->cused-1;
+	if( NULL == (gh = srmpc_get_chunk_start( conn, deleted ) ))
+		goto clean1;
 
-	if( gdat.mfirst >= 0 )
-		srm_data_add_marker( gdat.data, gdat.mfirst,
-			gdat.data->cused -1 );
+	/* TODO: start new file on recint change */
+	data->recint = gh->recint;
+
+	while( NULL != ( chunk = srmpc_get_chunk_next( gh ))){
+
+		if( 0 > srm_data_add_chunk( data, chunk ) )
+			goto clean2;
+
+		/* finish previous marker */
+		if( mfirst >= 0 && ( ! gh->iscont || gh->isfirst ) )
+			srm_data_add_marker( data, mfirst, data->cused -1 );
+
+		/* start marker */
+		if( gh->isfirst ){
+			mfirst = (int)data->cused;
+			DPRINTF( "srmpc_get_data: new marker at %d", mfirst );
+
+		} else if( ! gh->iscont )
+			mfirst = -1;
+
+	}
+	srmpc_get_chunk_done( gh );
+	gh = NULL;
+
+
+	/* finalize first + last marker */
+
+	mk->last = data->cused-1;
+
+	if( mfirst >= 0 )
+		srm_data_add_marker( data, mfirst,
+			data->cused -1 );
+
+
+	/* data fixup */
 
 	if( fixup ){
 		srm_data_t fixed;
 
-		if( NULL == ( fixed = srm_data_fixup( gdat.data ) ) )
+		if( NULL == ( fixed = srm_data_fixup( data ) ) )
 			goto clean2;
 
-		srm_data_free( gdat.data );
-		gdat.data = fixed;
+		srm_data_free( data );
+		data = fixed;
 	}
 
-	return gdat.data;
+	return data;
 
 clean2:
-	srm_marker_free(mk);
+	if( gh )
+		srmpc_get_chunk_done( gh );
 
 clean1:
-	free(gdat.data);
+	srm_data_free(data);
 	return NULL;
 }
 
