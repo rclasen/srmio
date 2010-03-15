@@ -88,8 +88,10 @@ static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
 	va_list ap;
 	char buf[SRM_BUFSIZE];
 
+#ifndef DEBUG
 	if( ! conn->lfunc )
 		return;
+#endif
 
 	va_start( ap, fmt );
 
@@ -99,7 +101,10 @@ static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
 	va_end( ap );
 	
 	DPRINTF("_srm_log: %s", buf );
-	(*conn->lfunc)( buf );
+#ifdef DEBUG
+	if( conn->lfunc )
+#endif
+		(*conn->lfunc)( buf );
 }
 
 /************************************************************
