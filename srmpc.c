@@ -426,7 +426,8 @@ void srmpc_close( srmpc_conn_t conn )
  * The response to commands to get the actual ride data off the SRM is
  * always transmitted "unencoded. (Though the whole response might be
  * wrapped in STX/ETX). Furthermore the SRM waits for confirmation
- * (ACK/NAK) periodically.
+ * (ACK/NAK) periodically. The download may be aborted by sending 0xAA,
+ * instead.
  *
  * FYI: I've tried to keep this as bitsex- - ehm - endianess-independent
  * as possible. Therefore I've decided against read()ing a struct and
@@ -1496,11 +1497,22 @@ void srmpc_get_chunk_done( srmpc_get_chunk_t gh )
 	int retries;
 	int ret;
 
-	/* read (and ignore) trailing ETX */
-	if( gh->blocks && gh->blocknum == gh->blocks && gh->conn->stxetx ){
-		if( 1 == _srmpc_read( gh->conn, gh->buf, 1 ) )
+	if( gh->blocks ){
+
+		/* abort */
+		if( gh->blocknum < gh->blocks ){
+			unsigned char buf = 0xAA; /* TODO: define */
+
+			_srm_log( gh->conn, "aborting download" );
+			tcflush( gh->conn->fd, TCIOFLUSH );
+			_srmpc_write( gh->conn, &buf, 1 );
+
+		/* read (and ignore) trailing ETX */
+		} else if( gh->conn->stxetx ){
+			if( 1 == _srmpc_read( gh->conn, gh->buf, 1 ) )
 			DPRINTF( "srmpc_get_chunk_done final ETX: %02x",
 				*gh->buf );
+		}
 	}
 
 
