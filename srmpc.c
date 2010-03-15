@@ -1415,7 +1415,8 @@ srmpc_get_chunk_t srmpc_get_chunk_start( srmpc_conn_t conn, int deleted )
 	DUMPHEX( "srmpc_get_chunk_start read response", gh->buf, ret );
 	if( conn->stxetx ){
 		/* TODO: how to distinguish "3 blocks" and 0 + ETX?
-		 * both: 0x02/  0x41/A 0x00/  0x03/ */
+		 * both: 0x02/  0x41/A 0x00/  0x03/
+		 * this is worked around in get_block() */
 		if( ret < 4 ){
 			errno = EPROTO;
 			goto clean1;
@@ -1425,6 +1426,7 @@ srmpc_get_chunk_t srmpc_get_chunk_start( srmpc_conn_t conn, int deleted )
 		}
 
 		gh->blocks = ( gh->buf[2] << 8) | gh->buf[3];
+		/* TODO: number of blocks for "download all" is wrong in FW 6b09*/
 
 	} else {
 		if( ret < 2 ){
