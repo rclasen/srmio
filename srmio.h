@@ -126,6 +126,7 @@ struct _srmpc_conn_t {
 	int		stxetx;	/* use stx/etx headers + encoding? */
 	time_t		nready;	/* PC accepts next command */
 	srmpc_log_callback_t	lfunc;	/* logging callback */
+	int		cmd_running; /* command is going on */
 };
 typedef struct _srmpc_conn_t *srmpc_conn_t;
 

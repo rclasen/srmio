@@ -229,6 +229,7 @@ static int _srmpc_init(
 		errno = EHOSTDOWN;
 		return -1;
 	}
+	conn->cmd_running = 0;
 
 	DUMPHEX( "_srmpc_init got ", buf, ret );
 
@@ -535,7 +536,11 @@ static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const unsigned char *ar
 	DPRINTF( "_srmpc_msg_send %c ...", cmd );
 	DUMPHEX( "_srmpc_msg_send", arg, alen );
 
-	/* TODO: refuse to send command while another one is running */
+
+	if( conn->cmd_running ){
+		errno = EBUSY;
+		return -1;
+	}
 
 	if( 2 * alen +3 < alen ){
 		errno = EOVERFLOW;
@@ -580,6 +585,7 @@ static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const unsigned char *ar
 		return -1;
 	}
 
+	conn->cmd_running = 1;
 	return 0;
 }
 
@@ -661,6 +667,12 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize
 	DPRINTF( "_srmpc_msg_recv got %lu chars", (unsigned long)rlen );
 	DUMPHEX( "_srmpc_msg_recv", buf, rlen );
 	
+	if( ! rlen ){
+		errno = ETIMEDOUT;
+		return -1;
+	}
+
+	conn->cmd_running = 0;
 	if( conn->stxetx ){
 		if( rlen < 3 ){
 			DPRINTF( "_srmpc_msg_recv response is too short" );
@@ -762,14 +774,32 @@ static int _srmpc_msg( srmpc_conn_t conn, char cmd,
 	size_t blen,
 	size_t want )
 {
-	/* TODO: retry */
+	int retries;
+	int ret;
+
 	if( 0 > _srmpc_msg_ready( conn ))
 		return -1;
 
-	if( _srmpc_msg_send( conn, cmd, arg, alen ) )
-		return -1;
+	for( retries = 0; retries < 3; ++retries ){
 
-	return _srmpc_msg_recv( conn, buf, blen, want );
+		if( retries ){
+			conn->cmd_running = 0;
+			_srm_log( conn, "SRM isn't responding, sending break" );
+			tcsendbreak( conn->fd, 0 );
+			sleep(1);
+		}
+
+		if( _srmpc_msg_send( conn, cmd, arg, alen ) )
+			return -1;
+
+		ret = _srmpc_msg_recv( conn, buf, blen, want);
+		/* TODO: retry on all errors? */
+		if( ret >= 0 || errno != ETIMEDOUT )
+			break;
+
+	}
+
+	return ret;
 }
 
 
@@ -1181,6 +1211,12 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
  * Alternatively all (incl. "deleted") chunks may be downloaded with
  * 'y' instead of 'A'.
  *
+ * It seems, the PCV goes to some kind of sleep mode when downloads take
+ * longer than 30sec (PCV changes display to show only the time).
+ *
+ * While this might be coincidence, PCV doesn't answer commands after
+ * longer downloads, too. Srmwin tries to wake up the PCV by sending it a
+ * BREAK signal
  */
 
 
@@ -1205,36 +1241,9 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 		gh->blocknum +1,
 		gh->blocks);
 
-	for( retries = 0; retries < 3; ++retries ){
-		ret = _srmpc_read( gh->conn, gh->buf, 64 );
-		DPRINTF( "_srmpc_get_block: got %d chars", ret );
-
-		if( ret < 0 ){
-			return -1;
-
-		} else if( ret < 1 ){
-			/* workaround stxetx + 3 blocks problem */
-			if( gh->conn->stxetx
-				&& gh->blocks == 3
-				&& gh->blocknum == 0 ){
-
-				DPRINTF( "_srmpc_get_block: stxetx, fixing blocks=0" );
-				gh->blocks = 0;
-				gh->finished++;
-				return 1;
-			}
-
-			/* TODO: retry */
-			errno = ETIMEDOUT;
-			return -1;
-
-		} else if( ret == 1 && gh->buf[0] == ETX ){
-			_srm_log( gh->conn, "got unexpected end of "
-				"transfer for block %u", gh->blocknum );
-			gh->finished++;
-			return 1;
-
-		} else if( ret < 64 ){
+	for( retries = 0; retries < 4; ++retries ){
+		if( retries ){
+			/* request retransmit */
 			_srm_log( gh->conn, "received incomplete block %u, "
 				"requesting retransmit", gh->blocknum );
 			sleep(1);
@@ -1242,21 +1251,49 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 			response = NAK;
 			if( 0 > _srmpc_write( gh->conn, &response, 1 ) )
 				return -1;
-			retries++;
+		}
 
-		} else {
+		ret = _srmpc_read( gh->conn, gh->buf, 64 );
+		DPRINTF( "_srmpc_get_block: got %d chars", ret );
+		DUMPHEX( "_srmpc_get_block", gh->buf, ret );
+
+		if( ret < 0 ){
+			/* non-recoverable error */
+			return -1;
+
+		} else if( ret == 64 ){
+			/* got complete block, terminate retry loop */
 			break;
+
+		} else if( ret == 0 && gh->conn->stxetx
+			&& gh->blocks == 3
+			&& gh->blocknum == 0 ){
+
+			/* workaround stxetx + 3 blocks problem */
+			DPRINTF( "_srmpc_get_block: stxetx, fixing blocks=0" );
+			gh->blocks = 0;
+			gh->finished++;
+			return 1;
+
+		} else if( ret == 1 && gh->conn->stxetx
+			&& gh->buf[0] == ETX ){
+
+			_srm_log( gh->conn, "got unexpected end of "
+				"transfer for block %u", gh->blocknum );
+			gh->finished++;
+			return 1;
 		}
 
 	}
 
-	if( retries > 2 ){
+	if( ret != 64 ){
 		errno = ETIMEDOUT;
 		return -1;
 	}
 
 
 	/* confirm receival of block */
+
 	response = ACK;
 	if( 0 > _srmpc_write( gh->conn, &response, 1 ) )
 		return -1;
@@ -1265,9 +1302,6 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 	gh->blocknum++;
 
 	/* parse block */
-
-	DUMPHEX( "_srmpc_get_block", gh->buf, 64 );
-
 
 	btm.tm_year = gh->pctime.tm_year;
 	btm.tm_isdst = -1;
@@ -1496,9 +1530,6 @@ srm_chunk_t srmpc_get_chunk_next( srmpc_get_chunk_t gh )
  */
 void srmpc_get_chunk_done( srmpc_get_chunk_t gh )
 {
-	int retries;
-	int ret;
-
 	if( gh->blocks ){
 
 		/* abort */
@@ -1516,23 +1547,13 @@ void srmpc_get_chunk_done( srmpc_get_chunk_t gh )
 				*gh->buf );
 		}
 	}
+	gh->conn->cmd_running = 0;
 
-
-	/* prod PCV to become responsive, again.
-	 * Passively waiting isn't sufficient */
-	for( retries = 0; retries < 5; ++retries ){
-		if( 0 < (ret = srmpc_get_version( gh->conn ) ) )
-			break;
-
-		if( retries )
-			sleep(1);
-	}
-
-	if( ret < 0 )
-		_srm_log( gh->conn, "Note: PCV doesn't respond after download!");
-	else
-		DPRINTF( "PCV took %d retries to respond after download",
-			retries);
+#ifdef DEBUG
+	/* issue *some* command for troubleshooting "stuck" PCV after
+	 * download: */
+	srmpc_get_version( gh->conn );
+#endif
 
 	free(gh);
 }
