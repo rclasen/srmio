@@ -14,8 +14,10 @@
 
 #define STX	((char)0x2)
 #define ETX	((char)0x3)
-#define ACK	((char)0x6)
-#define NAK	((char)0x15)
+
+#define BLOCK_ACK	((const unsigned char *)"\x06")
+#define BLOCK_NAK	((const unsigned char *)"\x15")
+#define BLOCK_ABRT	((const unsigned char *)"\xaa")
 
 /*
  * I'm a chicken and won't touch any SRM I don't know.
@@ -1233,7 +1235,6 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
 static int _srmpc_get_block( srmpc_get_chunk_t gh )
 {
 	int retries;
-	unsigned char response;
 	struct tm btm;
 	int ret;
 
@@ -1248,8 +1249,7 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 				"requesting retransmit", gh->blocknum );
 			sleep(1);
 
-			response = NAK;
-			if( 0 > _srmpc_write( gh->conn, &response, 1 ) )
+			if( 0 > _srmpc_write( gh->conn, BLOCK_NAK, 1 ) )
 				return -1;
 		}
 
@@ -1294,8 +1294,7 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 
 	/* confirm receival of block */
 
-	response = ACK;
-	if( 0 > _srmpc_write( gh->conn, &response, 1 ) )
+	if( 0 > _srmpc_write( gh->conn, BLOCK_ACK, 1 ) )
 		return -1;
 
 	gh->chunknum = 0;
@@ -1534,11 +1533,9 @@ void srmpc_get_chunk_done( srmpc_get_chunk_t gh )
 
 		/* abort */
 		if( gh->blocknum < gh->blocks ){
-			unsigned char buf = 0xAA; /* TODO: define */
-
 			_srm_log( gh->conn, "aborting download" );
 			tcflush( gh->conn->fd, TCIOFLUSH );
-			_srmpc_write( gh->conn, &buf, 1 );
+			_srmpc_write( gh->conn, BLOCK_ABRT, 1 );
 
 		/* read (and ignore) trailing ETX */
 		} else if( gh->conn->stxetx ){
