@@ -490,6 +490,11 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		return -1;
 	}
 
+	if( ! data->recint ){
+		errno = EINVAL;
+		return -1;
+	}
+
 	if( NULL == (blocks = srm_data_blocks( data )))
 		return -1;
 
