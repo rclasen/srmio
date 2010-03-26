@@ -1734,6 +1734,8 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 	if( fixup ){
 		srm_data_t fixed;
 
+		_srm_log( conn, "postprocessing data" );
+
 		if( NULL == ( fixed = srm_data_fixup( data ) ) )
 			goto clean2;
 
