@@ -1689,9 +1689,6 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 	if( NULL == (gh = srmpc_get_chunk_start( conn, deleted ) ))
 		goto clean1;
 
-	/* TODO: start new file on recint change */
-	data->recint = gh->recint;
-
 	while( NULL != ( chunk = srmpc_get_chunk_next( gh ))){
 
 		if( 0 > srm_data_add_chunk( data, chunk ) )
@@ -1710,6 +1707,15 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 			mfirst = -1;
 
 	}
+
+	/* TODO: catch and handle errors during download properly */
+
+	/* TODO: start new file on recint change */
+	data->recint = gh->recint;
+	if( ! data->recint )
+		goto clean2;
+
+
 	srmpc_get_chunk_done( gh );
 	gh = NULL;
 
