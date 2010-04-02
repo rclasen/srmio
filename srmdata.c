@@ -284,6 +284,7 @@ srm_data_t srm_data_fixup( srm_data_t data )
 	fixed->recint = data->recint;
 	fixed->slope = data->slope;
 	fixed->zeropos = data->zeropos;
+	fixed->circum = data->circum;
 	if( data->notes && NULL == (fixed->notes = strdup( data->notes ) ))
 		goto clean1;
 
