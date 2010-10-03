@@ -196,6 +196,7 @@ int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
 	/* ... adjust current time to fit n*recint */
 	lnext += data->recint * miss;
 	if( chunk->time > lnext ){
+		DPRINTF( "srm_data_add_fillp: cannot fill gaps < recint" );
 		errno = EOVERFLOW;
 		return -1;
 	}
@@ -390,6 +391,7 @@ int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
 		srm_chunk_t *tmp;
 
 		if( data->cavail > UINT_MAX - 1001 ){
+			DPRINTF("too many chunks");
 			errno = EOVERFLOW;
 			return -1;
 		}
@@ -436,6 +438,7 @@ int srm_data_add_markerp( srm_data_t data, srm_marker_t mk )
 		srm_marker_t *tmp;
 
 		if( data->mavail > UINT_MAX - 11 ){
+			DPRINTF("too many marker");
 			errno = EOVERFLOW;
 			return -1;
 		}
@@ -474,6 +477,7 @@ int srm_data_add_marker( srm_data_t data, unsigned first, unsigned last )
 		last );
 
 	if( first >= data->cused || first > last ){
+		DPRINTF("marker out of range");
 		errno = EINVAL;
 		return -1;
 	}
@@ -533,6 +537,7 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 	unsigned i;
 
 	if( data->cused < 1 ){
+		DPRINTF("no blocks in empty data");
 		errno = EINVAL;
 		return NULL;
 	}
@@ -557,6 +562,7 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 				unsigned ns = avail + 10;
 
 				if( ns < avail ){
+					DPRINTF("too many blocks");
 					errno = EOVERFLOW;
 					goto clean2;
 				}

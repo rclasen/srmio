@@ -230,8 +230,11 @@ int main( int argc, char **argv )
 		if( opt_fixup ){
 			srm_data_t fixed;
 
-			if( NULL == ( fixed = srm_data_fixup( srmdata ) ) )
+			if( NULL == ( fixed = srm_data_fixup( srmdata ) )){
+				fprintf( stderr, "srm_data_fixup failed: %s\n",
+					strerror(errno));
 				return -1;
+			}
 
 			srm_data_free( srmdata );
 			srmdata = fixed;

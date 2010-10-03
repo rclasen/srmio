@@ -25,6 +25,7 @@ static int _xread( int fd, unsigned char *buf, size_t len )
 		return -1;
 
 	if( (size_t)ret < len ){
+		DPRINTF("failed to write some data");
 		errno = EIO;
 		return -1;
 	}
@@ -410,6 +411,7 @@ srm_data_t srm_data_read( const char *fname )
 			ck->time = timerefday + blocks[i]->daydelta +
 				ci * tmp->recint;
 			if( ck->time < timerefday ){
+				DPRINTF("srm_data_read: timespan too large");
 				errno = EOVERFLOW;
 				goto clean3;
 			}
@@ -606,6 +608,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 		blockdelta = ck->time - timerefday;
 		if( blockdelta * 10 < blockdelta ){
+			DPRINTF("srm_data_write_srm7: timespan too large");
 			errno = EOVERFLOW;
 			goto clean2;
 		}
