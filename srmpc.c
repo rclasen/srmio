@@ -220,16 +220,16 @@ static int _srmpc_init(
 	/* send opening 'P' to verify communication works */
 	ret = _srmpc_msg_send( conn, 'P', NULL, 0 );
 	if( ret < 0 )
-		return -1;
+		goto clean1;
 
 	ret = _srmpc_read( conn, buf, 20 );
 	DPRINTF( "srmpc_init ret %d", ret );
 	if( ret < 0 )
-		return -1;
+		goto clean2;
 	if( ret == 0 ){
 		_srm_log( conn, "got no opening response" );
 		errno = EHOSTDOWN;
-		return -1;
+		goto clean2;
 	}
 	conn->cmd_running = 0;
 
@@ -237,19 +237,19 @@ static int _srmpc_init(
 
 	/* autodetect communcitation type */
 	if( *buf == STX ){
-		if( ret < 7 ){
+		if( ret != 7 || buf[1] != 'P' ){
 			_srm_log( conn, "opening response is garbled" );
 			errno = EPROTO;
-			return -1;
+			goto clean2;
 		}
 
 		_srmpc_msg_decode( verbuf, 2, &buf[2], 4 );
 
 	} else {
-		if( ret < 3 ){
+		if( ret != 3 ||  buf[0] != 'P' ){
 			_srm_log( conn, "opening response is garbled" );
 			errno = EPROTO;
-			return -1;
+			goto clean2;
 		}
 
 		conn->stxetx = 0;
@@ -259,6 +259,12 @@ static int _srmpc_init(
 	}
 
 	return ( verbuf[0] << 8 ) | verbuf[1];
+
+clean2:
+	conn->cmd_running = 0;
+clean1:
+	/* no need for termios cleanup - handled by srmpc_open() */
+	return -1;
 }
 
 
@@ -284,6 +290,8 @@ static int _srmpc_init_all( srmpc_conn_t conn )
 		}
 	}
 
+	_srm_log( conn, "no PCV found" );
+	errno = ENOTSUP;
 	return -1;
 }
 
@@ -330,7 +338,7 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 	/* set serial parameter and get PCV version */
 	/* TODO: allow user to specify baudrate+parity */
 	if( 0 > ( pcv = _srmpc_init_all( conn )))
-		goto clean3;
+		goto clean4;
 
 
 	/* verify it's a known/supported PCV */
@@ -348,11 +356,15 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 			_srm_log( conn, "PC Version 0x%x not whitelisted",
 				pcv );
 			errno = ENOTSUP;
-			goto clean3;
+			goto clean4;
 		}
 	}
 
 	return conn;
+
+clean4:
+	tcflush( conn->fd, TCIOFLUSH );
+	tcsetattr( conn->fd, TCSANOW, &conn->oldios );
 
 clean3:
 	close(conn->fd);
