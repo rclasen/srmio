@@ -379,7 +379,10 @@ void srmpc_close( srmpc_conn_t conn )
 		return;
 
 	tcflush( conn->fd, TCIOFLUSH );
-	tcsetattr( conn->fd, TCSANOW, &conn->oldios );
+	if( tcsetattr( conn->fd, TCSANOW, &conn->oldios ) )
+		DPRINTF( "failed to restore ios state: %s",
+			strerror(errno) );
+
 	close( conn->fd );
 	/* TODO: uu_unlock */
 	free( conn );
