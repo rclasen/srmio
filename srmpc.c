@@ -582,7 +582,7 @@ static int _srmpc_msg_send( srmpc_conn_t conn, char cmd, const unsigned char *ar
 		return -1;
 
 	} else if( (unsigned)ret < len ){
-		_srm_log( conn, "failed to get complete response from PC");
+		_srm_log( conn, "failed to send complete command to PC");
 		errno = EIO;
 		return -1;
 	}
@@ -786,7 +786,7 @@ static int _srmpc_msg( srmpc_conn_t conn, char cmd,
 
 		if( retries ){
 			conn->cmd_running = 0;
-			_srm_log( conn, "SRM isn't responding, sending break" );
+			_srm_log( conn, "SRM isn't responding, send break and retry" );
 			tcsendbreak( conn->fd, 0 );
 			sleep(1);
 		}
