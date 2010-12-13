@@ -25,7 +25,7 @@ static int _xread( int fd, unsigned char *buf, size_t len )
 		return -1;
 
 	if( (size_t)ret < len ){
-		DPRINTF("failed to write some data");
+		DPRINTF("failed to read some data");
 		errno = EIO;
 		return -1;
 	}
@@ -248,7 +248,7 @@ static srm_chunk_t _srm_data_chunk_srm7( const unsigned char *buf )
 }
 
 /*
- * read SRM6/SRM7 files, fill newly allocated data structure.
+ * read SRM5/6/7 files, fill newly allocated data structure.
  *
  * on success data pointer is returned.
  * returns NULL and sets errno on failure.
@@ -261,9 +261,11 @@ srm_data_t srm_data_read( const char *fname )
 	srm_time_t timerefday;
 	srm_data_read_cfunc cfunc = NULL;
 	unsigned chunklen;
+	unsigned mcmtlen;
 	unsigned bcnt;
 	struct _srm_block_t **blocks = NULL;
 	unsigned mcnt;
+	unsigned ckcnt;
 	unsigned i;
 
 	if( NULL == (tmp = srm_data_new()))
@@ -279,15 +281,32 @@ srm_data_t srm_data_read( const char *fname )
 		goto clean2;
 	DUMPHEX( "srm_data_read head", buf, 86 );
 
-	if( 0 == strncmp( (char*)buf, "SRM6", 4 )){
+	if( 0 != strncmp( (char*)buf, "SRM", 3 )){
+		errno = ENOTSUP;
+		goto clean2;
+
+	}
+
+	switch( buf[3] ){
+	  case '5':
+		mcmtlen = 3;
 		chunklen = 5;
 		cfunc = _srm_data_chunk_srm6;
+		break;
 
-	} else if( 0 == strncmp( (char*)buf, "SRM7", 4 )){
+	  case '6':
+		mcmtlen = 255;
+		chunklen = 5;
+		cfunc = _srm_data_chunk_srm6;
+		break;
+
+	  case '7':
+		mcmtlen = 255;
 		chunklen = 14;
 		cfunc = _srm_data_chunk_srm7;
+		break;
 
-	} else {
+	  default:
 		errno = ENOTSUP;
 		goto clean2;
 	}
@@ -325,9 +344,9 @@ srm_data_t srm_data_read( const char *fname )
 	for( ; tmp->mused < mcnt; ++tmp->mused ){
 		srm_marker_t tm;
 
-		if( 0 > _xread( fd, buf, 270 ))
+		if( 0 > _xread( fd, buf, mcmtlen + 15 ))
 			goto clean2;
-		DUMPHEX( "srm_data_read marker", buf, 270 );
+		DUMPHEX( "srm_data_read marker", buf, mcmtlen + 15 );
 
 		if( NULL == (tm = srm_marker_new()))
 			goto clean2;
@@ -335,14 +354,14 @@ srm_data_t srm_data_read( const char *fname )
 		tmp->marker[tmp->mused] = tm;
 		tmp->marker[tmp->mused+1] = NULL;
 
-		tm->first = CINT16(buf,256)-1;
-		tm->last = CINT16(buf,258)-1;
+		tm->first = CINT16(buf,mcmtlen +1)-1;
+		tm->last = CINT16(buf,mcmtlen +3)-1;
 
-		if( NULL == (tm->notes = malloc(256)))
+		if( NULL == (tm->notes = malloc(mcmtlen +1)))
 			goto clean2;
 		/* TODO: iconv notes cp850 -> internal */
-		memcpy( tm->notes, (char*)buf, 255 );
-		tm->notes[255] = 0;
+		memcpy( tm->notes, (char*)buf, mcmtlen );
+		tm->notes[mcmtlen] = 0;
 
 		DPRINTF( "srm_data_read marker %u %u %s",
 			tm->first,
@@ -351,7 +370,7 @@ srm_data_t srm_data_read( const char *fname )
 	}
 
 	/* blocks */
-	if( NULL == (blocks = malloc( (bcnt+1) * sizeof( struct _srm_block_t *))))
+	if( NULL == (blocks = malloc( (bcnt+2) * sizeof( struct _srm_block_t *))))
 		goto clean2;
 	*blocks=NULL;
 
@@ -390,10 +409,20 @@ srm_data_t srm_data_read( const char *fname )
 
 	tmp->zeropos = CINT16(buf, 0);
 	tmp->slope = (double)(CINT16(buf, 2) * 140) / 42781;
-	/* ccnt = CINT16(buf, 2) */;
-	DPRINTF( "srm_data_read cal zpos=%d slope=%.1f",
-		tmp->zeropos, tmp->slope );
-	
+	ckcnt = CINT16(buf, 4);
+	DPRINTF( "srm_data_read cal zpos=%d slope=%.1f, chunks=%u",
+		tmp->zeropos, tmp->slope, ckcnt );
+
+	/* synthesize block for SRM5 files */
+	if( bcnt == 0 ){
+		blocks[1] = NULL;;
+
+		if( NULL == (blocks[0] = malloc(sizeof(struct _srm_block_t))))
+			goto clean3;
+
+		blocks[0]->daydelta = tmp->recint;
+		blocks[0]->chunks = ckcnt;
+	}
 
 	/* chunks */
 	for( i = 0; blocks[i]; ++i ){
