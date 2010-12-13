@@ -431,8 +431,13 @@ srm_data_t srm_data_read( const char *fname )
 		for( ci = 0; ci < blocks[i]->chunks; ++ci ){
 			srm_chunk_t ck;
 
-			if( 0 > _xread( fd, buf, chunklen ))
-				goto clean3;
+			if( 0 > _xread( fd, buf, chunklen )){
+				// TODO: log( "failed to read all chunks" );
+				if( tmp->cused )
+					goto clean4;
+				else
+					goto clean3;
+			}
 
 			if( NULL == (ck = (*cfunc)( buf )))
 				goto clean3;
@@ -454,6 +459,21 @@ srm_data_t srm_data_read( const char *fname )
 	}
 	free( blocks );
 
+
+	close(fd);
+	return tmp;
+
+clean4:
+	/* premature end of file, fix marker */
+	ckcnt = tmp->cused -1;
+	for( i = 0; i < tmp->mused; ++i ){
+		srm_marker_t mk = tmp->marker[i];
+
+		if( mk->first > ckcnt )
+			mk->first = ckcnt;
+		if( mk->last > ckcnt )
+			mk->last = ckcnt;
+	}
 
 	close(fd);
 	return tmp;
