@@ -21,11 +21,13 @@ static int _xread( int fd, unsigned char *buf, size_t len )
 
 	ret = read( fd, buf, len );
 
-	if( ret < 0)
+	if( ret < 0){
+		ERRMSG("read failed: %s", strerror(errno));
 		return -1;
+	}
 
 	if( (size_t)ret < len ){
-		DPRINTF("failed to read some data");
+		ERRMSG("failed to read some data");
 		errno = EIO;
 		return -1;
 	}
@@ -128,14 +130,17 @@ static srm_time_t _srm_mktime( unsigned days )
 	if( days < SRM2EPOCH ){
 		/* TODO: SRM2EPOCH is a hack that might cause problems
 		 * with misadjusted SRM clocks or other time glitches */
+		ERRMSG("date is before supported range" );
 		errno = ENOTSUP;
 		return (srm_time_t)-1;
 	}
 	t.tm_mday += days - SRM2EPOCH;
 
 	ret = mktime( &t );
-	if( ret == (time_t) -1 )
+	if( ret == (time_t) -1 ){
+		ERRMSG("mktime failed: %s", strerror(errno));
 		return (srm_time_t)-1;
+	}
 
 	DPRINTF( "_srm_mktime %u days -> %lu", days, (unsigned long)ret );
 	return (srm_time_t)ret * 10;
@@ -167,12 +172,16 @@ static unsigned _srm_mkdays( srm_time_t input )
 
 	tstamp = input / 10;
 #ifdef HAVE_LOCALTIME_R
-	if( NULL == localtime_r( &tstamp, &tm ) )
+	if( NULL == localtime_r( &tstamp, &tm ) ){
+		ERRMSG("localtime failed: %s", strerror(errno));
 		return -1;
+	}
 #else
 	{ struct tm *tmp;
-	if( NULL == ( tmp = localtime( &tstamp )))
+	if( NULL == ( tmp = localtime( &tstamp ))){
+		ERRMSG("localtime failed: %s", strerror(errno));
 		return -1;
+	}
 	memcpy( &tm, tmp, sizeof(struct tm));
 	}
 #endif
@@ -199,6 +208,7 @@ static unsigned _srm_mkdays( srm_time_t input )
 	}
 
 	if( days < DAYS_SRM ){
+		ERRMSG("resutling date is outside supported range");
 		errno = ERANGE;
 		return -1;
 	}
@@ -268,11 +278,15 @@ srm_data_t srm_data_read( const char *fname )
 	unsigned ckcnt;
 	unsigned i;
 
-	if( NULL == (tmp = srm_data_new()))
+	if( NULL == (tmp = srm_data_new())){
+		ERRMSG("srm_data_new failed: %s", strerror(errno));
 		return NULL;
+	}
 
-	if( 0 > ( fd = open( fname, O_RDONLY )))
+	if( 0 > ( fd = open( fname, O_RDONLY ))){
+		ERRMSG("open failed: %s", strerror(errno));
 		goto clean1;
+	}
 
 
 	/* header */
@@ -282,6 +296,7 @@ srm_data_t srm_data_read( const char *fname )
 	DUMPHEX( "srm_data_read head", buf, 86 );
 
 	if( 0 != strncmp( (char*)buf, "SRM", 3 )){
+		ERRMSG("unrecognized file format");
 		errno = ENOTSUP;
 		goto clean2;
 
@@ -307,6 +322,7 @@ srm_data_t srm_data_read( const char *fname )
 		break;
 
 	  default:
+		ERRMSG("unsupported file format version: %c", buf[3] );
 		errno = ENOTSUP;
 		goto clean2;
 	}
@@ -329,15 +345,19 @@ srm_data_t srm_data_read( const char *fname )
 	DPRINTF( "srm_data_read bcnt=%u mcnt=%u,", bcnt, mcnt );
 
 	/* "notes" is preceeded by length + zero padded. Ignore length... */
-	if( NULL == (tmp->notes = malloc(71) ))
+	if( NULL == (tmp->notes = malloc(71) )){
+		ERRMSG("malloc failed: %s", strerror(errno));
 		goto clean2;
+	}
 	/* TODO: iconv notes cp850 -> internal */
 	memcpy( tmp->notes, (char*)&buf[16], 70 );
 	tmp->notes[70] = 0;
 
 	/* marker */
-	if( NULL == (tmp->marker = malloc( (mcnt +1) * sizeof(srm_marker_t *))))
+	if( NULL == (tmp->marker = malloc( (mcnt +1) * sizeof(srm_marker_t *)))){
+		ERRMSG("malloc failed: %s", strerror(errno));
 		goto clean2;
+	}
 	*tmp->marker = NULL;
 	tmp->mavail = mcnt;
 
@@ -348,8 +368,10 @@ srm_data_t srm_data_read( const char *fname )
 			goto clean2;
 		DUMPHEX( "srm_data_read marker", buf, mcmtlen + 15 );
 
-		if( NULL == (tm = srm_marker_new()))
+		if( NULL == (tm = srm_marker_new())){
+			ERRMSG("srm_marker_new failed: %s", strerror(errno));
 			goto clean2;
+		}
 
 		tmp->marker[tmp->mused] = tm;
 		tmp->marker[tmp->mused+1] = NULL;
@@ -357,8 +379,10 @@ srm_data_t srm_data_read( const char *fname )
 		tm->first = CINT16(buf,mcmtlen +1)-1;
 		tm->last = CINT16(buf,mcmtlen +3)-1;
 
-		if( NULL == (tm->notes = malloc(mcmtlen +1)))
+		if( NULL == (tm->notes = malloc(mcmtlen +1))){
+			ERRMSG("malloc failed: %s", strerror(errno));
 			goto clean2;
+		}
 		/* TODO: iconv notes cp850 -> internal */
 		memcpy( tm->notes, (char*)buf, mcmtlen );
 		tm->notes[mcmtlen] = 0;
@@ -370,8 +394,10 @@ srm_data_t srm_data_read( const char *fname )
 	}
 
 	/* blocks */
-	if( NULL == (blocks = malloc( (bcnt+2) * sizeof( struct _srm_block_t *))))
+	if( NULL == (blocks = malloc( (bcnt+2) * sizeof( struct _srm_block_t *)))){
+		ERRMSG("malloc failed: %s", strerror(errno));
 		goto clean2;
+	}
 	*blocks=NULL;
 
 	for( i = 0; i < bcnt; ++i ){
@@ -381,8 +407,10 @@ srm_data_t srm_data_read( const char *fname )
 			goto clean3;
 		DUMPHEX( "srm_data_read block", buf, 6 );
 
-		if( NULL == (tb = malloc(sizeof(struct _srm_block_t))))
+		if( NULL == (tb = malloc(sizeof(struct _srm_block_t)))){
+			ERRMSG("malloc failed: %s", strerror(errno));
 			goto clean3;
+		}
 
 		blocks[i] = tb;
 		blocks[i+1] = NULL;;
@@ -417,8 +445,10 @@ srm_data_t srm_data_read( const char *fname )
 	if( bcnt == 0 ){
 		blocks[1] = NULL;;
 
-		if( NULL == (blocks[0] = malloc(sizeof(struct _srm_block_t))))
+		if( NULL == (blocks[0] = malloc(sizeof(struct _srm_block_t)))){
+			ERRMSG("malloc failed: %s", strerror(errno));
 			goto clean3;
+		}
 
 		blocks[0]->daydelta = tmp->recint;
 		blocks[0]->chunks = ckcnt;
@@ -439,19 +469,23 @@ srm_data_t srm_data_read( const char *fname )
 					goto clean3;
 			}
 
-			if( NULL == (ck = (*cfunc)( buf )))
+			if( NULL == (ck = (*cfunc)( buf ))){
+				ERRMSG("failed to get chunk: %s", strerror(errno));
 				goto clean3;
+			}
 
 			ck->time = timerefday + blocks[i]->daydelta +
 				ci * tmp->recint;
 			if( ck->time < timerefday ){
-				DPRINTF("srm_data_read: timespan too large");
+				ERRMSG("srm_data_read: timespan too large");
 				errno = EOVERFLOW;
 				goto clean3;
 			}
 
-			if( 0 > srm_data_add_chunkp( tmp, ck ) )
+			if( 0 > srm_data_add_chunkp( tmp, ck ) ){
+				ERRMSG("add chunk failed: %s", strerror(errno));
 				goto clean3;
+			}
 
 		}
 
@@ -497,10 +531,13 @@ static int _xwrite( int fd, unsigned char *buf, size_t len )
 
 	ret = write( fd, buf, len );
 
-	if( ret < 0)
+	if( ret < 0){
+		ERRMSG("write failed: %s", strerror(errno));
 		return -1;
+	}
 
 	if( (size_t)ret < len ){
+		ERRMSG("write was truncated %d/%d", ret, len );
 		errno = EIO;
 		return -1;
 	}
@@ -522,26 +559,31 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 	unsigned i;
 
 	if( ! data ){
+		ERRMSG( "no data to write" );
 		errno = EINVAL;
 		return -1;
 	}
 
 	if( data->notes && strlen(data->notes) > 255 ){
+		ERRMSG( "notes are too long" );
 		errno = EINVAL;
 		return -1;
 	}
 
 	if( data->cused < 1 || data->cused > UINT16_MAX ){
+		ERRMSG( "too few/many chunks" );
 		errno = EINVAL;
 		return -1;
 	}
 
 	if( data->mused < 1 || data->mused > UINT16_MAX ){
+		ERRMSG( "too few/many marker" );
 		errno = EINVAL;
 		return -1;
 	}
 
 	if( ! data->recint ){
+		ERRMSG( "missing recint" );
 		errno = EINVAL;
 		return -1;
 	}
@@ -583,7 +625,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			data->notes );
 
 		if( timerefday > mintime ){
-			DPRINTF("srm_data_write: failed to determin time reference" );
+			ERRMSG("srm_data_write: failed to determin time reference" );
 			errno = EOVERFLOW;
 			goto clean1;
 		}
@@ -591,28 +633,40 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		if( 0 >= (fd = open( fname, O_WRONLY | O_CREAT | O_TRUNC, 
 			S_IRUSR | S_IWUSR |
 			S_IRGRP | S_IWGRP |
-			S_IROTH | S_IWOTH )))
+			S_IROTH | S_IWOTH ))){
 
+			ERRMSG("open failed: %s", strerror(errno));
 			goto clean1;
+		}
 	
 		/* header */
 		memcpy( buf, "SRM7", 4 );
-		if( 0 > _setuint16( buf, 4, days ) )
+		if( 0 > _setuint16( buf, 4, days ) ){
+			ERRMSG( "failed to convert date: %s", strerror(errno));
 			goto clean1;
-		if( 0 > _setuint16( buf, 6, data->circum ) )
+		}
+		if( 0 > _setuint16( buf, 6, data->circum ) ){
+			ERRMSG( "failed to convert circum: %s", strerror(errno));
 			goto clean1;
+		}
 		if( data->recint < 10 ){
 			buf[8] = (unsigned char)(data->recint % 10 );
 			buf[9] = 10u;
 		} else {
-			if( 0 > _setuint8( buf, 8, data->recint / 10 ) )
+			if( 0 > _setuint8( buf, 8, data->recint / 10 ) ){
+				ERRMSG( "failed to convert recint: %s", strerror(errno));
 				goto clean1;
+			}
 			buf[9] = 1u;
 		}
-		if( 0 > _setuint16( buf, 10, bcnt ) )
+		if( 0 > _setuint16( buf, 10, bcnt ) ){
+			ERRMSG( "failed to convert bcnt: %s", strerror(errno));
 			goto clean1;
-		if( 0 > _setuint16( buf, 12, mcnt ) )
+		}
+		if( 0 > _setuint16( buf, 12, mcnt ) ){
+			ERRMSG( "failed to convert mcnt: %s", strerror(errno));
 			goto clean1;
+		}
 		buf[14] = 0;
 		buf[15] = data->notes ? strlen( data->notes) : 0;
 		/* TODO: iconv notes -> cp850 */
@@ -632,10 +686,14 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		/* TODO: iconv notes -> cp850 */
 		strncpy( (char*)buf, mk->notes ? mk->notes : "", 255 );
 		buf[255] = 1; /* active */
-		if( 0 > _setuint16( buf, 256, first ) )
+		if( 0 > _setuint16( buf, 256, first ) ){
+			ERRMSG( "failed to convert marker index: %s", strerror(errno));
 			goto clean1;
-		if( 0 > _setuint16( buf, 258, last ) )
+		}
+		if( 0 > _setuint16( buf, 258, last ) ){
+			ERRMSG( "failed to convert marker index: %s", strerror(errno));
 			goto clean1;
+		}
 		memset( &buf[260], 0, 10 );
 
 		DPRINTF( "srm_data_write marker @%x %u %u %s",
@@ -657,7 +715,22 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 		blockdelta = ck->time - timerefday;
 		if( blockdelta * 10 < blockdelta ){
-			DPRINTF("srm_data_write_srm7: timespan too large");
+			int j;
+			ERRMSG("srm_data_write_srm7: "
+				"block %u ref=%.1f: "
+				"timespan %u too large",
+				i,
+				(double)timerefday/10,
+				blockdelta );
+			for( j = 0; blocks[j]; ++j ){
+				srm_marker_t b = blocks[j];
+				srm_chunk_t c = data->chunks[b->first];
+				unsigned l = b->last - b->first +1;
+
+				ERRMSG(" block %d: time=%.1f len=%u",
+					j, (double)c->time/10, l );
+			}
+
 			errno = EOVERFLOW;
 			goto clean2;
 		}
@@ -667,10 +740,14 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			(int)lseek( fd, 0, SEEK_CUR),
 			(double)ck->time/10,
 			blockdelta );
-		if( 0 > _setuint32( buf, 0, blockdelta) )
+		if( 0 > _setuint32( buf, 0, blockdelta) ){
+			ERRMSG( "failed to convert block time: %s", strerror(errno));
 			goto clean1;
-		if( 0 > _setuint16( buf, 4, len) )
+		}
+		if( 0 > _setuint16( buf, 4, len) ){
+			ERRMSG( "failed to convert block length: %s", strerror(errno));
 			goto clean1;
+		}
 		
 		if( 0 > _xwrite( fd, buf, 6 ))
 			goto clean2;
@@ -683,12 +760,18 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 	{
 		unsigned slope = 0.5 + ( data->slope * 42781) / 140;
 
-		if( 0 > _setuint16( buf, 0, data->zeropos ) )
+		if( 0 > _setuint16( buf, 0, data->zeropos ) ){
+			ERRMSG( "failed to convert zeropos: %s", strerror(errno));
 			goto clean1;
-		if( 0 > _setuint16( buf, 2, slope ) )
+		}
+		if( 0 > _setuint16( buf, 2, slope ) ){
+			ERRMSG( "failed to convert slope: %s", strerror(errno));
 			goto clean1;
-		if( 0 > _setuint16( buf, 4, data->cused ) )
+		}
+		if( 0 > _setuint16( buf, 4, data->cused ) ){
+			ERRMSG( "failed to convert chunk count: %s", strerror(errno));
 			goto clean1;
+		}
 		buf[6] = 0;
 
 		if( 0 > _xwrite( fd, buf, 7 ))
@@ -714,18 +797,30 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			unsigned speed = 0.5 + ( ck->speed * 1000) / 3.6;
 			int temp = 0.5 + ck->temp * 10;
 
-			if( 0 > _setuint16( buf, 0, ck->pwr ) )
+			if( 0 > _setuint16( buf, 0, ck->pwr ) ){
+				ERRMSG( "failed to convert power: %s", strerror(errno));
 				goto clean1;
-			if( 0 > _setuint8( buf, 2, ck->cad ) )
+			}
+			if( 0 > _setuint8( buf, 2, ck->cad ) ){
+				ERRMSG( "failed to convert cadence: %s", strerror(errno));
 				goto clean1;
-			if( 0 > _setuint8( buf, 3, ck->hr ) )
+			}
+			if( 0 > _setuint8( buf, 3, ck->hr ) ){
+				ERRMSG( "failed to convert hr: %s", strerror(errno));
 				goto clean1;
-			if( 0 > _setuint32( buf, 4, speed ) )
+			}
+			if( 0 > _setuint32( buf, 4, speed ) ){
+				ERRMSG( "failed to convert speed: %s", strerror(errno));
 				goto clean1;
-			if( 0 > _setint32( buf, 8, ck->ele ) )
+			}
+			if( 0 > _setint32( buf, 8, ck->ele ) ){
+				ERRMSG( "failed to convert ele: %s", strerror(errno));
 				goto clean1;
-			if( 0 > _setint16( buf, 12, temp ) )
+			}
+			if( 0 > _setint16( buf, 12, temp ) ){
+				ERRMSG( "failed to convert temp: %s", strerror(errno));
 				goto clean1;
+			}
 
 			if( 0 > _xwrite( fd, buf, 14 ))
 				goto clean2;

@@ -70,6 +70,15 @@
 #include <limits.h>
 #endif
 
+#ifdef VERBOSE
+/* TODO: workaround for bad error reporting */
+#define ERRMSG(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
+#define STATMSG(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
+#else
+#define ERRMSG(x, ...)	while(0);
+#define STATMSG(x, ...)	while(0);
+#endif
+
 #ifdef DEBUG
 
 #include <ctype.h>

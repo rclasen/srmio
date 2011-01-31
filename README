@@ -43,6 +43,10 @@ If you use a developer snapshot, you first have use the autotools to build
 a configure script:
  sh genautomake.sh
 
+To workaround some desing issues with the error reporting, you can build
+the lib with support to print some more verbose error messages by defining
+the preprocessor variable VERBOSE:
+ ./configure CFLAGS="-DVERBOSE"
 
 
 Linux:
@@ -108,8 +112,8 @@ Notes:
 Of course I'm open to all suggestions, comments and patches.
 
 If you experience problems with *your* PCV, please
- - recompile with -DDEBUG enabled. 
-   (CFLAGS="-g -DDEBUG -Wall -Wextra" ./configure)
+ - recompile with -DVERBOSE -DDEBUG enabled. 
+   (./configure CFLAGS="-g -DVERBOSE -DDEBUG -Wall -Wextra")
 
 If you want to help me adding support for your PCV, please capture the
 communication:

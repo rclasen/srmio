@@ -18,6 +18,7 @@ configure-stamp:
 	dh_testdir
 	# Add here commands to configure the package.
 	./configure \
+		CFLAGS="-g -DVERBOSE" \
 		--host=$(DEB_HOST_GNU_TYPE) \
 		--build=$(DEB_BUILD_GNU_TYPE) \
 		--prefix=/usr \
