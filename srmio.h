@@ -102,7 +102,8 @@ void srm_data_free( srm_data_t data );
  *
  ************************************************************/
 
-srm_data_t srm_data_read( const char *fname );
+srm_data_t srm_data_read( const char *fname ); /* TODO: obsolete, will go away */
+srm_data_t srm_data_read_srm( const char *fname );
 int srm_data_write_srm7( srm_data_t data, const char *fname );
 
 
@@ -190,6 +191,33 @@ int srmpc_clear_chunks( srmpc_conn_t conn );
 
 srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup );
 
+/************************************************************
+ *
+ * from ftypes.c
+ *
+ ************************************************************/
+
+typedef enum {
+	srm_ftype_unknown,
+	srm_ftype_srm5,
+	srm_ftype_srm6,
+	srm_ftype_srm7,
+	srm_ftype_wkt,
+	srm_ftype_max,
+} srm_ftype_t;
+
+srm_ftype_t srm_ftype_from_string( const char *type );
+
+srm_data_t srm_data_read_ftype( srm_ftype_t ftype, const char *fname );
+int srm_data_write_ftype( srm_data_t data, srm_ftype_t ftype, const char *fname );
+
+/************************************************************
+ *
+ * from wkt.c
+ *
+ ************************************************************/
+
+int srm_data_write_wkt( srm_data_t data, const char *fname );
 
 # ifdef __cplusplus
 }

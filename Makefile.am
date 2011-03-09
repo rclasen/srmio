@@ -33,9 +33,11 @@ lib_LTLIBRARIES=libsrmio.la
 libsrmio_la_SOURCES= \
 	common.h \
 	\
+	ftypes.c \
 	srmdata.c \
 	srmfile.c \
-	srmpc.c
+	srmpc.c \
+	wkt.c
 
 bin_PROGRAMS=srmcmd
 

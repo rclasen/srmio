@@ -258,12 +258,21 @@ static srm_chunk_t _srm_data_chunk_srm7( const unsigned char *buf )
 }
 
 /*
+ * backwards compatibility wrapper
+ * TODO: srm_data_read is obsolete, will go away
+ */
+srm_data_t srm_data_read( const char *fname )
+{
+	return srm_data_read_srm( fname );
+}
+
+/*
  * read SRM5/6/7 files, fill newly allocated data structure.
  *
  * on success data pointer is returned.
  * returns NULL and sets errno on failure.
  */
-srm_data_t srm_data_read( const char *fname )
+srm_data_t srm_data_read_srm( const char *fname )
 {
 	srm_data_t tmp;
 	int fd;

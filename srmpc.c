@@ -1391,6 +1391,7 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 		/ 3.9;
 
 	gh->temp = gh->buf[8];
+	/* TODO: store recint per chunk */
 	gh->recint = ( (gh->buf[1] & 0xe0) >> 5)
 		| ( (gh->buf[0] & 0x40) >> 3);
 	if( ! (gh->buf[2] & 0x40) )

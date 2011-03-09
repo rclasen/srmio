@@ -111,10 +111,12 @@ int main( int argc, char **argv )
 	int opt_int = 0;
 	int opt_name = 0;
 	int opt_read = 0;
+	srm_ftype_t opt_rtype = srm_ftype_srm7;
 	int opt_time = 0;
 	int opt_verb = 0;
 	int opt_version = 0;
 	char *opt_write = NULL;
+	srm_ftype_t opt_wtype = srm_ftype_srm7;
 	int needhelp = 0;
 	struct option lopts[] = {
 		{ "clear", no_argument, NULL, 'c' },
@@ -126,16 +128,18 @@ int main( int argc, char **argv )
 		{ "int", required_argument, NULL, 'i' },
 		{ "name", no_argument, NULL, 'n' },
 		{ "read", no_argument, NULL, 'r' },
+		{ "read-type", required_argument, NULL, 'R' },
 		{ "time", no_argument, NULL, 't' },
 		{ "verbose", no_argument, NULL, 'v' },
 		{ "version", no_argument, NULL, 'V' },
 		{ "write", required_argument, NULL, 'w' },
+		{ "write-type", required_argument, NULL, 'W' },
 	};
 	char c;
 	srmpc_conn_t srm;
 
 	/* TODO: option to filter data by timerange */
-	while( -1 != ( c = getopt_long( argc, argv, "cdFg::hi:nrtVvw:x", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "cdFg::hi:nrR:tVvw:W:x", lopts, NULL ))){
 		switch(c){
 		  case 'c':
 			++opt_clear;
@@ -171,6 +175,15 @@ int main( int argc, char **argv )
 		  	++opt_read;
 			break;
 
+		  case 'R':
+			if( srm_ftype_unknown == (
+				opt_rtype = srm_ftype_from_string( optarg)) ){
+
+				fprintf( stderr, "invalid read file type: %s\n", optarg );
+				++needhelp;
+			}
+			break;
+
 		  case 't':
 			++opt_time;
 			break;
@@ -185,6 +198,15 @@ int main( int argc, char **argv )
 
 		  case 'w':
 		  	opt_write = optarg;
+			break;
+
+		  case 'W':
+			if( srm_ftype_unknown == (
+				opt_wtype = srm_ftype_from_string( optarg)) ){
+
+				fprintf( stderr, "invalid write file type: %s\n", optarg );
+				++needhelp;
+			}
 			break;
 
 		  case 'x':
@@ -221,7 +243,7 @@ int main( int argc, char **argv )
 	if( opt_read ){
 		srm_data_t srmdata;
 
-		if( NULL == (srmdata = srm_data_read( fname ))){
+		if( NULL == (srmdata = srm_data_read_ftype( opt_rtype, fname ))){
 			fprintf( stderr, "srm_data_read(%s) failed: %s\n",
 				fname, strerror(errno) );
 			return 1;
@@ -263,7 +285,7 @@ int main( int argc, char **argv )
 				fprintf( stderr, "no data available\n" );
 				return 1;
 			}
-			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
+			if( 0 > srm_data_write_ftype( srmdata, opt_wtype, opt_write ) ){
 				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
 					opt_write, strerror(errno) );
 				return 1;
@@ -318,7 +340,7 @@ int main( int argc, char **argv )
 				fprintf( stderr, "no data available\n" );
 				return 1;
 			}
-			if( 0 > srm_data_write_srm7( srmdata, opt_write ) ){
+			if( 0 > srm_data_write_ftype( srmdata, opt_wtype, opt_write ) ){
 				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
 					opt_write, strerror(errno) );
 				return 1;
@@ -377,11 +399,13 @@ static void usage( char *name )
 " --help|-h           this cruft\n"
 " --int=<interval>|-i set recording interval, 10 -> 1sec\n"
 " --name              get athlete name\n"
-" --read|-r           dump srm file to stdout\n"
+" --read|-r           read from speciefied file instead of device\n"
+" --read-type=<t>|-R  read data as specified file format\n"
 " --time|-t           set current time\n"
 " --verbose|-v        increase verbosity\n"
 " --version|-V        show version number and exit\n"
 " --write=<fname>|-w  save data as specified .srm file\n" 
+" --write-type=<t>|-W save data with specified file format\n"
 , name );
 }
 

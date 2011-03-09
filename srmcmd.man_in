@@ -1,4 +1,4 @@
-.TH SRMCMD 1 "18 Juli 2009" "SRM access tool" "Version %PACKAGE_VERSION%"
+.TH SRMCMD 1 "9 Mar 2011" "SRM access tool" "Version %PACKAGE_VERSION%"
 .SH NAME
 srmcmd \- download/access your SRM PowerControl
 
@@ -58,8 +58,11 @@ Show athlete name (initials) stored on the PC.
 .TP
 \fB\-r\fR, \fB\-\-read\fR
 instead of accessing the PC, the specified file is read. By default data
-is written to stdout as with --get. Both SRM6 and SRM7 formats are
-supported.
+is written to stdout as with --get. See below for supported file formats.
+.TP
+\fB\-R\fR, \fB\-\-read-type\fR=\fItype\fR
+specify format of file to read. See below for supported file formats.
+Defaults to srm7.
 .TP
 \fB\-t\fR, \fB\-\-time\fR
 Set the PCs time to the current system time.
@@ -72,7 +75,31 @@ show srmcmd version number and exit.
 .TP
 \fB\-w\fR, \fB\-\-write\fR=\fIdestination\fR
 Write data retrieved from PC (or with --read from file) to the specified
-destination file. Files are written using the SRM7 format.
+destination file.
+.TP
+\fB\-W\fR, \fB\-\-write-type\fR=\fItype\fR
+specify format of file to write. See below for supported file formats.
+Defaults to srm7.
+
+.SH "FILE FORMATS"
+
+.TP
+srm5
+Binary format written by ancient srmwin versions. Supports same fields as
+srm6. Only reading is implemented.
+.TP
+srm6
+Binary format as written by srmwin until PCVI was introduced. Supports
+power, heartrate, speed, cadence. Only reading is implemented.
+.TP
+srm7
+Binary format as written by srmwin that supports PCVI. Supports power,
+heartrate, speed, cadence, elevation, temperature. For reading, the
+srm file sub-type is autodetected.
+.TP
+wkt
+custom text-based format that has a lot less restrictions than both SRM
+formats. Supports all fields. Only writing is implemented.
 
 .SH EXAMPLES
 Show name configured in PC:
