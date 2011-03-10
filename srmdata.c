@@ -192,18 +192,13 @@ int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
 		return -1;
 	}
 
-	miss = (chunk->time - lnext) / recint;
+	miss = 0.4 + (chunk->time - lnext) / recint;
+	lnext += recint * miss;
+
 
 	/* ... adjust current time to fit n*recint */
-	lnext += recint * miss;
-	if( chunk->time > lnext ){
-		ERRMSG( "srm_data_add_fillp: cannot fill gaps < recint" );
-		errno = EOVERFLOW;
-		return -1;
-	}
-
 	if( chunk->time != lnext ){
-		ERRMSG("srm_data_add_fill: adjusting gap %.1f -> %.1f",
+		DPRINTF("srm_data_add_fill: adjusting gap %.1f -> %.1f",
 			(double)chunk->time / 10,
 			(double)lnext / 10);
 		chunk->time = lnext;
@@ -319,7 +314,9 @@ srm_data_t srm_data_fixup( srm_data_t data )
 		lnext = last->time + recint;
 
 		/* overlapping < 1sec, adjust this time */
-		if( this->time < lnext && lnext - last->time < 10 ){
+		if( this->time < lnext
+			&& lnext - last->time < 10 ){
+
 			DPRINTF("srm_data_fixup: adjusting overlap %.1f -> %.1f",
 				(double)this->time / 10,
 				(double)lnext / 10);
@@ -328,9 +325,9 @@ srm_data_t srm_data_fixup( srm_data_t data )
 			if( 0 > srm_data_add_chunkp( fixed, this ) )
 				goto clean1;
 
-		/* gap <= 2sec ... */
-		} else if ( lnext < this->time
-			&& this->time - lnext <= 20) {
+		/* small gap > recint ... fill/shift  */
+		} else if( lnext < this->time
+			&& this->time - lnext <= 2*recint ){
 
 			if( 0 > srm_data_add_fillp( fixed, this ))
 				goto clean1;
