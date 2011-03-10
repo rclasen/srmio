@@ -27,6 +27,7 @@
  * limited.
  */
 static const unsigned _srmpc_whitelist[] = {
+	0x6b08,		/* fw 6b.08 - uses stxetx, from Andree */
 	0x6b09,		/* fw 6b.09 - uses stxetx */
 	0x4309,		/* fw 43.09 - no stxetx, fw was upgraded 04/2009 */
 	0x3404,		/* fw 34.04 - no stxetx, reported by MorganFletcher */
@@ -1194,6 +1195,7 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
 }
 
 
+/* TODO: srmpc_reset_battery */
 /* TODO: implement srmpc_set_* functions */
 /* TODO: investigate/implement other commands */
 
@@ -1632,6 +1634,8 @@ void srmpc_get_chunk_done( srmpc_get_chunk_t gh )
 
 
 /*
+ * TODO: srmpc_get_chunks is obsolete and will go away
+ *
  * wrapper arround _start(), _next(), _done() for backwards compatible
  * callback based interface for chunk download.
  *
