@@ -91,11 +91,11 @@ int srm_data_write_wkt( srm_data_t data, const char *fname )
 			"%ld\t"		/* ele */
 			"%.1lf\n",	/* temp */
 			(double)(ck->time / 10),
-			(double)(data->recint / 10),
-			(double)( (double)ck->pwr * data->recint / 10 ),
+			(double)(ck->dur / 10),
+			(double)( (double)ck->pwr * ck->dur / 10 ),
 			ck->cad,
 			ck->hr,
-			(double)( (double)ck->speed * data->recint / 36 ),
+			(double)( (double)ck->speed * ck->dur / 36 ),
 			ck->ele,
 			ck->temp
 			) ){
@@ -116,7 +116,7 @@ int srm_data_write_wkt( srm_data_t data, const char *fname )
 		srm_chunk_t last = data->chunks[mk->last];
 
 		if( 0 > fprintf( fh, "%.1lf\t%.1lf\t%s\n",
-			(double)( (first->time - data->recint) / 10 ),
+			(double)( (first->time - first->dur) / 10 ),
 			(double)( last->time / 10 ),
 			mk->notes ? mk->notes : "" ) ){
 

@@ -31,6 +31,7 @@ typedef uint64_t srm_time_t;	/* seconds since epoch * 10 */
 /* actual data tuple as retrieved from PCV or file */
 struct _srm_chunk_t {
 	srm_time_t	time;	/* chunk end time */
+	srm_time_t	dur;	/* chunk duration */
 	double		temp;	/* temperature °C */
 	unsigned	pwr;	/* avg power W */
 	double		speed;	/* avg speed km/h */
@@ -62,7 +63,6 @@ void srm_marker_free( srm_marker_t marker );
 /* data structure to hold all information retrieved 
  * from PCV or file */
 struct _srm_data_t {
-	srm_time_t	recint;
 	double		slope;
 	unsigned	zeropos;
 	unsigned	circum;

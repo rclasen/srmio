@@ -277,6 +277,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 	srm_data_t tmp;
 	int fd;
 	unsigned char buf[1024];
+	srm_time_t recint;
 	srm_time_t timerefday;
 	srm_data_read_cfunc cfunc = NULL;
 	unsigned chunklen;
@@ -348,7 +349,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 #endif
 
 	tmp->circum = CINT16(buf,6);
-	tmp->recint = 10 * buf[8] / buf[9];
+	recint = 10 * buf[8] / buf[9];
 	bcnt = CINT16(buf,10);
 	mcnt = CINT16(buf,12) +1;
 	DPRINTF( "srm_data_read bcnt=%u mcnt=%u,", bcnt, mcnt );
@@ -459,7 +460,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 			goto clean3;
 		}
 
-		blocks[0]->daydelta = tmp->recint;
+		blocks[0]->daydelta = recint;
 		blocks[0]->chunks = ckcnt;
 	}
 
@@ -484,7 +485,8 @@ srm_data_t srm_data_read_srm( const char *fname )
 			}
 
 			ck->time = timerefday + blocks[i]->daydelta +
-				ci * tmp->recint;
+				ci * recint;
+			ck->dur = recint;
 			if( ck->time < timerefday ){
 				ERRMSG("srm_data_read: timespan too large");
 				errno = EOVERFLOW;
@@ -565,6 +567,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 	int fd;
 	srm_marker_t *blocks;
 	srm_time_t timerefday;
+	srm_time_t recint;
 	unsigned i;
 
 	if( ! data ){
@@ -591,8 +594,8 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		return -1;
 	}
 
-	if( ! data->recint ){
-		ERRMSG( "missing recint" );
+	if( 0 == ( recint = srm_data_recint( data ) )){
+		ERRMSG( "cannot identify recint" );
 		errno = EINVAL;
 		return -1;
 	}
@@ -658,11 +661,11 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			ERRMSG( "failed to convert circum: %s", strerror(errno));
 			goto clean1;
 		}
-		if( data->recint < 10 ){
-			buf[8] = (unsigned char)(data->recint % 10 );
+		if( recint < 10 ){
+			buf[8] = (unsigned char)(recint % 10 );
 			buf[9] = 10u;
 		} else {
-			if( 0 > _setuint8( buf, 8, data->recint / 10 ) ){
+			if( 0 > _setuint8( buf, 8, recint / 10 ) ){
 				ERRMSG( "failed to convert recint: %s", strerror(errno));
 				goto clean1;
 			}

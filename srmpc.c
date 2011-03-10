@@ -1391,11 +1391,16 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 		/ 3.9;
 
 	gh->temp = gh->buf[8];
-	/* TODO: store recint per chunk */
 	gh->recint = ( (gh->buf[1] & 0xe0) >> 5)
 		| ( (gh->buf[0] & 0x40) >> 3);
 	if( ! (gh->buf[2] & 0x40) )
 		gh->recint *= 10;
+
+	if( ! gh->recint ){
+		_srm_log( gh->conn, "block has no recint" );
+		return -1;
+	}
+
 
 	DPRINTF( "_srmpc_get_block mon=%u day=%u hour=%u min=%u sec=%u "
 		"dist=%lu temp=%d recint=%.1f na0=%x na2=%x",
@@ -1448,6 +1453,7 @@ static int _srmpc_get_chunk( srmpc_get_chunk_t gh, srm_chunk_t *chunkp )
 
 	chunk->time = gh->bstart
 		+ gh->chunknum * gh->recint;
+	chunk->dur = gh->recint;
 	if( chunk->time < gh->bstart ){
 		_srm_log( gh->conn, "chunk time had INT overflow" );
 		errno = EOVERFLOW;
@@ -1797,13 +1803,9 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 
 	/* TODO: catch and handle errors during download properly */
 
-	/* TODO: start new file on recint change */
-	data->recint = gh->recint;
-	if( ! data->recint ){
-		_srm_log( conn, "block has no recint" );
-		goto clean2;
-	}
+	/* TODO: start new data_t on recint change */
 
+	/* TODO: start new data_t on backwards time step when deleted==1 */
 
 	srmpc_get_chunk_done( gh );
 	gh = NULL;

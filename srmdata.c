@@ -181,7 +181,8 @@ clean1:
 int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
 {
 	srm_chunk_t last = data->chunks[data->cused-1];
-	srm_time_t lnext = last->time + data->recint;
+	srm_time_t recint = chunk->dur;
+	srm_time_t lnext = last->time + recint;
 	unsigned miss;
 	unsigned i;
 
@@ -191,10 +192,10 @@ int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
 		return -1;
 	}
 
-	miss = (chunk->time - lnext) / data->recint;
+	miss = (chunk->time - lnext) / recint;
 
 	/* ... adjust current time to fit n*recint */
-	lnext += data->recint * miss;
+	lnext += recint * miss;
 	if( chunk->time > lnext ){
 		ERRMSG( "srm_data_add_fillp: cannot fill gaps < recint" );
 		errno = EOVERFLOW;
@@ -233,7 +234,8 @@ int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
 		if( NULL == (fill = srm_chunk_new() ))
 			return -1;
 
-		fill->time = last->time + (i * data->recint);
+		fill->time = last->time + (i * recint);
+		fill->dur = recint;
 		fill->temp = part * (chunk->temp
 			- last->temp) + last->temp;
 		fill->pwr = part * (int)( chunk->pwr - last->pwr )
@@ -282,7 +284,6 @@ srm_data_t srm_data_fixup( srm_data_t data )
 		return NULL;
 
 	/* copy global data */
-	fixed->recint = data->recint;
 	fixed->slope = data->slope;
 	fixed->zeropos = data->zeropos;
 	fixed->circum = data->circum;
@@ -307,11 +308,15 @@ srm_data_t srm_data_fixup( srm_data_t data )
 
 	for( c=1; c < data->cused; ++c ){
 		srm_chunk_t last = fixed->chunks[fixed->cused-1];
-		srm_time_t lnext = last->time + fixed->recint;
 		srm_chunk_t this;
+		srm_time_t recint;
+		srm_time_t lnext;
 
 		if( NULL == ( this = srm_chunk_clone( data->chunks[c] )))
 			goto clean1;
+
+		recint = this->dur;
+		lnext = last->time + recint;
 
 		/* overlapping < 1sec, adjust this time */
 		if( this->time < lnext && lnext - last->time < 10 ){
@@ -343,7 +348,8 @@ srm_data_t srm_data_fixup( srm_data_t data )
 	for( c = fixed->cused -1; c > 0; --c ){
 		srm_chunk_t this = fixed->chunks[c-1];
 		srm_chunk_t next = fixed->chunks[c];
-		srm_time_t nprev = next->time - fixed->recint - delta;
+		srm_time_t recint = next->dur;
+		srm_time_t nprev = next->time - recint - delta;
 
 		if( nprev < this->time ){
 			delta += this->time - nprev;
@@ -515,7 +521,10 @@ srm_time_t srm_data_time_start( srm_data_t data )
  */
 srm_time_t srm_data_recint( srm_data_t data )
 {
-	return data->recint;
+	if( ! data->cused )
+		return 0;
+
+	return data->chunks[data->cused-1]->dur;
 }
 
 
@@ -555,7 +564,7 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 		srm_chunk_t prev = data->chunks[i-1];
 		srm_chunk_t this = data->chunks[i];
 
-		if( prev->time + data->recint != this->time ){
+		if( prev->time + this->dur != this->time ){
 
 			if( used >= avail ){
 				srm_marker_t *tmp;

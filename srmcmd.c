@@ -57,6 +57,7 @@
 static void csvdump( srm_data_t data )
 {
 	srm_chunk_t *ck;
+	srm_time_t recint = srm_data_recint( data );
 
 	printf(
 		"time\t"
@@ -80,7 +81,7 @@ static void csvdump( srm_data_t data )
 			"%ld"		/* "ele\t" */
 			"\n",
 			(double)(*ck)->time / 10,
-			(double)data->recint / 10,
+			(double)recint / 10,
 			(*ck)->temp,
 			(*ck)->pwr,
 			(*ck)->speed,
