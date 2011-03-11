@@ -21,13 +21,15 @@ tmp=`tempfile -d "$srmbase" -s ".srm" `
 srmcmd $srmopt -g -w "$tmp" "$srmdev"
 
 # build filename
-athlete=`srmcmd -n -r "$tmp"`
+athlete=`srmcmd -n -r "$tmp" | sed -e 's/[ 	]*//g'`
+: ${athlete:="YYY"}
+initial=`echo "$athlete" | sed -e 's/^\(.\).*/\1/'`
 time=`srmcmd -d -r "$tmp"`
 dir="$srmbase/_$athlete.SRM/`date -d"@$time" +"%Y_%m"`.SRM"
 [ -d "$dir" ] || mkdir -p "$dir"
 
 # note: somehow depends on the selected time format:
-fname=`date -d"@$time" +"r%d%m%y"`
+fname="$initial`date -d"@$time" +"%d%m%y"`"
 path=""
 for x in A B C D E F G H I J; do
 	path="$dir/$fname$x.srm"
