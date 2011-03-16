@@ -1296,6 +1296,7 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 	int retries;
 	struct tm btm;
 	int ret;
+	time_t bstart;
 
 	_srm_log( gh->conn, "getting block %u/%u",
 		gh->blocknum +1,
@@ -1378,13 +1379,15 @@ static int _srmpc_get_block( srmpc_get_chunk_t gh )
 	if( btm.tm_mon < gh->pctime.tm_mon )
 		-- btm.tm_year;
 
-	ret = mktime( &btm );
-	if( 0 > ret ){
-		_srm_log( gh->conn, "mktime failed: %s", strerror(errno) );
+	bstart = mktime( &btm );
+	if( (time_t) -1 > bstart ){
+		_srm_log( gh->conn, "mktime %s failed: %s",
+			asctime( &btm ),
+			strerror(errno) );
 		return -1;
 	}
 
-	gh->bstart = (srm_time_t)ret *10;
+	gh->bstart = (srm_time_t)bstart *10;
 	gh->dist = ( (gh->buf[5] << 16 )
 		| ( gh->buf[6] << 8 )
 		| gh->buf[7] )
