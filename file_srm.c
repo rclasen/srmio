@@ -258,15 +258,6 @@ static srmio_chunk_t _srmio_data_chunk_srm7( const unsigned char *buf )
 }
 
 /*
- * backwards compatibility wrapper
- * TODO: srmio_file_read is obsolete, will go away
- */
-srmio_data_t srmio_file_read( const char *fname )
-{
-	return srmio_file_srm_read( fname );
-}
-
-/*
  * read SRM5/6/7 files, fill newly allocated data structure.
  *
  * on success data pointer is returned.

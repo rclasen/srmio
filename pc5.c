@@ -1644,45 +1644,6 @@ void srmio_pc_get_chunk_done( srmio_pc_get_chunk_t gh )
 
 
 /*
- * TODO: srmio_pc_get_chunks is obsolete and will go away
- *
- * wrapper arround _start(), _next(), _done() for backwards compatible
- * callback based interface for chunk download.
- *
- * parameter:
- *  conn: connection handle
- *  deleted: instruct PCV to send deleted data, too (when != 0)
- *  cbfunc: callback to process each retrieved data chunk
- *  cbdata: passed to cbfunc
- *
- * on error errno is set and returns NULL
- */
-int srmio_pc_get_chunks(
-	srmio_pc_t conn,
-	int deleted,
-	srmio_pc_chunk_callback_t cbfunc,
-	void *cbdata )
-{
-	srmio_pc_get_chunk_t gh;
-	srmio_chunk_t chunk;
-
-	if( ! cbfunc )
-		return 0;
-
-	if( NULL == (gh = srmio_pc_get_chunk_start( conn, deleted ) ))
-		return -1;
-
-	while( NULL != ( chunk = srmio_pc_get_chunk_next( gh ))){
-		if( (*cbfunc)( gh, cbdata, chunk ) )
-			return -1;
-	}
-
-	srmio_pc_get_chunk_done( gh );
-
-	return 0;
-}
-
-/*
  * setting:	clear recorded data
  * command:	B and T
  * argument:	none

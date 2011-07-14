@@ -102,7 +102,6 @@ void srmio_data_free( srmio_data_t data );
  *
  ************************************************************/
 
-srmio_data_t srmio_file_read( const char *fname ); /* TODO: obsolete, will go away */
 srmio_data_t srmio_file_srm_read( const char *fname );
 int srmio_file_srm7_write( srmio_data_t data, const char *fname );
 
@@ -209,11 +208,6 @@ srmio_pc_get_chunk_t srmio_pc_get_chunk_start( srmio_pc_t conn, int getall );
 srmio_chunk_t srmio_pc_get_chunk_next( srmio_pc_get_chunk_t handle );
 void srmio_pc_get_chunk_done( srmio_pc_get_chunk_t handle );
 
-/* alternative / obsolete callback-based interface: */
-typedef int (*srmio_pc_chunk_callback_t)( srmio_pc_get_chunk_t gh,
-	void *cbdata, srmio_chunk_t chunk );
-int srmio_pc_get_chunks( srmio_pc_t conn, int getall,
-	srmio_pc_chunk_callback_t cfunc, void *cbdata );
 
 int srmio_pc_clear_chunks( srmio_pc_t conn );
 
