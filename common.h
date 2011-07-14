@@ -10,6 +10,13 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
+#ifndef DEBUG
+/* suppress assert() code generation: */
+#define NDEBUG
+#endif
+
+#include <assert.h>
+
 #include "srmio.h"
 
 #include <errno.h>
@@ -79,12 +86,19 @@
 #define STATMSG(x, ...)	while(0);
 #endif
 
+/************************************************************
+ *
+ * from common.c
+ *
+ ************************************************************/
+
 #ifdef DEBUG
 
 #include <ctype.h>
 
-#define DPRINTF(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
-void DUMPHEX( const char *prefix, const unsigned char *buf, size_t blen );
+#define DPRINTF(x, ...)	fprintf( stderr, "%s: " x "\n", __func__, ##__VA_ARGS__ );
+#define DUMPHEX(prefix, buf, blen) dumphex(__func__, prefix, buf, blen );
+void dumphex(const char *func, const char *prefix, const unsigned char *buf, size_t blen );
 
 #else
 
@@ -92,5 +106,49 @@ void DUMPHEX( const char *prefix, const unsigned char *buf, size_t blen );
 #define DUMPHEX(x, ...) while(0);
 
 #endif
+
+/************************************************************
+ *
+ * from buf.c
+ *
+ ************************************************************/
+
+/* any endianess */
+
+char *buf_get_string( const unsigned char *buf, size_t pos, size_t len );
+
+int8_t buf_get_int8( const unsigned char *buf, size_t pos );
+uint8_t buf_get_uint8( const unsigned char *buf, size_t pos );
+
+bool buf_set_string( unsigned char *buf, size_t pos, const char *string, size_t max );
+
+bool buf_set_uint8( unsigned char *buf, size_t pos, uint16_t x );
+
+
+/* little endian */
+
+int16_t buf_get_lint16( const unsigned char *buf, size_t pos );
+int32_t buf_get_lint32( const unsigned char *buf, size_t pos );
+
+uint16_t buf_get_luint16( const unsigned char *buf, size_t pos );
+uint32_t buf_get_luint32( const unsigned char *buf, size_t pos );
+
+
+bool buf_set_lint16( unsigned char *buf, size_t pos, int32_t x );
+bool buf_set_lint32( unsigned char *buf, size_t pos, int64_t x );
+
+bool buf_set_luint16( unsigned char *buf, size_t pos, uint32_t x );
+bool buf_set_luint32( unsigned char *buf, size_t pos, uint64_t x );
+
+/* big endian */
+
+int16_t buf_get_bint16( const unsigned char *buf, size_t pos );
+
+uint16_t buf_get_buint16( const unsigned char *buf, size_t pos );
+uint32_t buf_get_buint24( const unsigned char *buf, size_t pos );
+uint32_t buf_get_buint32( const unsigned char *buf, size_t pos );
+
+bool buf_set_buint16( unsigned char *buf, size_t pos, uint32_t x );
+bool buf_set_buint32( unsigned char *buf, size_t pos, uint64_t x );
 
 #endif /* _COMMON_H */

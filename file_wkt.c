@@ -12,30 +12,14 @@
 /*
  * write contents of data structure into specified file
  */
-int srmio_file_wkt_write( srmio_data_t data, const char *fname )
+bool srmio_file_wkt_write( srmio_data_t data, FILE *fh )
 {
-	int fd;
-	FILE *fh;
 	unsigned i;
 
 	if( ! data ){
 		ERRMSG( "no data to write" );
 		errno = EINVAL;
-		return -1;
-	}
-
-	if( 0 >= (fd = open( fname, O_WRONLY | O_CREAT | O_TRUNC,
-		S_IRUSR | S_IWUSR |
-		S_IRGRP | S_IWGRP |
-		S_IROTH | S_IWOTH ))){
-
-		ERRMSG("open failed: %s", strerror(errno));
-		return -1;
-	}
-
-	if( NULL == ( fh = fdopen( fd, "w" ))){
-		ERRMSG("fdopen failed: %s", strerror(errno));
-		goto clean1;
+		return false;
 	}
 
 	if( 0 > fprintf( fh,
@@ -125,19 +109,9 @@ int srmio_file_wkt_write( srmio_data_t data, const char *fname )
 		}
 	}
 
-	if( 0 != fclose( fh ) ){
-		ERRMSG("fclose failed: %s", strerror(errno));
-		goto clean2;
-	}
-
-	return 0;
+	return true;
 
 clean2:
-	fclose( fh );
-	return -1;
-
-clean1:
-	close( fd );
-	return -1;
+	return false;
 }
 

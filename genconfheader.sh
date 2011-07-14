@@ -25,6 +25,28 @@ if [ -n "$HEADER_INTTYPES_H" ]; then
 	echo "#include <inttypes.h>"
 fi
 
+if [ -n "$HEADER_STDBOOL_H" ]; then
+	echo "#include <stdbool.h>"
+
+else
+	if [ -z "$HAVE__BOOL" ]; then
+cat <<EOF
+#ifdef __cplusplus
+typedef bool _Bool;
+#else
+#define _Bool signed char
+#endif
+EOF
+	fi
+cat <<EOF
+#define bool _Bool
+#define false 0
+#define true 1
+#define __bool_true_false_are_defined 1
+EOF
+fi
+
+
 if [ -n "$HEADER_TIME_WITH_SYS_TIME" ]; then
 	echo "#include <sys/time.h>"
 	echo "#include <time.h>"

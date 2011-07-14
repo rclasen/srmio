@@ -11,6 +11,7 @@ AC_CONFIG_HEADER([config.h])
 AC_PROG_CC
 AC_PROG_LIBTOOL
 AC_PROG_CPP
+AC_PROG_CXX
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
@@ -20,6 +21,7 @@ AC_PROG_MAKE_SET
 
 # Checks for header files.
 AC_HEADER_STDC
+AC_HEADER_STDBOOL
 AC_CHECK_HEADERS([fcntl.h getopt.h inttypes.h limits.h memory.h stddef.h stdint.h stdlib.h string.h sys/time.h termios.h unistd.h])
 
 
@@ -44,14 +46,40 @@ AC_FUNC_MEMCMP
 AC_FUNC_MKTIME
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([localtime_r ])
-AC_CHECK_FUNCS([memset strdup strerror getopt_long ])
+AC_CHECK_FUNCS([memset strdup strrchr strerror getopt_long ])
 
-for func in memset strdup strerror getopt_long; do
+for func in memset strdup strrchr strerror getopt_long; do
 	eval have_func=\$ac_cv_func_$func
 	if test "x$have_func" != xyes; then
-		AC_MSG_ERROR([missing working $func])
+		AC_MSG_ERROR([missing working $func: $have_func])
 	fi
 done
+# AC_CPP_FUNC
+# ------------------ #
+# Checks to see if ANSI C99 CPP variable __func__ works.
+# If not, perhaps __FUNCTION__ works instead. 
+# If not, we'll just define __func__ to "". 
+AC_DEFUN([AC_CPP_FUNC],
+[AC_REQUIRE([AC_PROG_CC_STDC])dnl
+AC_CACHE_CHECK([for an ANSI C99-conforming __func__], ac_cv_cpp_func,
+[AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+[[char *foo = __func__;]])],
+  [ac_cv_cpp_func=yes],
+  [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+[[char *foo = __FUNCTION__;]])],
+  [ac_cv_cpp_func=__FUNCTION__],
+  [ac_cv_cpp_func=no])])])
+if test $ac_cv_cpp_func = __FUNCTION__; then
+  AC_DEFINE(__func__,__FUNCTION__,
+            [Define to __FUNCTION__ or "" if __func__ does not conform to ANSI C.])
+elif test $ac_cv_cpp_func = no; then
+  AC_DEFINE(__func__,"",
+            [Define to __FUNCTION__ or "" if __func__ does not conform to ANSI C.])
+fi
+])# AC_CPP_FUNC
+
+AC_CPP_FUNC
+
 
 # TODO: getopt_long alternatives (FreeBSD)
 # TODO: provide alternative implementations, use gnulib?
@@ -67,6 +95,8 @@ AC_CONFIG_COMMANDS([genconfheader.sh],[
 ],[
 HEADER_STDINT_H=$ac_cv_header_stdint_h
 HEADER_INTTYPES_H=$ac_cv_header_inttypes_h
+HEADER_STDBOOL_H=$ac_cv_header_stdbool_h
+HAVE__BOOL=$ac_cv_type__Bool
 HEADER_TIME_WITH_SYS_TIME=$ac_cv_header_time
 HEADER_SYS_TIME_H=$ac_cv_header_sys_time_h
 HEADER_TERMIOS_H=$ac_cv_header_termios_h

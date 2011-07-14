@@ -8,7 +8,7 @@
  */
 
 
-#include "common.h"
+#include "pc.h"
 #include <stdarg.h>
 
 
@@ -19,54 +19,40 @@
 #define BLOCK_NAK	((const unsigned char *)"\x15")
 #define BLOCK_ABRT	((const unsigned char *)"\xaa")
 
-#define SRM_BUFSIZE	1024
-#define SRM_BLOCKCHUNKS	11u
+#define PC5_BUFSIZE	1024
+#define PC5_PKT_CHUNKS	11u
 
-struct _srmio_pc_t {
-	int		fd;
-	struct termios	oldios;
-	int		stxetx;	/* use stx/etx headers + encoding? */
-	time_t		nready;	/* PC accepts next command */
-	srmio_log_callback_t	lfunc;	/* logging callback */
-	int		cmd_running; /* command is going on */
-};
-
-struct _srmio_pc_get_chunk_t {
-	/* whole downlad */
-	srmio_pc_t		conn;
-	struct tm		pctime;
-	unsigned		blocks;
-	unsigned char		buf[SRM_BUFSIZE];
-	int			finished;
-
-	/* current block */
-	unsigned		blocknum;	/* 0..blocks-1 */
-	srmio_time_t		bstart;
-	unsigned long		dist;
-	int			temp;
-	srmio_time_t		recint;
-
-	/* current chunk */
-	unsigned		chunknum;	/* within block 0..10 */
-	int			isfirst;	/* ... of marker */
-	int			iscont;		/* ... of marker */
-};
+// TODO: replace _srm_log
+#define _srm_log(x,y, ...) DPRINTF(y, ##__VA_ARGS__)
 
 
 /*
- * I'm a chicken and won't touch any SRM I don't know.
- *
- * This is a good(tm) idea as a misencoded command argument leads to
- * broken settings within the SRM. Seems the SRM's input checking is
- * limited.
+ * connection handle
  */
-static const unsigned _srmio_pc_whitelist[] = {
-	0x6b08,		/* fw 6b.08 - uses stxetx, from Andree */
-	0x6b09,		/* fw 6b.09 - uses stxetx */
-	0x4309,		/* fw 43.09 - no stxetx, fw was upgraded 04/2009 */
-	0x3404,		/* fw 34.04 - no stxetx, reported by MorganFletcher */
-	0,
+struct _srmio_pc5_t {
+	int			stxetx;	/* use stx/etx headers + encoding? */
+	time_t			nready;	/* PC accepts next command */
+
+	/* whole downlad */
+	struct tm		pctime;
+	unsigned		pkt_cnt;
+	unsigned char		pkt_data[PC5_BUFSIZE];
+	struct _srmio_pc_xfer_block_t block;
+	size_t			block_num;
+
+	/* current pkt */
+	unsigned		pkt_num;	/* 0..pkts-1 */
+	srmio_time_t		pkt_time;
+	unsigned long		pkt_dist;
+	int			pkt_temp;
+	srmio_time_t		pkt_recint;
+
+	/* current chunk */
+	unsigned		chunk_num;	/* within pkt 0..10 */
 };
+typedef struct _srmio_pc5_t *srmio_pc5_t;
+
+#define SELF(x) ((srmio_pc5_t)x->child)
 
 /*
  * supported baudrates in order to try
@@ -75,66 +61,26 @@ static const unsigned _srmio_pc_whitelist[] = {
  *  9600,4800,19200,2400 Baud
  *  each baudrate with none, then with even parity
  */
-typedef enum {
-	_srmio_pc_baud_9600,
-	_srmio_pc_baud_19200,
-	_srmio_pc_baud_4800,
-	_srmio_pc_baud_2400,
-	_srmio_pc_baud_max
-} _srmio_pc_baudrate_t;
-
-static const tcflag_t _srmio_pc_baudrates[_srmio_pc_baud_max] = {
-	B9600,
-	B19200,
-	B4800,
-	B2400,
+static const srmio_io_baudrate_t _srmio_pc5_baud_probe[] = {
+	srmio_io_baud_9600,
+	srmio_io_baud_19200,
+	srmio_io_baud_4800,
+	srmio_io_baud_2400,
+	srmio_io_baud_max,
 };
 
-static const int _srmio_pc_baudnames[_srmio_pc_baud_max] = {
-	9600,
-	19200,
-	4800,
-	2400,
+static const srmio_io_parity_t _srmio_pc5_parity_probe[] = {
+	srmio_io_parity_none,
+	srmio_io_parity_even,
+	srmio_io_parity_max,
 };
 
-static int _srmio_pc_msg_decode(
+static int _srmio_pc5_msg_decode(
 	unsigned char *out, size_t olen,
 	const unsigned char *in, size_t ilen );
 
-static int _srmio_pc_msg_send( srmio_pc_t conn,
+static int _srmio_pc5_msg_send( srmio_pc_t conn,
 	char cmd, const unsigned char *arg, size_t alen );
-
-
-/************************************************************
- *
- * helper / logging
- *
- ************************************************************/
-
-
-static void _srm_log( srmio_pc_t conn, const char *fmt, ... )
-{
-	va_list ap;
-	char buf[SRM_BUFSIZE];
-
-#ifndef DEBUG
-	if( ! conn->lfunc )
-		return;
-#endif
-
-	va_start( ap, fmt );
-
-	if( 0 > vsnprintf(buf, SRM_BUFSIZE, fmt, ap ) )
-		return
-		;
-	va_end( ap );
-
-	DPRINTF("_srm_log: %s", buf );
-#ifdef DEBUG
-	if( conn->lfunc )
-#endif
-		(*conn->lfunc)( buf );
-}
 
 /************************************************************
  *
@@ -149,16 +95,13 @@ static void _srm_log( srmio_pc_t conn, const char *fmt, ... )
  * returns number of chars written
  * on error errno is set and returns -1
  */
-static int _srmio_pc_write( srmio_pc_t conn, const unsigned char *buf, size_t blen )
+static int _srmio_pc5_write( srmio_pc_t conn, const unsigned char *buf, size_t blen )
 {
 	int ret;
 
-	DUMPHEX( "_srmio_pc_write", buf, blen );
+	DUMPHEX( "", buf, blen );
 
-	if( tcflush( conn->fd, TCIOFLUSH ) )
-		return -1;
-
-	ret = write( conn->fd, buf, blen );
+	ret = srmio_io_write( conn->io, buf, blen );
 	if( ret < 0 )
 		return -1;
 
@@ -166,9 +109,6 @@ static int _srmio_pc_write( srmio_pc_t conn, const unsigned char *buf, size_t bl
 		errno = EIO;
 		return -1;
 	}
-
-	if( 0 > tcdrain( conn->fd ) )
-		return -1;
 
 	return ret;
 }
@@ -179,24 +119,11 @@ static int _srmio_pc_write( srmio_pc_t conn, const unsigned char *buf, size_t bl
  * returns number of chars read
  * on error errno is set and returns -1
  */
-static int _srmio_pc_read( srmio_pc_t conn, unsigned char *buf, size_t want )
+static int _srmio_pc5_read( srmio_pc_t conn, unsigned char *buf, size_t want )
 {
-	size_t got = 0;
-	int ret;
-
-	while( got < want ){
-		ret = read( conn->fd, &buf[got], 1 );
-		if( ret < 0 )
-			return -1;
-
-		if( ret < 1 )
-			return got;
-
-		got += ret;
-	}
-
-	return got;
+	return srmio_io_read( conn->io, buf, want );
 }
+
 
 /*
  * set serial parameter
@@ -204,72 +131,51 @@ static int _srmio_pc_read( srmio_pc_t conn, unsigned char *buf, size_t want )
  * send "hello"
  * check returned version
  * decode version
- * return detected version (or -1 on error)
+ *
+ * returns true on success, otherwise errno is set
  */
-static int _srmio_pc_init(
+static bool _srmio_pc5_init(
 	srmio_pc_t conn,
-	_srmio_pc_baudrate_t baudrate,
-	int parity )
+	const srmio_io_baudrate_t baudrate,
+	const srmio_io_parity_t parity )
 {
-	struct termios	ios;
 	int		ret;
 	unsigned char	buf[20];
 	unsigned char	verbuf[2];
+	unsigned	baudname;
+	char		parityname;
 
-	if( baudrate >= _srmio_pc_baud_max ){
-		_srm_log( conn, "srmio_pc_init: invalid baud request: %d", baudrate );
-		errno = EINVAL;
-		return -1;
-	}
+	assert( conn );
+	assert( baudrate < srmio_io_baud_max );
+	assert( parity < srmio_io_parity_max );
 
-	conn->stxetx = 1;
+	SELF(conn)->stxetx = 1;
+
+	srmio_io_baud2name( baudrate, &baudname );
+	srmio_io_parity2name( parity, &parityname );
+
 	_srm_log( conn, "trying comm %d/8%c1",
-		_srmio_pc_baudnames[baudrate],
-		parity ? 'e' : 'n' );
+		baudname,
+		parityname );
 
-#ifdef HAVE_CFMAKERAW
-	cfmakeraw( &ios );
-#else
-	memset(&ios, 0, sizeof(struct termios));
-#endif
-	ios.c_cflag = CS8 | CLOCAL | CREAD;
-	if( parity ) ios.c_cflag |= PARENB;
-	if( 0 > cfsetispeed( &ios, _srmio_pc_baudrates[baudrate] ) ){
-		_srm_log( conn, "cfsetispeed failed: %s", strerror(errno));
-		return -1;
-	}
-	if( 0 > cfsetospeed( &ios, _srmio_pc_baudrates[baudrate] ) ){
-		_srm_log( conn, "cfsetospeed failed: %s", strerror(errno));
-		return -1;
-	}
+	srmio_io_set_baudrate( conn->io, baudrate );
+	srmio_io_set_parity( conn->io, parity );
 
-	ios.c_iflag = IGNPAR;
+	if( ! srmio_io_update( conn->io ))
+		return false;
 
-	ios.c_cc[VMIN] = 0;
-	ios.c_cc[VTIME] = 10;
-
-
-	if( tcflush( conn->fd, TCIOFLUSH ) ){
-		_srm_log( conn, "tcflush failed: %s", strerror(errno));
-		return -1;
-	}
-
-	if( tcsetattr( conn->fd, TCSANOW, &ios ) ){
-		_srm_log( conn, "tcsetattr failed: %s", strerror(errno));
-		return -1;
-	}
-
-	tcsendbreak( conn->fd, 0 );
+	srmio_io_send_break( conn->io );
+	srmio_io_flush( conn->io );
 
 	/* send opening 'P' to verify communication works */
-	ret = _srmio_pc_msg_send( conn, 'P', NULL, 0 );
+	ret = _srmio_pc5_msg_send( conn, 'P', NULL, 0 );
 	if( ret < 0 )
 		goto clean1;
 
-	ret = _srmio_pc_read( conn, buf, 20 );
-	DPRINTF( "srmio_pc_init ret %d", ret );
+	ret = _srmio_pc5_read( conn, buf, 20 );
+	DPRINTF( "ret %d", ret );
 	if( ret < 0 ){
-		_srm_log( conn, "srmio_pc_read failed: %s", strerror(errno));
+		_srm_log( conn, "srmio_pc5_read failed: %s", strerror(errno));
 		goto clean2;
 	}
 	if( ret == 0 ){
@@ -277,9 +183,8 @@ static int _srmio_pc_init(
 		errno = EHOSTDOWN;
 		goto clean2;
 	}
-	conn->cmd_running = 0;
 
-	DUMPHEX( "_srmio_pc_init got ", buf, ret );
+	DUMPHEX( "got", buf, ret );
 
 	/* autodetect communcitation type */
 	if( *buf == STX ){
@@ -289,7 +194,7 @@ static int _srmio_pc_init(
 			goto clean2;
 		}
 
-		if( 0 >  _srmio_pc_msg_decode( verbuf, 2, &buf[2], 4 ) ){
+		if( 0 >  _srmio_pc5_msg_decode( verbuf, 2, &buf[2], 4 ) ){
 			_srm_log( conn, "msg decode failed: %s", strerror(errno));
 			goto clean2;
 		}
@@ -301,156 +206,113 @@ static int _srmio_pc_init(
 			goto clean2;
 		}
 
-		conn->stxetx = 0;
-		DPRINTF( "_srmio_pc_init: disabling stx/etx" );
+		SELF(conn)->stxetx = 0;
+		DPRINTF( "disabling stx/etx" );
 
 		memcpy( verbuf, &buf[1], 2 );
 	}
 
-	return ( verbuf[0] << 8 ) | verbuf[1];
+	conn->baudrate = baudrate;
+	conn->parity = parity;
+	conn->firmware = buf_get_buint16( verbuf, 0 );
+
+	_srm_log( conn, "found PCV version 0x%x at %d/8%c1",
+		conn->firmware,
+		baudname,
+		parityname );
+
+	return true;
 
 clean2:
-	conn->cmd_running = 0;
 clean1:
-	/* no need for termios cleanup - handled by srmio_pc_open() */
-	return -1;
+	/* no need for termios cleanup - handled by srmio_pc5_open() */
+	return false;
 }
 
-
-static int _srmio_pc_init_all( srmio_pc_t conn )
+static bool _srmio_pc5_probe_parity( srmio_pc_t conn,
+	srmio_io_baudrate_t rate )
 {
-	_srmio_pc_baudrate_t baudrate;
+	const srmio_io_parity_t *parity;
 
-	for( baudrate = 0; baudrate < _srmio_pc_baud_max; ++baudrate ){
-		int parity;
+	for( parity = _srmio_pc5_parity_probe;
+		*parity < srmio_io_parity_max; ++parity ){
 
-		for( parity = 0; parity < 2; ++parity ){
-			int	ret;
+		if( _srmio_pc5_init( conn, rate, *parity ) )
+			return true;
+	}
 
-			ret = _srmio_pc_init( conn, baudrate, parity );
-			if( ret >= 0 ){
-				_srm_log( conn, "found PCV version 0x%x at %d/8%c1",
-					(unsigned)ret,
-					_srmio_pc_baudnames[baudrate],
-					parity ? 'e' : 'n' );
+	return false;
+}
 
-				return ret;
-			}
+static bool _srmio_pc5_probe_baud( srmio_pc_t conn )
+{
+	const srmio_io_baudrate_t *rate;
+
+	for( rate = _srmio_pc5_baud_probe; *rate < srmio_io_baud_max; ++rate ){
+		if( conn->parity == srmio_io_parity_max ){
+			if( _srmio_pc5_probe_parity( conn, *rate ) )
+				return true;
+
+		} else if( _srmio_pc5_init( conn, *rate, conn->parity ) ){
+			return true;
 		}
 	}
 
 	_srm_log( conn, "no PCV found" );
 	errno = ENOTSUP;
-	return -1;
+	return false;
 }
 
-
 /*
- * allocate internal data structures,
- * open serial device
+ * serial handle must be opened before this
  * set serial device properties
+ * get version from initial greeting
  *
- * parameter:
- *  fname: path to serial device
- *  force: ignore whitelist (when != 0)
- *  lfunc: function to invoke for verbose status reporting
- *
- * returns newly allocated connection handle.
- *
- * on error errno is set and returns NULL
  */
-srmio_pc_t srmio_pc_open( const char *fname, int force,
-	srmio_log_callback_t lfunc )
+static bool _srmio_pc5_open( srmio_pc_t conn )
 {
-	srmio_pc_t	conn;
-	int		pcv;
+	assert( conn );
+	assert( conn->io );
 
-	DPRINTF( "srmio_pc_open %s", fname );
+	DPRINTF( "" );
 
-	if( NULL == (conn = malloc(sizeof(struct _srmio_pc_t))))
-		return NULL;
-	conn->lfunc = lfunc;
-
-	_srm_log( conn, "%s opening device %s",
-		PACKAGE_STRING,
-		fname );
-
-	/* TODO: uucp style lockfils */
-
-	if( 0 > (conn->fd = open( fname, O_RDWR | O_NOCTTY ))){
-		_srm_log( conn, "open failed: %s", strerror(errno) );
-		goto clean2;
-	}
-
-	/* get serial comm parameter for restore on close*/
-	if( tcgetattr( conn->fd, &conn->oldios ) ){
-		_srm_log( conn, "tcgetattr failed: %s", strerror(errno) );
-		goto clean3;
-	}
+	srmio_io_set_flow( conn->io, srmio_io_flow_none );
 
 	/* set serial parameter and get PCV version */
-	/* TODO: allow user to specify baudrate+parity */
-	if( 0 > ( pcv = _srmio_pc_init_all( conn )))
-		goto clean4;
+	if( conn->baudrate == srmio_io_baud_max ){
+		if( ! _srmio_pc5_probe_baud( conn ) )
+			goto clean1;
 
+	} else if( conn->parity == srmio_io_parity_max ){
+		if( ! _srmio_pc5_probe_parity( conn, conn->baudrate ) )
+			goto clean1;
 
-	/* verify it's a known/supported PCV */
-	if( ! force ){
-		int known = 0;
-		const unsigned *white;
+	} else if( ! _srmio_pc5_init( conn, conn->baudrate, conn->parity )) {
+		goto clean1;
 
-		for( white = _srmio_pc_whitelist; *white; ++white ){
-			if( (unsigned)pcv == *white ){
-				++known;
-				break;
-			}
-		}
-		if( ! known ){
-			_srm_log( conn, "PC Version 0x%x not whitelisted",
-				pcv );
-			errno = ENOTSUP;
-			goto clean4;
-		}
 	}
 
-	return conn;
+	return true;
 
-clean4:
-	tcflush( conn->fd, TCIOFLUSH );
-	tcsetattr( conn->fd, TCSANOW, &conn->oldios );
-
-clean3:
-	close(conn->fd);
-
-clean2:
-	free(conn);
-	return NULL;
+clean1:
+	return false;
 }
 
 /*
  * close serial device
- * and free memory
  *
  * parameter:
  *  conn: connection handle
  *
- * returns: nothing
- *
+ * returns true on success, otherwise errno is set
  */
-void srmio_pc_close( srmio_pc_t conn )
+bool _srmio_pc5_close( srmio_pc_t conn )
 {
-	DPRINTF( "srmio_pc_close" );
-	if( ! conn )
-		return;
+	assert( conn );
 
-	tcflush( conn->fd, TCIOFLUSH );
-	if( tcsetattr( conn->fd, TCSANOW, &conn->oldios ) )
-		_srm_log( conn, "failed to restore ios state: %s",
-			strerror(errno) );
+	DPRINTF( "" );
 
-	close( conn->fd );
-	/* TODO: uu_unlock */
-	free( conn );
+	return true;
 }
 
 
@@ -514,7 +376,7 @@ void srmio_pc_close( srmio_pc_t conn )
  * returns number of encoded bytes
  * on error errno is set and returns -1
  */
-static int _srmio_pc_msg_encode(
+static int _srmio_pc5_msg_encode(
 	unsigned char *out, size_t olen,
 	const unsigned char *in, size_t ilen )
 {
@@ -522,13 +384,13 @@ static int _srmio_pc_msg_encode(
 	size_t o=0;
 
 	if( 2 * ilen < ilen ){
-		ERRMSG( "_srmio_pc_msg_encode: input too large, INT overflow" );
+		ERRMSG( "_srmio_pc5_msg_encode: input too large, INT overflow" );
 		errno = EOVERFLOW;
 		return -1;
 	}
 
 	if( olen < 2 * ilen ){
-		ERRMSG( "_srmio_pc_msg_encode: dst buffer too small %lu/%lu",
+		ERRMSG( "_srmio_pc5_msg_encode: dst buffer too small %lu/%lu",
 			(unsigned long)ilen,
 			(unsigned long)olen);
 		errno = ERANGE;
@@ -540,7 +402,7 @@ static int _srmio_pc_msg_encode(
 		out[o++] = (in[i] & 0x0f ) | 0x30;
 	}
 
-	DUMPHEX( "_srmio_pc_msg_encode", out, o );
+	DUMPHEX( "", out, o );
 	return o;
 }
 
@@ -551,27 +413,27 @@ static int _srmio_pc_msg_encode(
  * returns number of decoded bytes
  * on error errno is set and returns -1
  */
-static int _srmio_pc_msg_decode(
+static int _srmio_pc5_msg_decode(
 	unsigned char *out, size_t olen,
 	const unsigned char *in, size_t ilen )
 {
 	int o=0;
 
 	if( olen * 2 < olen ){
-		ERRMSG( "_srmio_pc_msg_decode: input too large, INT overflow");
+		ERRMSG( "_srmio_pc5_msg_decode: input too large, INT overflow");
 		errno = EOVERFLOW;
 		return -1;
 	}
 
 	if( ilen % 2 ){
-		ERRMSG( "_srmio_pc_msg_decode: uneven input size: %lu",
+		ERRMSG( "_srmio_pc5_msg_decode: uneven input size: %lu",
 			(unsigned long)ilen );
 		errno = EINVAL;
 		return -1;
 	}
 
 	if( olen * 2 < ilen ){
-		ERRMSG( "_srmio_pc_msg_decode: dst buffer too small %lu/%lu",
+		ERRMSG( "_srmio_pc5_msg_decode: dst buffer too small %lu/%lu",
 			(unsigned long)ilen,
 			(unsigned long)olen);
 		errno = ERANGE;
@@ -586,7 +448,7 @@ static int _srmio_pc_msg_decode(
 		++o;
 	}
 
-	DUMPHEX( "_srmio_pc_msg_decode", out, o );
+	DUMPHEX( "", out, o );
 	return o;
 }
 
@@ -599,21 +461,15 @@ static int _srmio_pc_msg_decode(
  * returns 0 on success
  * on error errno is set and returns -1
  */
-static int _srmio_pc_msg_send( srmio_pc_t conn, char cmd, const unsigned char *arg, size_t alen )
+static int _srmio_pc5_msg_send( srmio_pc_t conn, char cmd, const unsigned char *arg, size_t alen )
 {
-	unsigned char buf[SRM_BUFSIZE];
+	unsigned char buf[PC5_BUFSIZE];
 	unsigned len = 0;
 	int ret;
 
-	DPRINTF( "_srmio_pc_msg_send %c ...", cmd );
-	DUMPHEX( "_srmio_pc_msg_send", arg, alen );
+	DPRINTF( "%c ...", cmd );
+	DUMPHEX( "", arg, alen );
 
-
-	if( conn->cmd_running ){
-		_srm_log( conn, "another command is still running" );
-		errno = EBUSY;
-		return -1;
-	}
 
 	if( 2 * alen +3 < alen ){
 		_srm_log( conn, "too large argument, INT overflow" );
@@ -622,18 +478,18 @@ static int _srmio_pc_msg_send( srmio_pc_t conn, char cmd, const unsigned char *a
 	}
 
 	/* sledgehammer aproach to prevent exceeding the buffer: */
-	if( 2 * alen +3 > SRM_BUFSIZE ){
+	if( 2 * alen +3 > PC5_BUFSIZE ){
 		_srm_log( conn, "too large argument for buffer" );
 		errno = ERANGE;
 		return -1;
 	}
 
 	/* build command */
-	if( conn->stxetx ){
+	if( SELF(conn)->stxetx ){
 		buf[len++] = STX;
 		buf[len++] = cmd;
 
-		ret = _srmio_pc_msg_encode( &buf[len], SRM_BUFSIZE-2, arg, alen );
+		ret = _srmio_pc5_msg_encode( &buf[len], PC5_BUFSIZE-2, arg, alen );
 		if( ret < 0 ){
 			_srm_log( conn, "failed to encode message: %s", strerror(errno) );
 			return -1;
@@ -652,7 +508,10 @@ static int _srmio_pc_msg_send( srmio_pc_t conn, char cmd, const unsigned char *a
 
 
 	/* send */
-	ret = _srmio_pc_write( conn, buf, len );
+	if( ! srmio_io_flush( conn->io ) )
+		return -1;
+
+	ret = _srmio_pc5_write( conn, buf, len );
 	if( ret < 0 ){
 		_srm_log( conn, "send failed: %s", strerror(errno) );
 		return -1;
@@ -663,7 +522,6 @@ static int _srmio_pc_msg_send( srmio_pc_t conn, char cmd, const unsigned char *a
 		return -1;
 	}
 
-	conn->cmd_running = 1;
 	return 0;
 }
 
@@ -677,14 +535,14 @@ static int _srmio_pc_msg_send( srmio_pc_t conn, char cmd, const unsigned char *a
  * returns 0 on success
  * on error errno is set and returns -1
  */
-static int _srmio_pc_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsize, size_t want )
+static int _srmio_pc5_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsize, size_t want )
 {
-	unsigned char	buf[SRM_BUFSIZE];
+	unsigned char	buf[PC5_BUFSIZE];
 	size_t	rlen = 0;
 	int	ret;
 
 	if( rbuf && want > rsize ){
-		_srm_log( conn, "_srmio_pc_msg_recv rbuf too small want %lu rsize %lu",
+		_srm_log( conn, "_srmio_pc5_msg_recv rbuf too small want %lu rsize %lu",
 			(unsigned long)want,
 			(unsigned long)rsize);
 		errno = ERANGE;
@@ -697,7 +555,7 @@ static int _srmio_pc_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsiz
 		return -1;
 	}
 
-	if( conn->stxetx )
+	if( SELF(conn)->stxetx )
 		/* stx, etc, encoding */
 		want = 2*want +2;
 
@@ -705,10 +563,10 @@ static int _srmio_pc_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsiz
 	++want;
 
 
-	DPRINTF( "_srmio_pc_msg_recv will read %lu ", (unsigned long)want );
+	DPRINTF( "will read %lu ", (unsigned long)want );
 
-	if( want >= SRM_BUFSIZE ){
-		_srm_log( conn, "_srmio_pc_msg_recv tmp buf too small for rsize=%lu",
+	if( want >= PC5_BUFSIZE ){
+		_srm_log( conn, "_srmio_pc5_msg_recv tmp buf too small for rsize=%lu",
 			(unsigned long)rsize );
 		errno = ERANGE;
 		return -1;
@@ -720,11 +578,11 @@ static int _srmio_pc_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsiz
 	 * - read times out
 	 */
 	while( rlen < want ){
-		ret = _srmio_pc_read( conn, &buf[rlen], 1 );
+		ret = _srmio_pc5_read( conn, &buf[rlen], 1 );
 
 		if( ret < 0 ){
 			_srm_log( conn, "read failed: %s", strerror(errno));
-			DUMPHEX( "_srmio_pc_msg_recv", buf, rlen );
+			DUMPHEX( "", buf, rlen );
 			return -1; /* read failed */
 
 		}
@@ -738,14 +596,14 @@ static int _srmio_pc_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsiz
 		++rlen;
 
 		/* avoid running into timeout */
-		if( conn->stxetx && buf[rlen-1] == ETX ){
-			DPRINTF( "_srmio_pc_msg_recv ETX" );
+		if( SELF(conn)->stxetx && buf[rlen-1] == ETX ){
+			DPRINTF( "ETX" );
 			break;
 		}
 
 	}
-	DPRINTF( "_srmio_pc_msg_recv got %lu chars", (unsigned long)rlen );
-	DUMPHEX( "_srmio_pc_msg_recv", buf, rlen );
+	DPRINTF( "got %lu chars", (unsigned long)rlen );
+	DUMPHEX( "", buf, rlen );
 
 	if( ! rlen ){
 		_srm_log( conn, "response timed out" );
@@ -753,29 +611,28 @@ static int _srmio_pc_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsiz
 		return -1;
 	}
 
-	conn->cmd_running = 0;
-	if( conn->stxetx ){
+	if( SELF(conn)->stxetx ){
 		if( rlen < 3 ){
-			_srm_log( conn, "_srmio_pc_msg_recv response is too short" );
+			_srm_log( conn, "_srmio_pc5_msg_recv response is too short" );
 			errno = EBADMSG;
 			return -1;
 		}
 
 		if( buf[0] != STX ){
-			_srm_log( conn, "_srmio_pc_msg_recv STX is missing" );
+			_srm_log( conn, "_srmio_pc5_msg_recv STX is missing" );
 			errno = EPROTO;
 			return -1;
 		}
 
 		if( buf[rlen-1] != ETX ){
-			_srm_log( conn, "_srmio_pc_msg_recv ETX is missing" );
+			_srm_log( conn, "_srmio_pc5_msg_recv ETX is missing" );
 			errno = EPROTO;
 			return -1;
 		}
 		rlen -= 3; /* stx, cmd, etx */
 
 		if( rbuf ){
-			ret = _srmio_pc_msg_decode(rbuf, rsize, &buf[2], rlen );
+			ret = _srmio_pc5_msg_decode(rbuf, rsize, &buf[2], rlen );
 			if( ret < 0 ){
 				_srm_log( conn, "msg decode failed: %s", strerror(errno));
 				return -1;
@@ -786,7 +643,7 @@ static int _srmio_pc_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsiz
 
 	} else {
 		if( rlen < 1 ){
-			_srm_log( conn, "_srmio_pc_msg_recv response is too short" );
+			_srm_log( conn, "_srmio_pc5_msg_recv response is too short" );
 			errno = EBADMSG;
 			return -1;
 		}
@@ -811,10 +668,10 @@ static int _srmio_pc_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsiz
  * returns 0 on success
  * on error errno is set and returns -1
  */
-static int _srmio_pc_msg_busy( srmio_pc_t conn, unsigned delay )
+static int _srmio_pc5_msg_busy( srmio_pc_t conn, unsigned delay )
 {
-	time( &conn->nready );
-	conn->nready += delay;
+	time( &SELF(conn)->nready );
+	SELF(conn)->nready += delay;
 
 	return 0;
 }
@@ -826,16 +683,16 @@ static int _srmio_pc_msg_busy( srmio_pc_t conn, unsigned delay )
  * returns 0 on success
  * on error errno is set and returns -1
  */
-static int _srmio_pc_msg_ready( srmio_pc_t conn )
+static int _srmio_pc5_msg_ready( srmio_pc_t conn )
 {
 	time_t now;
 	unsigned delta;
 
 	time( &now );
-	if( conn->nready <= now )
+	if( SELF(conn)->nready <= now )
 		return 0;
 
-	delta = conn->nready - now;
+	delta = SELF(conn)->nready - now;
 
 	_srm_log( conn, "PC still busy for %usec, waiting...", delta );
 	sleep( delta );
@@ -850,7 +707,7 @@ static int _srmio_pc_msg_ready( srmio_pc_t conn )
  * returns 0 on success
  * on error errno is set and returns -1
  */
-static int _srmio_pc_msg( srmio_pc_t conn, char cmd,
+static int _srmio_pc5_msg( srmio_pc_t conn, char cmd,
 	const unsigned char *arg,
 	size_t alen,
 	unsigned char *buf,
@@ -860,7 +717,13 @@ static int _srmio_pc_msg( srmio_pc_t conn, char cmd,
 	int retries;
 	int ret;
 
-	if( 0 > _srmio_pc_msg_ready( conn )){
+	if( conn->xfer_state != srmio_pc_xfer_type_new ){
+		_srm_log( conn, "another command is still running" );
+		errno = EBUSY;
+		return -1;
+	}
+
+	if( 0 > _srmio_pc5_msg_ready( conn )){
 		_srm_log( conn, "failed to wait for PC becoming available: %s", strerror(errno));
 		return -1;
 	}
@@ -868,16 +731,16 @@ static int _srmio_pc_msg( srmio_pc_t conn, char cmd,
 	for( retries = 0; retries < 3; ++retries ){
 
 		if( retries ){
-			conn->cmd_running = 0;
 			_srm_log( conn, "SRM isn't responding, send break and retry" );
-			tcsendbreak( conn->fd, 0 );
+			srmio_io_send_break( conn->io );
 			sleep(1);
+			srmio_io_flush( conn->io );
 		}
 
-		if( _srmio_pc_msg_send( conn, cmd, arg, alen ) )
+		if( _srmio_pc5_msg_send( conn, cmd, arg, alen ) )
 			return -1;
 
-		ret = _srmio_pc_msg_recv( conn, buf, blen, want);
+		ret = _srmio_pc5_msg_recv( conn, buf, blen, want);
 		/* TODO: retry on all errors? */
 		if( ret >= 0 || errno != ETIMEDOUT )
 			break;
@@ -912,21 +775,26 @@ static int _srmio_pc_msg( srmio_pc_t conn, char cmd,
  * returns integer firmware version
  * on error errno is set and returns -1
  */
-int srmio_pc_get_version( srmio_pc_t conn )
+bool srmio_pc5_cmd_get_version( srmio_pc_t conn, unsigned *version )
 {
 	unsigned char buf[20];
 	int ret;
 
-	ret = _srmio_pc_msg( conn, 'P', NULL, 0, buf, 20, 2 );
+	assert( conn );
+	assert( conn->is_open );
+	assert( version );
+
+	ret = _srmio_pc5_msg( conn, 'P', NULL, 0, buf, 20, 2 );
 	if( ret < 0 )
-		return -1;
+		return false;
 	if( ret < 2 ){
 		_srm_log( conn, "got truncated version response" );
 		errno = EPROTO;
-		return -1;
+		return false;
 	}
 
-	return ( buf[0] << 8 ) | buf[1];
+	*version = buf_get_buint16( buf, 0 );
+	return true;
 }
 
 /*
@@ -942,24 +810,29 @@ int srmio_pc_get_version( srmio_pc_t conn )
  * returns malloc()ed string on succuess
  * on error errno is set and returns -1
  */
-char *srmio_pc_get_athlete( srmio_pc_t conn )
+static bool _srmio_pc5_cmd_get_athlete( srmio_pc_t conn, char **name )
 {
 	unsigned char buf[20];
 	int ret;
 
-	ret = _srmio_pc_msg( conn, 'N', (unsigned char*)"\x0", 1, buf, 20, 8 );
+	assert( conn );
+	assert( conn->is_open );
+	assert( name );
+
+	ret = _srmio_pc5_msg( conn, 'N', (unsigned char*)"\x0", 1, buf, 20, 8 );
 	if( ret < 0 )
-		return NULL;
+		return false;
 	if( ret < 6 ){
 		_srm_log( conn, "got truncated athlete response" );
 		errno = EPROTO;
-		return NULL;
+		return false;
 	}
 
-	buf[6] = 0;
-	DPRINTF( "srmio_pc_get_athlete got=%s", (char*)buf );
+	*name = buf_get_string( buf, 0, 6 );
+	DPRINTF( "got=%s", (char*)*name );
 	/* TODO: iconv cp850 -> internal ?? */
-	return strdup( (char*)buf );
+
+	return true;
 }
 
 /*
@@ -978,18 +851,22 @@ char *srmio_pc_get_athlete( srmio_pc_t conn )
  * returns 0 on succuess
  * on error errno is set and returns -1
  */
-int srmio_pc_get_time( srmio_pc_t conn, struct tm *timep )
+bool srmio_pc5_cmd_get_time( srmio_pc_t conn, struct tm *timep )
 {
 	unsigned char buf[20];
 	int ret;
 
-	ret = _srmio_pc_msg( conn, 'M', (unsigned char*)"\x0", 1, buf, 20, 6 );
+	assert( conn );
+	assert( conn->is_open );
+	assert( timep );
+
+	ret = _srmio_pc5_msg( conn, 'M', (unsigned char*)"\x0", 1, buf, 20, 6 );
 	if( ret < 0 )
-		return -1;
+		return false;
 	if( ret < 6 ){
 		_srm_log( conn, "got truncated time response" );
 		errno = EPROTO;
-		return -1;
+		return false;
 	}
 
 	timep->tm_mday = TIMEDEC( buf[0] );
@@ -1000,9 +877,9 @@ int srmio_pc_get_time( srmio_pc_t conn, struct tm *timep )
 	timep->tm_sec = TIMEDEC( buf[5] );
 	timep->tm_isdst = -1;
 
-	DPRINTF( "srmio_pc_get_time time=%s", asctime( timep ) );
+	DPRINTF( "time=%s", asctime( timep ) );
 
-	return 0;
+	return true;
 }
 
 /*
@@ -1015,9 +892,13 @@ int srmio_pc_get_time( srmio_pc_t conn, struct tm *timep )
  * returns 0 on succuess
  * on error errno is set and returns -1
  */
-int srmio_pc_set_time( srmio_pc_t conn, struct tm *timep )
+static bool _srmio_pc5_cmd_set_time( srmio_pc_t conn, struct tm *timep )
 {
 	unsigned char buf[6];
+
+	assert( conn );
+	assert( conn->is_open );
+	assert( timep );
 
 	/* TODO: check for overflows */
 	buf[0] = TIMEENC( timep->tm_mday );
@@ -1027,12 +908,12 @@ int srmio_pc_set_time( srmio_pc_t conn, struct tm *timep )
 	buf[4] = TIMEENC( timep->tm_min );
 	buf[5] = TIMEENC( timep->tm_sec );
 
-	if( 0 > _srmio_pc_msg( conn, 'M', buf, 6, NULL, 0, 0 ))
-		return -1;
+	if( 0 > _srmio_pc5_msg( conn, 'M', buf, 6, NULL, 0, 0 ))
+		return false;
 
-	DPRINTF( "srmio_pc_set_time set %s", asctime(timep) );
-	_srmio_pc_msg_busy( conn, 2 );
-	return 0;
+	DPRINTF( "set %s", asctime(timep) );
+	_srmio_pc5_msg_busy( conn, 2 );
+	return true;
 }
 
 /*
@@ -1050,25 +931,27 @@ int srmio_pc_set_time( srmio_pc_t conn, struct tm *timep )
  * returns circumference on succuess
  * on error errno is set and returns -1
  */
-int srmio_pc_get_circum( srmio_pc_t conn )
+bool srmio_pc5_cmd_get_circum( srmio_pc_t conn, unsigned *circum )
 {
 	unsigned char buf[20];
 	int ret;
-	int circum;
 
-	ret = _srmio_pc_msg( conn, 'G', (unsigned char*)"\x0\x0", 2, buf, 20, 2 );
+	assert( conn );
+	assert( conn->is_open );
+	assert( circum );
+
+	ret = _srmio_pc5_msg( conn, 'G', (unsigned char*)"\x0\x0", 2, buf, 20, 2 );
 	if( ret < 0 )
-		return -1;
+		return false;
 	if( ret < 2 ){
 		_srm_log( conn, "got truncated circumference response" );
 		errno = EPROTO;
-		return -1;
+		return false;
 	}
 
-	circum = ( buf[0] << 8 )
-		| ( buf[1] );
-	DPRINTF( "srmio_pc_get_circum circum=%d", circum );
-	return circum;
+	*circum = buf_get_buint16( buf, 0 );
+	DPRINTF( "circum=%d", *circum );
+	return true;
 }
 
 /*
@@ -1086,24 +969,27 @@ int srmio_pc_get_circum( srmio_pc_t conn )
  * returns slope  eg. 17.4
  * on error errno is set and returns < 0
  */
-double srmio_pc_get_slope( srmio_pc_t conn )
+bool srmio_pc5_cmd_get_slope( srmio_pc_t conn, double *slope )
 {
 	unsigned char buf[20];
 	int ret;
-	double slope;
 
-	ret = _srmio_pc_msg( conn, 'E', (unsigned char*)"\x0\x0", 2, buf, 20, 2 );
+	assert( conn );
+	assert( conn->is_open );
+	assert( slope );
+
+	ret = _srmio_pc5_msg( conn, 'E', (unsigned char*)"\x0\x0", 2, buf, 20, 2 );
 	if( ret < 0 )
-		return -1;
+		return false;
 	if( ret < 2 ){
 		_srm_log( conn, "got truncated slope response" );
 		errno = EPROTO;
-		return -1;
+		return false;
 	}
 
-	slope = (double)(( buf[0] <<8 ) | buf[1]  ) / 10;
-	DPRINTF( "srmio_pc_get_slope slope=%.1f", slope );
-	return slope;
+	*slope = (double)( buf_get_buint16( buf, 0 ) ) / 10;
+	DPRINTF( "slope=%.1f", *slope );
+	return true;
 }
 
 
@@ -1122,24 +1008,27 @@ double srmio_pc_get_slope( srmio_pc_t conn )
  * returns circumference on succuess
  * on error errno is set and returns -1
  */
-int srmio_pc_get_zeropos( srmio_pc_t conn )
+bool srmio_pc5_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos )
 {
 	unsigned char buf[20];
 	int ret;
-	int zeropos;
 
-	ret = _srmio_pc_msg( conn, 'F', (unsigned char*)"\x0\x0", 2, buf, 20, 2 );
+	assert( conn );
+	assert( conn->is_open );
+	assert( zeropos );
+
+	ret = _srmio_pc5_msg( conn, 'F', (unsigned char*)"\x0\x0", 2, buf, 20, 2 );
 	if( ret < 0 )
-		return -1;
+		return false;
 	if( ret < 2 ){
 		_srm_log( conn, "got truncated offset response" );
 		errno = EPROTO;
-		return -1;
+		return false;
 	}
 
-	zeropos = ( buf[0] << 8) | buf[1];
-	DPRINTF( "srmio_pc_get_zeropos zeropos=%d", zeropos );
-	return zeropos;
+	*zeropos = buf_get_buint16( buf, 0 );
+	DPRINTF( "zeropos=%d", *zeropos );
+	return true;
 }
 
 
@@ -1163,27 +1052,31 @@ int srmio_pc_get_zeropos( srmio_pc_t conn )
  * returns recint * 10 -> 1sec becomes 10
  * on error errno is set and returns -1
  */
-int srmio_pc_get_recint( srmio_pc_t conn )
+bool srmio_pc5_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint )
 {
 	unsigned char buf[10];
 	int ret;
-	int recint;
 
-	ret = _srmio_pc_msg( conn, 'R', (unsigned char*)"\x0", 1, buf, 10, 1 );
+	assert( conn );
+	assert( conn->is_open );
+	assert( recint );
+
+	ret = _srmio_pc5_msg( conn, 'R', (unsigned char*)"\x0", 1, buf, 10, 1 );
 	if( ret < 0 )
-		return -1;
+		return false;
 	if( ret < 1 ){
 		_srm_log( conn, "got truncated recint response" );
 		errno = EPROTO;
-		return -1;
+		return false;
 	}
 
-	recint = ( *buf & 0x80 )
+	*recint = ( *buf & 0x80 )
 		? *buf & 0x0f
 		: *buf * 10;
 
-	DPRINTF( "srmio_pc_get_recint raw=0x%02x recint=%d", *buf, recint);
-	return recint;
+	DPRINTF( "raw=0x%02x recint=%.1f", *buf,
+		(double)*recint/10 );
+	return true;
 }
 
 /*
@@ -1191,19 +1084,19 @@ int srmio_pc_get_recint( srmio_pc_t conn )
  *
  * parameter:
  *  conn: connection handle
- *  recint: new interval (see srmio_pc_get_recint for details)
+ *  recint: new interval (see srmio_pc5_cmd_get_recint for details)
  *
  * returns 0 on success
  * on error errno is set and returns -1
  */
-int srmio_pc_set_recint( srmio_pc_t conn, srmio_time_t recint )
+static bool _srmio_pc5_cmd_set_recint( srmio_pc_t conn, srmio_time_t recint )
 {
 	unsigned char raw;
 
 	if( recint <= 0 ){
 		_srm_log( conn, "recint < 0sec isn't supported" );
 		errno = ENOTSUP;
-		return -1;
+		return false;
 	}
 
 	/* 0.1 .. 0.9 sec? */
@@ -1215,22 +1108,54 @@ int srmio_pc_set_recint( srmio_pc_t conn, srmio_time_t recint )
 		if( recint > 150 || recint % 10 ){
 			_srm_log( conn, "fractional recint > 1sec isn't supported" );
 			errno = ENOTSUP;
-			return -1;
+			return false;
 		}
 
 		raw = recint / 10;
 	}
 
-	if( 0 > _srmio_pc_msg( conn, 'R', &raw, 1, NULL, 0, 1 ) )
-		return -1;
+	if( 0 > _srmio_pc5_msg( conn, 'R', &raw, 1, NULL, 0, 1 ) )
+		return false;
 
-	DPRINTF( "srmio_pc_set_recint: success" );
-	return 0;
+	DPRINTF( "success" );
+	return true;
 }
 
 
-/* TODO: srmio_pc_reset_battery */
-/* TODO: implement srmio_pc_set_* functions */
+/*
+ * setting:	clear recorded data
+ * command:	B and T
+ * argument:	none
+ */
+
+/*
+ * mark data on PCV as deleted
+ *
+ * parameter:
+ *  conn: connection handle
+ *
+ * returns true on success, otherwise errno is set
+ */
+static bool _srmio_pc5_cmd_clear( srmio_pc_t conn )
+{
+	/* TODO: what's the individual effect of B and T?
+	 *
+	 * T seems to do the actual clean.
+	 */
+
+	if( 0 >  _srmio_pc5_msg( conn, 'B', NULL, 0, NULL, 0, 0 ) )
+		return false;
+
+	if( 0 >  _srmio_pc5_msg( conn, 'T', NULL, 0, NULL, 0, 0 ) )
+		return false;
+
+	DPRINTF( "success" );
+	return true;
+}
+
+
+/* TODO: srmio_pc5_reset_battery */
+/* TODO: implement srmio_pc5_cmd_set_* functions */
 /* TODO: investigate/implement other commands */
 
 
@@ -1240,17 +1165,17 @@ int srmio_pc_set_recint( srmio_pc_t conn, srmio_time_t recint )
 
 /************************************************************
  *
- * get/parse data blocks
+ * get/parse data pkts
  *
  ************************************************************/
 
 /*
  * communication to download the data chunks looks like this:
  *  computer: <STX>A<ETX>
- *  SRM:      <STX>A<num_blocks>
+ *  SRM:      <STX>A<num_pkts>
  *  SRM:      <64byte_block>
  *  computer: <ACK>/<NAK>
- *    ... repeat last 2 steps for each block
+ *    ... repeat last 2 steps for each pkt
  *  SRM:      <ETX>
  *
  * As with all commands it depends on the FW, if STX/ETX must be
@@ -1258,12 +1183,12 @@ int srmio_pc_set_recint( srmio_pc_t conn, srmio_time_t recint )
  *
  * The SRM sends pure binary data between the 'A' and the final ETX.
  *
- * num_blocks is encoded as 16bit big-endian integer.
+ * num_pkts is encoded as 16bit big-endian integer.
  *
  * The 64 byte blocks comes with a 9 byte "header" followed by 11 data
  * chunks.
  *
- * block header bytes:
+ * pkt header bytes:
  *  - byte 0-4: timestamp of first chunk + recint,
  *  - byte 0:
  *    - bit 0-3: day decimal digit 0
@@ -1316,532 +1241,520 @@ int srmio_pc_set_recint( srmio_pc_t conn, srmio_time_t recint )
 
 
 /*
- * retrieve next block from PC into buffer
- * parse block-wide data
- * and request next block
+ * retrieve next pkt from PC into buffer
+ * parse pkt-wide data
+ * and request next pkt
  *
  * returns
  *  0 on success
  *  -1 on error
- *  1 when there's no block left
+ *  1 when there's no pkt left
  */
-static int _srmio_pc_get_block( srmio_pc_get_chunk_t gh )
+static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 {
 	int retries;
 	struct tm btm;
 	int ret;
 	time_t bstart;
+	int valid;
 
-	_srm_log( gh->conn, "getting block %u/%u",
-		gh->blocknum +1,
-		gh->blocks);
+	assert( conn );
+
+	DPRINTF( "getting pkt %u/%u",
+		SELF(conn)->pkt_num +1,
+		SELF(conn)->pkt_cnt);
 
 	for( retries = 0; retries < 4; ++retries ){
+		valid = 0;
+
 		if( retries ){
 			/* request retransmit */
-			_srm_log( gh->conn, "received incomplete block %u, "
-				"requesting retransmit", gh->blocknum );
+			_srm_log( conn, "received bad pkt %u, "
+				"requesting retransmit", SELF(conn)->pkt_num );
 			sleep(1);
 
-			if( 0 > _srmio_pc_write( gh->conn, BLOCK_NAK, 1 ) ){
-				_srm_log( gh->conn, "block NAK failed: %s", strerror(errno) );
-				return -1;
+			if( ! srmio_io_flush( conn->io ) ){
+				conn->xfer_state = srmio_pc_xfer_state_failed;
+				return false;
+			}
+
+			if( 0 > _srmio_pc5_write( conn, BLOCK_NAK, 1 ) ){
+				conn->xfer_state = srmio_pc_xfer_state_failed;
+				_srm_log( conn, "pkt NAK failed: %s", strerror(errno) );
+				return false;
 			}
 		}
 
-		ret = _srmio_pc_read( gh->conn, gh->buf, 64 );
-		DPRINTF( "_srmio_pc_get_block: got %d chars", ret );
-		DUMPHEX( "_srmio_pc_get_block", gh->buf, ret );
+		ret = _srmio_pc5_read( conn, SELF(conn)->pkt_data, 64 );
+		DPRINTF( "got %d chars", ret );
+		DUMPHEX( "", SELF(conn)->pkt_data, ret );
 
 		if( ret < 0 ){
-			_srm_log( gh->conn, "read block failed: %s", strerror(errno) );
+			conn->xfer_state = srmio_pc_xfer_state_failed;
+			_srm_log( conn, "read pkt failed: %s", strerror(errno) );
 			/* non-recoverable error */
-			return -1;
+			return false;
 
-		} else if( ret == 64 ){
-			/* got complete block, terminate retry loop */
-			break;
+		} else if( ret == 0 && SELF(conn)->stxetx
+			&& SELF(conn)->pkt_cnt == 3
+			&& SELF(conn)->pkt_num == 0 ){
 
-		} else if( ret == 0 && gh->conn->stxetx
-			&& gh->blocks == 3
-			&& gh->blocknum == 0 ){
+			/* workaround stxetx + 3 pkts problem */
+			DPRINTF( "stxetx, fixing pkts=0" );
+			SELF(conn)->pkt_cnt = 0;
+			conn->xfer_state = srmio_pc_xfer_state_success;
+			return false;
 
-			/* workaround stxetx + 3 blocks problem */
-			DPRINTF( "_srmio_pc_get_block: stxetx, fixing blocks=0" );
-			gh->blocks = 0;
-			gh->finished++;
-			return 1;
+		} else if( ret == 1 && SELF(conn)->stxetx
+			&& SELF(conn)->pkt_data[0] == ETX ){
 
-		} else if( ret == 1 && gh->conn->stxetx
-			&& gh->buf[0] == ETX ){
+			_srm_log( conn, "got unexpected end of "
+				"transfer for pkt %u", SELF(conn)->pkt_num );
+			conn->xfer_state = srmio_pc_xfer_state_failed;
+			return false;
 
-			_srm_log( gh->conn, "got unexpected end of "
-				"transfer for block %u", gh->blocknum );
-			gh->finished++;
-			return 1;
+		} else if( ret < 64 ){
+			/* incomplete pkt, retry */
+			_srm_log( conn, "pkt is too short" );
+			continue;
+
 		}
 
+		/* parse pkt */
+
+		btm.tm_year = SELF(conn)->pctime.tm_year;
+		btm.tm_isdst = -1;
+		btm.tm_mday = TIMEDEC( SELF(conn)->pkt_data[0] & 0x3f );
+		btm.tm_mon = TIMEDEC( SELF(conn)->pkt_data[1] & 0x1f ) -1;
+		btm.tm_hour = TIMEDEC( SELF(conn)->pkt_data[2] & 0x3f );
+		btm.tm_min = TIMEDEC( SELF(conn)->pkt_data[3] );
+		btm.tm_sec = TIMEDEC( SELF(conn)->pkt_data[4] );
+
+		if( btm.tm_mon < SELF(conn)->pctime.tm_mon )
+			-- btm.tm_year;
+
+		bstart = mktime( &btm );
+		if( (time_t) -1 > bstart ){
+			conn->xfer_state = srmio_pc_xfer_state_failed;
+			_srm_log( conn, "mktime %s failed: %s",
+				asctime( &btm ),
+				strerror(errno) );
+			return false;
+		}
+
+		SELF(conn)->pkt_time = (srmio_time_t)bstart *10;
+		SELF(conn)->pkt_dist = (double)buf_get_buint24( SELF(conn)->pkt_data, 5 ) / 3.9;
+
+		SELF(conn)->pkt_temp = buf_get_int8( SELF(conn)->pkt_data, 8 );
+		SELF(conn)->pkt_recint = ( (SELF(conn)->pkt_data[1] & 0xe0) >> 5)
+			| ( (SELF(conn)->pkt_data[0] & 0x40) >> 3);
+
+		if( ! (SELF(conn)->pkt_data[2] & 0x40) )
+			SELF(conn)->pkt_recint *= 10;
+
+
+		if( ! SELF(conn)->pkt_recint ){
+			_srm_log( conn, "pkt has no recint" );
+			continue;
+		}
+
+		valid = 1;
+		break;
 	}
 
-	if( ret != 64 ){
-		_srm_log( gh->conn, "got partial chunk, receive timed out" );
-		errno = ETIMEDOUT;
-		return -1;
-	}
-
-
-	/* confirm receival of block */
-
-	if( 0 > _srmio_pc_write( gh->conn, BLOCK_ACK, 1 ) ){
-		_srm_log( gh->conn, "block ACK failed: %s", strerror(errno) );
-		return -1;
-	}
-
-	gh->chunknum = 0;
-	gh->blocknum++;
-
-	/* parse block */
-
-	btm.tm_year = gh->pctime.tm_year;
-	btm.tm_isdst = -1;
-	btm.tm_mday = TIMEDEC( gh->buf[0] & 0x3f );
-	btm.tm_mon = TIMEDEC( gh->buf[1] & 0x1f ) -1;
-	btm.tm_hour = TIMEDEC( gh->buf[2] & 0x3f );
-	btm.tm_min = TIMEDEC( gh->buf[3] );
-	btm.tm_sec = TIMEDEC( gh->buf[4] );
-
-	if( btm.tm_mon < gh->pctime.tm_mon )
-		-- btm.tm_year;
-
-	bstart = mktime( &btm );
-	if( (time_t) -1 > bstart ){
-		_srm_log( gh->conn, "mktime %s failed: %s",
-			asctime( &btm ),
-			strerror(errno) );
-		return -1;
-	}
-
-	gh->bstart = (srmio_time_t)bstart *10;
-	gh->dist = ( (gh->buf[5] << 16 )
-		| ( gh->buf[6] << 8 )
-		| gh->buf[7] )
-		/ 3.9;
-
-	gh->temp = gh->buf[8];
-	gh->recint = ( (gh->buf[1] & 0xe0) >> 5)
-		| ( (gh->buf[0] & 0x40) >> 3);
-	if( ! (gh->buf[2] & 0x40) )
-		gh->recint *= 10;
-
-	if( ! gh->recint ){
-		_srm_log( gh->conn, "block has no recint" );
-		return -1;
+	if( ! valid ){
+		conn->xfer_state = srmio_pc_xfer_state_failed;
+		_srm_log( conn, "got invalid pkt" );
+		errno = EBADMSG;
+		return false;
 	}
 
 
-	DPRINTF( "_srmio_pc_get_block mon=%u day=%u hour=%u min=%u sec=%u "
+	/* confirm receival of pkt */
+
+	if( 0 > _srmio_pc5_write( conn, BLOCK_ACK, 1 ) ){
+		conn->xfer_state = srmio_pc_xfer_state_failed;
+		_srm_log( conn, "pkt ACK failed: %s", strerror(errno) );
+		return false;
+	}
+
+	SELF(conn)->chunk_num = 0;
+	SELF(conn)->pkt_num++;
+
+	DPRINTF( "mon=%u day=%u hour=%u min=%u sec=%u "
 		"dist=%lu temp=%d recint=%.1f na0=%x na2=%x",
 		(unsigned)btm.tm_mon,
 		(unsigned)btm.tm_mday,
 		(unsigned)btm.tm_hour,
 		(unsigned)btm.tm_min,
 		(unsigned)btm.tm_sec,
-		gh->dist,
-		gh->temp,
-		(double)gh->recint/10,
-		(int)( ( gh->buf[0] & 0x80) >> 7 ),
-		(int)( ( gh->buf[2] & 0x80) >> 7 ) );
+		SELF(conn)->pkt_dist,
+		SELF(conn)->pkt_temp,
+		(double)SELF(conn)->pkt_recint/10,
+		(int)( ( SELF(conn)->pkt_data[0] & 0x80) >> 7 ),
+		(int)( ( SELF(conn)->pkt_data[2] & 0x80) >> 7 ) );
 
-	return 0;
-}
-
-/*
- * allocates and parses next chunk from buffer.
- *
- * returns
- *  0 when chunk was returned
- *  1 when there's no chunk left in this block
- *  -1 on error
- */
-static int _srmio_pc_get_chunk( srmio_pc_get_chunk_t gh, srmio_chunk_t *chunkp )
-{
-	unsigned char *cbuf;
-	srmio_chunk_t chunk;
-
-
-	cbuf = &gh->buf[9 + 5*gh->chunknum];
-	DUMPHEX( "_srmio_pc_get_chunk", cbuf, 5 );
-
-	if( NULL == (chunk = srmio_chunk_new())){
-		_srm_log( gh->conn, "chunk_new failed: %s", strerror(errno));
-		return -1;
-	}
-	*chunkp = chunk;
-
-	gh->isfirst = cbuf[0] & 0x40;
-	gh->iscont = cbuf[0] & 0x80;
-
-	if( 0 == memcmp( cbuf, "\0\0\0\0\0", 5 )){
-		DPRINTF( "_srmio_pc_get_chunk: skipping empty chunk#%u",
-			gh->chunknum );
-		++gh->chunknum;
-		return 1;
-	}
-
-	chunk->time = gh->bstart
-		+ gh->chunknum * gh->recint;
-	chunk->dur = gh->recint;
-	if( chunk->time < gh->bstart ){
-		_srm_log( gh->conn, "chunk time had INT overflow" );
-		errno = EOVERFLOW;
-		return -1;
-	}
-
-	chunk->temp = gh->temp;
-	chunk->pwr = ( ( cbuf[0] & 0x0f) << 8 ) | cbuf[1];
-	chunk->speed =  (double)0.2 * (
-		( ( cbuf[0] & 0x30) << 4)
-		| cbuf[2] );
-	chunk->cad = cbuf[3];
-	chunk->hr = cbuf[4];
-	chunk->ele = 0;
-
-	gh->chunknum++;
-
-	/* TODO: verify data when display is non-metric */
-	/* TODO: verify temperature < 0°C */
-
-	return 0;
+	return true;
 }
 
 
-
 /*
- * get all blocks/chunks off the SRM, parse it and pass the decoded chunks
- * to the callback function.
+ * actually start the data transfer off the PCV
  *
  * parameter:
- *  conn: connection handle
- *  deleted: instruct PCV to send deleted data, too (when != 0)
+ *  conn: transfer handle
  *
- * on error errno is set and returns NULL
+ * returns true on success, otherwise errno is set
  */
-srmio_pc_get_chunk_t srmio_pc_get_chunk_start( srmio_pc_t conn, int deleted )
+static bool _srmio_pc5_xfer_start( srmio_pc_t conn )
 {
-	srmio_pc_get_chunk_t gh;
 	int ret;
 	char cmd;
 
-	if( deleted )
-		cmd = 'y';
-	else
-		cmd = 'A';
+	assert( conn );
 
-	if( NULL == (gh = malloc( sizeof(struct _srmio_pc_get_chunk_t)) )){
-		_srm_log( conn, "malloc failed: %s", strerror(errno));
-		return NULL;
+	DPRINTF("getting meta info");
+	if( conn->xfer_state != srmio_pc_xfer_state_new ){
+		errno = EBUSY;
+		return false;
 	}
 
-	memset(gh, 0, sizeof( struct _srmio_pc_get_chunk_t ));
-	gh->conn = conn;
-	gh->chunknum = SRM_BLOCKCHUNKS;
+	if( ! srmio_pc5_cmd_get_time( conn, &SELF(conn)->pctime ))
+		return false;
 
-	if( 0 > srmio_pc_get_time( conn, &gh->pctime ))
+	if( ! srmio_pc5_cmd_get_slope( conn, &SELF(conn)->block.slope ) )
+		return false;
+
+	if( ! srmio_pc5_cmd_get_zeropos( conn, &SELF(conn)->block.zeropos ) )
+		return false;
+
+	if( ! srmio_pc5_cmd_get_circum( conn, &SELF(conn)->block.circum ) )
+		return false;
+
+	if( ! srmio_pc5_cmd_get_recint( conn, &SELF(conn)->block.recint ) )
+		return false;
+
+	if( ! srmio_pc_cmd_get_athlete( conn, &SELF(conn)->block.athlete ) )
+		return false;
+
+
+
+	if(  _srmio_pc5_msg_ready( conn ))
 		goto clean1;
 
-	if( 0 > _srmio_pc_msg_ready( conn ))
+	switch( conn->xfer_type ){
+	  case srmio_pc_xfer_type_new:
+		cmd = 'A';
+		break;
+
+	  case srmio_pc_xfer_type_all:
+		cmd = 'y';
+		break;
+
+	  default:
+		goto clean1;
+	}
+
+	DPRINTF("starting %c", cmd );
+	if( _srmio_pc5_msg_send( conn, cmd, NULL, 0 ) )
 		goto clean1;
 
-	if( _srmio_pc_msg_send( conn, cmd, NULL, 0 ) )
-		goto clean1;
+	conn->xfer_state = srmio_pc_xfer_state_running;
+	conn->xfer_type = srmio_pc_xfer_type_new;
+	SELF(conn)->block_num = 0;
+	SELF(conn)->chunk_num = PC5_PKT_CHUNKS;
 
-	/* get header + number of blocks to read */
-	ret = _srmio_pc_read( conn, gh->buf, conn->stxetx ? 4 : 3 );
-	DPRINTF( "srmio_pc_get_chunk_start read %d chars", ret );
+
+	/* get header + number of pkts to read */
+	ret = _srmio_pc5_read( conn, SELF(conn)->pkt_data, SELF(conn)->stxetx ? 4 : 3 );
+	DPRINTF( "read %d chars", ret );
 	if( ret < 0 ){
 		_srm_log( conn, "reading data failed: %s", strerror(errno));
-		goto clean1;
+		goto clean2;
 	}
 
-	DUMPHEX( "srmio_pc_get_chunk_start read response", gh->buf, ret );
-	if( conn->stxetx ){
-		/* TODO: how to distinguish "3 blocks" and 0 + ETX?
+	DUMPHEX( "read response", SELF(conn)->pkt_data, ret );
+	if( SELF(conn)->stxetx ){
+		/* TODO: how to distinguish "3 pkts" and 0 + ETX?
 		 * both: 0x02/  0x41/A 0x00/  0x03/
-		 * this is worked around in get_block() */
+		 * this is worked around in get_pkt() */
 		if( ret < 4 ){
 			_srm_log( conn, "got incomplete download response" );
 			errno = EPROTO;
-			goto clean1;
-		} else if( gh->buf[0] != STX || gh->buf[1] != cmd ){
+			goto clean2;
+		} else if( SELF(conn)->pkt_data[0] != STX || SELF(conn)->pkt_data[1] != cmd ){
 			_srm_log( conn, "download response is garbled" );
 			errno = EPROTO;
-			goto clean1;
+			goto clean2;
 		}
 
-		gh->blocks = ( gh->buf[2] << 8) | gh->buf[3];
-		/* TODO: number of blocks for "download all" is wrong in FW 6b09*/
+		SELF(conn)->pkt_cnt = buf_get_buint16( SELF(conn)->pkt_data, 2 );
+		/* TODO: number of pkts for "download all" is wrong in FW 6b09*/
 
 	} else {
 		if( ret < 2 ){
 			_srm_log( conn, "got incomplete download response" );
 			errno = EPROTO;
-			goto clean1;
+			goto clean2;
 
 		} else if( ret > 2 ){
-			gh->blocks = ( gh->buf[1] << 8 ) | gh->buf[2];
+			SELF(conn)->pkt_cnt = buf_get_buint16(
+			SELF(conn)->pkt_data, 1 );
 
 		} else {
-			gh->blocks = gh->buf[1];
+			SELF(conn)->pkt_cnt = SELF(conn)->pkt_data[1];
 
 		}
 
 	}
-	DPRINTF( "srmio_pc_get_chunk_start expecting %u blocks", gh->blocks );
-	if( (unsigned long)gh->blocks * SRM_BLOCKCHUNKS > UINT16_MAX ){
-		_srm_log( conn, "cannot handle that many blocks, sorry" );
+	DPRINTF( "expecting %u pkts", SELF(conn)->pkt_cnt );
+	if( (unsigned long)SELF(conn)->pkt_cnt * PC5_PKT_CHUNKS > UINT16_MAX ){
+		_srm_log( conn, "cannot handle that many pkts, sorry" );
 		errno = EOVERFLOW;
-		goto clean1;
+		goto clean2;
 	}
+	SELF(conn)->block.total = 1+SELF(conn)->pkt_cnt;
 
-	return gh;
+	return true;
+
+clean2:
+	conn->xfer_state = srmio_pc_xfer_state_failed;
+
 clean1:
-	free(gh);
-	return NULL;
+	free(SELF(conn)->block.athlete);
+	SELF(conn)->block.athlete = NULL;
+	return false;
+}
+
+static bool _srmio_pc5_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t block )
+{
+	assert(conn);
+	assert(block);
+
+	DPRINTF("");
+	if( SELF(conn)->block_num  )
+		return false;
+
+	memcpy( block, &SELF(conn)->block, sizeof( struct _srmio_pc_xfer_block_t ));
+	SELF(conn)->block.athlete = NULL;
+
+	++SELF(conn)->block_num;
+
+	return true;
 }
 
 /*
- * retrieve next chunk from PC
- * automagically fetches next block when last chunk of block was returned.
- * returns NULL when last chunk was returned
+ * retrieve next chunk from PCV
+ * automagically fetches next pkt when last chunk of pkt was returned.
+ *
+ * chunk is set to NULL, when end of transmission is reached.
+ *
+ * returns true on success, otherwise errno is set
  */
-srmio_chunk_t srmio_pc_get_chunk_next( srmio_pc_get_chunk_t gh )
+static bool _srmio_pc5_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
+	bool *is_intervall, bool *start_intervall )
 {
-	srmio_chunk_t chunk;
-	int ret;
+	bool is_int, is_first;
 
-	do {
-		if( gh->finished )
-			return NULL;
+	assert( conn );
+	assert( chunk );
 
-		if( gh->blocknum >= gh->blocks )
-			return NULL;
+	DPRINTF("");
+	while(1){
+		unsigned char *cbuf;
 
-		if( gh->chunknum >= SRM_BLOCKCHUNKS ){
+		if( conn->xfer_state != srmio_pc_xfer_state_running )
+			return false;
 
-			if( _srmio_pc_get_block( gh ) )
-				return NULL;
-
+		if( SELF(conn)->pkt_num >= SELF(conn)->pkt_cnt ){
+			conn->xfer_state = srmio_pc_xfer_state_success;
+			return false;
 		}
 
-		ret = _srmio_pc_get_chunk( gh, &chunk );
-		if( ret < 0 )
-			return NULL;
+		if( SELF(conn)->chunk_num >= PC5_PKT_CHUNKS )
+			if( ! srmio_pc5_xfer_pkt_next( conn ) )
+				return false;
 
-	} while( ret || ! chunk );
+		cbuf = &SELF(conn)->pkt_data[9 + 5*SELF(conn)->chunk_num];
+		DUMPHEX( "", cbuf, 5 );
 
-	return chunk;
+		is_first = cbuf[0] & 0x40;
+		is_int = cbuf[0] & 0x80;
+
+		if( start_intervall )
+			*start_intervall = is_first;
+		if( is_intervall )
+			*is_intervall = is_int;
+
+		if( 0 == memcmp( cbuf, "\0\0\0\0\0", 5 )){
+			DPRINTF( "skipping empty chunk#%u",
+				SELF(conn)->chunk_num );
+			SELF(conn)->chunk_num++;
+			continue;
+		}
+
+		chunk->time = SELF(conn)->pkt_time
+			+ SELF(conn)->chunk_num * SELF(conn)->pkt_recint;
+		if( chunk->time < SELF(conn)->pkt_time ){
+			_srm_log( conn, "chunk time had INT overflow" );
+			errno = EOVERFLOW;
+			conn->xfer_state = srmio_pc_xfer_state_failed;
+			return false;
+		}
+		chunk->dur = SELF(conn)->pkt_recint;
+
+		chunk->temp = SELF(conn)->pkt_temp;
+		chunk->pwr = 0x0fff & buf_get_buint16( cbuf, 0 );
+		chunk->speed =  (double)0.2 * (
+			( ( cbuf[0] & 0x30) << 4)
+			| cbuf[2] );
+		chunk->cad = cbuf[3];
+		chunk->hr = cbuf[4];
+		chunk->ele = 0;
+
+		DPRINTF( "%u: "
+			"time=%.1f, "
+			"temp=%.1f, "
+			"pwr=%u, "
+			"spd=%.3f, "
+			"cad=%u, "
+			"hr=%u, "
+			"is_int=%d, "
+			"is_first=%d",
+			SELF(conn)->chunk_num,
+			(double)chunk->time/10,
+			chunk->temp,
+			chunk->pwr,
+			chunk->speed,
+			chunk->cad,
+			chunk->hr,
+			is_int,
+			is_first);
+
+		SELF(conn)->chunk_num++;
+
+		/* TODO: verify data when display is non-metric */
+		/* TODO: verify temperature < 0°C */
+
+		break;
+	}
+
+	return true;
 }
 
 
 
 /*
  * finalize chunk download
- * free get_chunk_t handle
  */
-void srmio_pc_get_chunk_done( srmio_pc_get_chunk_t gh )
+static bool _srmio_pc5_xfer_finish( srmio_pc_t conn )
 {
-	if( gh->blocks ){
+	assert( conn );
 
-		/* abort */
-		if( gh->blocknum < gh->blocks ){
-			_srm_log( gh->conn, "aborting download" );
-			tcflush( gh->conn->fd, TCIOFLUSH );
-			_srmio_pc_write( gh->conn, BLOCK_ABRT, 1 );
+	DPRINTF("");
 
+	/* abort */
+	if( SELF(conn)->pkt_num < SELF(conn)->pkt_cnt ){
+		_srm_log( conn, "aborting download" );
+		srmio_io_flush( conn->io );
+		_srmio_pc5_write( conn, BLOCK_ABRT, 1 );
+		sleep(1);
+
+	} else {
 		/* read (and ignore) trailing ETX */
-		} else if( gh->conn->stxetx ){
-			if( 1 == _srmio_pc_read( gh->conn, gh->buf, 1 ) )
-			DPRINTF( "srmio_pc_get_chunk_done final ETX: %02x",
-				*gh->buf );
-		}
+		if( SELF(conn)->stxetx )
+			if( 1 == _srmio_pc5_read( conn, SELF(conn)->pkt_data, 1 ) )
+				DPRINTF( "final ETX: %02x",
+				*SELF(conn)->pkt_data );
+
 	}
-	gh->conn->cmd_running = 0;
+
+	/* forget junk, PCV might've send after transfer */
+	srmio_io_flush( conn->io );
+
+	conn->xfer_state = srmio_pc_xfer_state_new;
 
 #ifdef DEBUG
 	/* issue *some* command for troubleshooting "stuck" PCV after
 	 * download: */
-	srmio_pc_get_version( gh->conn );
+	{
+		unsigned version;
+		srmio_pc5_cmd_get_version( conn, &version );
+	}
 #endif
 
-	free(gh);
+	return true;
 }
 
-
 /*
- * setting:	clear recorded data
- * command:	B and T
- * argument:	none
- */
-
-/*
- * mark data on PCV as deleted
+ * gets current transfer status and progress
  *
- * parameter:
- *  conn: connection handle
- *
- * returns 0 on success
- * on error errno is set and returns -1
  */
-int srmio_pc_clear_chunks( srmio_pc_t conn )
+static srmio_pc_xfer_state_t _srmio_pc5_xfer_status( srmio_pc_t conn,
+	size_t *done )
 {
-	/* TODO: what's the individual effect of B and T?
-	 *
-	 * T seems to do the actual clean.
-	 */
+	assert( conn );
 
-	if( 0 >  _srmio_pc_msg( conn, 'B', NULL, 0, NULL, 0, 0 ) )
-		return -1;
+	if( done )
+		*done = SELF(conn)->pkt_num;
 
-	if( 0 >  _srmio_pc_msg( conn, 'T', NULL, 0, NULL, 0, 0 ) )
-		return -1;
-
-	DPRINTF( "srmio_pc_clear_chunks: success" );
-	return 0;
+	return conn->xfer_state;
 }
 
 /************************************************************
  *
- * use srmio_pc_get_chunks() to fill srmio_data_t structure
- * with all chunks.
- *
- * Also serves as example on how to use the download API.
- *
- ************************************************************/
+ * handle management
+ */
 
 /*
- * retrieve recorded data from PC and build  "friendly" srmio_data_t structure.
- *
- * parameter:
- *  conn: connection handle
- *  deleted: instruct PCV to send deleted data, too (when != 0).
- *          Same as pressing shift while downloading in srmwin.
- *  fixup: postprocess data (fix timestamps, fill micro-gaps, ...) (when != 0)
- *
- * returns pointer to newly allocated srmio_data_t structure.
- * on error NULL is returned and errno is set.
+ * cleans up and frees a connection handle
  */
-srmio_data_t srmio_pc_get_data( srmio_pc_t conn, int deleted, int fixup )
+static void _srmio_pc5_free( srmio_pc_t conn )
 {
-	int mfirst = -1;
-	srmio_data_t data;
-	srmio_pc_get_chunk_t gh;
-	srmio_chunk_t chunk;
-	srmio_marker_t mk;
-	int ret;
+	assert( conn );
 
-	if( NULL == (data = srmio_data_new())){
-		_srm_log( conn, "srmio_data_new failed: %s", strerror(errno));
+	free( SELF(conn) );
+}
+
+static const srmio_pc_methods_t _pc5_methods = {
+	.free                   = _srmio_pc5_free,
+	.open                   = _srmio_pc5_open,
+	.close                  = _srmio_pc5_close,
+	.cmd_get_athlete        = _srmio_pc5_cmd_get_athlete,
+	.cmd_set_time           = _srmio_pc5_cmd_set_time,
+	.cmd_set_recint         = _srmio_pc5_cmd_set_recint,
+	.cmd_clear              = _srmio_pc5_cmd_clear,
+	.xfer_start             = _srmio_pc5_xfer_start,
+	.xfer_block_next        = _srmio_pc5_xfer_block_next,
+	.xfer_chunk_next        = _srmio_pc5_xfer_chunk_next,
+	.xfer_status            = _srmio_pc5_xfer_status,
+	.xfer_finish            = _srmio_pc5_xfer_finish,
+};
+
+/*
+ * allocate new connection handle for accessing the PCV
+ */
+srmio_pc_t srmio_pc5_new( void )
+{
+	srmio_pc5_t self;
+	srmio_pc_t conn;
+
+	if( NULL == (self = malloc(sizeof(struct _srmio_pc5_t))))
 		return NULL;
-	}
 
-	if( NULL == (mk = srmio_marker_new() )){
-		_srm_log( conn, "srmio_marker_new failed: %s", strerror(errno));
-		goto clean1;
-	}
+	memset(self, 0, sizeof( struct _srmio_pc5_t ));
 
-	if( 0 > srmio_data_add_markerp( data, mk )){
-		_srm_log( conn, "adding marker failed: %s", strerror(errno));
-		srmio_marker_free( mk );
-		goto clean1;
-	}
-
-
-	/* get metadata */
-
-	if( 0 > (data->slope = srmio_pc_get_slope( conn ) ))
+	if( NULL == ( conn = srmio_pc_new( &_pc5_methods, (void*)self )))
 		goto clean1;
 
-	if( 0 > ( ret = srmio_pc_get_zeropos( conn ) ))
-		goto clean1;
-	data->zeropos = ret;
+	conn->baudrate = srmio_io_baud_max;
+	conn->parity = srmio_io_parity_max;
 
-	if( 0 > ( ret = srmio_pc_get_circum( conn ) ))
-		goto clean1;
-	data->circum = ret;
-
-	if( NULL == (mk->notes = srmio_pc_get_athlete( conn ) ))
-		goto clean1;
-
-
-	/* get chunks */
-
-	if( NULL == (gh = srmio_pc_get_chunk_start( conn, deleted ) ))
-		goto clean1;
-
-	while( NULL != ( chunk = srmio_pc_get_chunk_next( gh ))){
-
-		if( 0 > srmio_data_add_chunk( data, chunk ) ){
-			_srm_log( conn, "add chunk failed: %s", strerror(errno));
-			goto clean2;
-		}
-
-		/* finish previous marker */
-		if( mfirst >= 0 && ( ! gh->iscont || gh->isfirst ) )
-			srmio_data_add_marker( data, mfirst, data->cused -1 );
-
-		/* start marker */
-		if( gh->isfirst ){
-			mfirst = (int)data->cused;
-			DPRINTF( "srmio_pc_get_data: new marker at %d", mfirst );
-
-		} else if( ! gh->iscont )
-			mfirst = -1;
-
-	}
-
-	/* TODO: catch and handle errors during download properly */
-
-	/* TODO: start new data_t on recint change */
-
-	/* TODO: start new data_t on backwards time step when deleted==1 */
-
-	srmio_pc_get_chunk_done( gh );
-	gh = NULL;
-
-
-	/* finalize first + last marker */
-
-	mk->last = data->cused-1;
-
-	if( mfirst >= 0 )
-		srmio_data_add_marker( data, mfirst,
-			data->cused -1 );
-
-
-	/* data fixup */
-
-	if( fixup ){
-		srmio_data_t fixed;
-
-		_srm_log( conn, "postprocessing data" );
-
-		if( NULL == ( fixed = srmio_data_fixup( data ) ) ){
-			_srm_log( conn, "data fixup failed: %s", strerror(errno));
-			goto clean2;
-		}
-
-		srmio_data_free( data );
-		data = fixed;
-	}
-
-	return data;
-
-clean2:
-	if( gh )
-		srmio_pc_get_chunk_done( gh );
+	return conn;
 
 clean1:
-	srmio_data_free(data);
+	free(self);
 	return NULL;
 }
+
 

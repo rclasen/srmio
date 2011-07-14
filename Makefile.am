@@ -33,11 +33,20 @@ lib_LTLIBRARIES=libsrmio.la
 libsrmio_la_SOURCES= \
 	common.h \
 	\
-	ftypes.c \
+	buf.c \
+	chunk.c \
+	common.c \
 	data.c \
+	ftypes.c \
 	file_srm.c \
 	file_wkt.c \
-	pc5.c
+	fixup.c \
+	io.c \
+	ios.c \
+	marker.c \
+	pc.c \
+	pc5.c \
+	split.c
 
 bin_PROGRAMS=srmcmd
 

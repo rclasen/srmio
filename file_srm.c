@@ -15,100 +15,54 @@ struct _srm_block_t {
 	unsigned	chunks;
 };
 
-static int _xread( int fd, unsigned char *buf, size_t len )
+static bool _xread( FILE *fh, unsigned char *buf, size_t len )
 {
-	int ret;
+	size_t ret;
 
-	ret = read( fd, buf, len );
+	assert( fh );
+	assert( buf );
+	assert( len );
 
-	if( ret < 0){
+	ret = fread( buf, 1, len, fh );
+
+	if( ret == 0){
 		ERRMSG("read failed: %s", strerror(errno));
-		return -1;
+		return false;
 	}
 
-	if( (size_t)ret < len ){
+	if( ret < len ){
 		ERRMSG("failed to read some data");
 		errno = EIO;
-		return -1;
+		return false;
 	}
 
-	return ret;
+	return true;
 }
 
-#define CINT16(buf,pos)	((buf[pos+1] << 8) | buf[pos] )
-#define CINT32(buf,pos)	( (buf[pos+3] << 24) \
-	| (buf[pos+2] << 16) \
-	| (buf[pos+1] << 8) \
-	| buf[pos] )
-
-static inline int _setuint8( unsigned char *buf, size_t pos, uint16_t x )
+static bool _xwrite( FILE *fh, unsigned char *buf, size_t len )
 {
-	if( x > UINT8_MAX ){
-		errno = ERANGE;
-		return -1;
+	size_t ret;
+
+	assert( fh );
+	assert( buf );
+	assert( len );
+
+	ret = fwrite( buf, 1, len, fh );
+
+	if( ret == 0){
+		ERRMSG("write failed: %s", strerror(errno));
+		return false;
 	}
 
-	buf[pos] = x;
-
-	return 0;
-}
-
-static inline int _setuint16( unsigned char *buf, size_t pos, uint32_t x )
-{
-	if( x > UINT16_MAX ){
-		errno = ERANGE;
-		return -1;
+	if( ret < len ){
+		ERRMSG("write was truncated %d/%d", ret, len );
+		errno = EIO;
+		return false;
 	}
 
-	buf[pos] = x & 0xff;
-	buf[pos+1] = (x >> 8) & 0xff;
-
-	return 0;
+	return true;
 }
 
-static inline int _setuint32( unsigned char *buf, size_t pos, uint64_t x )
-{
-	if( x > UINT32_MAX ){
-		errno = ERANGE;
-		return -1;
-	}
-
-	buf[pos] = x & 0xff;
-	buf[pos+1] = (x >> 8) & 0xff;
-	buf[pos+2] = (x >> 16) & 0xff;
-	buf[pos+3] = (x >> 24) & 0xff;
-
-	return 0;
-}
-
-
-static inline int _setint16( unsigned char *buf, size_t pos, int32_t x )
-{
-	if( x > INT16_MAX || x < INT16_MIN ){
-		errno = ERANGE;
-		return -1;
-	}
-
-	buf[pos] = x & 0xff;
-	buf[pos+1] = (x >> 8) & 0xff;
-
-	return 0;
-}
-
-static inline int _setint32( unsigned char *buf, size_t pos, int64_t x )
-{
-	if( x > INT32_MAX || x < INT32_MIN ){
-		errno = ERANGE;
-		return -1;
-	}
-
-	buf[pos] = x & 0xff;
-	buf[pos+1] = (x >> 8) & 0xff;
-	buf[pos+2] = (x >> 16) & 0xff;
-	buf[pos+3] = (x >> 24) & 0xff;
-
-	return 0;
-}
 
 
 /* days since 0000-01-01 */
@@ -142,7 +96,7 @@ static srmio_time_t _srm_mktime( unsigned days )
 		return (srmio_time_t)-1;
 	}
 
-	DPRINTF( "_srm_mktime %u days -> %lu", days, (unsigned long)ret );
+	DPRINTF( "%u days -> %lu", days, (unsigned long)ret );
 	return (srmio_time_t)ret * 10;
 }
 
@@ -214,7 +168,7 @@ static unsigned _srm_mkdays( srmio_time_t input )
 	}
 	days -= DAYS_SRM;
 
-	DPRINTF( "_srm_mkdays %.1f -> %u",
+	DPRINTF( "%.1f -> %u",
 		(double)input/10,
 		days );
 	return days;
@@ -225,16 +179,20 @@ typedef srmio_chunk_t (*srmio_file_read_cfunc)( const unsigned char *buf );
 static srmio_chunk_t _srmio_data_chunk_srm6( const unsigned char *buf )
 {
 	srmio_chunk_t ck;
+	uint8_t c0, c1, c2;
 
 	if( NULL == (ck = srmio_chunk_new() ))
 		return NULL;
 
-	ck->pwr = ( buf[1] & 0x0f)
-		| ( buf[2] << 4 );
-	ck->speed = (double)( ((buf[1] & 0xf0) << 3)
-		| (buf[0] & 0x7f) ) * 3 / 26;
-	ck->cad = buf[5];
-	ck->hr = buf[4];
+	c0 = buf_get_uint8( buf, 0 );
+	c1 = buf_get_uint8( buf, 1 );
+	c2 = buf_get_uint8( buf, 2 );
+
+	ck->pwr = ( c1 & 0x0f) | ( c2 << 4 );
+	ck->speed = (double)( ((c1 & 0xf0) << 3)
+		| (c0 & 0x7f) ) * 3 / 26;
+	ck->cad = buf_get_uint8( buf, 5 );
+	ck->hr = buf_get_uint8( buf, 4 );
 
 	return ck;
 }
@@ -247,12 +205,14 @@ static srmio_chunk_t _srmio_data_chunk_srm7( const unsigned char *buf )
 	if( NULL == (ck = srmio_chunk_new() ))
 		return NULL;
 
-	ck->pwr = CINT16(buf, 0);
-	ck->cad = buf[2];
-	ck->hr = buf[3];
-	ck->speed = ( (double)CINT32(buf, 4) * 3.6) / 1000;
-	ck->ele = CINT32(buf, 8);
-	ck->temp = 0.1 * (signed int)CINT16(buf,12);
+	ck->pwr = buf_get_luint16( buf, 0 );
+	ck->cad = buf_get_uint8( buf, 2 );
+	ck->hr = buf_get_uint8( buf, 3 );
+	ck->speed = ( (double)buf_get_lint32( buf, 4 ) * 3.6) / 1000;
+	if( ck->speed < 0 )
+		ck->speed = 0;
+	ck->ele = buf_get_lint32( buf, 8 );
+	ck->temp = 0.1 * buf_get_lint16( buf, 12 );
 
 	return ck;
 }
@@ -263,10 +223,9 @@ static srmio_chunk_t _srmio_data_chunk_srm7( const unsigned char *buf )
  * on success data pointer is returned.
  * returns NULL and sets errno on failure.
  */
-srmio_data_t srmio_file_srm_read( const char *fname )
+srmio_data_t srmio_file_srm_read( FILE *fh )
 {
 	srmio_data_t tmp;
-	int fd;
 	unsigned char buf[1024];
 	srmio_time_t recint;
 	srmio_time_t timerefday;
@@ -284,17 +243,12 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 		return NULL;
 	}
 
-	if( 0 > ( fd = open( fname, O_RDONLY ))){
-		ERRMSG("open failed: %s", strerror(errno));
-		goto clean1;
-	}
-
 
 	/* header */
 
-	if( 0 > _xread( fd, buf, 86 ) )
+	if( ! _xread( fh, buf, 86 ) )
 		goto clean2;
-	DUMPHEX( "srmio_file_read head", buf, 86 );
+	DUMPHEX( "head", buf, 86 );
 
 	if( 0 != strncmp( (char*)buf, "SRM", 3 )){
 		ERRMSG("unrecognized file format");
@@ -328,31 +282,30 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 		goto clean2;
 	}
 
-	if( (srmio_time_t)-1 == (timerefday = _srm_mktime( CINT16(buf,4) )))
+	if( (srmio_time_t)-1 == (timerefday = _srm_mktime( buf_get_luint16( buf, 4) )))
 		goto clean2;
 #ifdef DEBUG
 	{
 	time_t t = timerefday / 10;
-	DPRINTF( "srmio_file_read timerefday %u %.1f %s",
-		(unsigned)CINT16(buf,4),
+	DPRINTF( "timerefday %u %.1f %s",
+		(unsigned)buf_get_luint16( buf, 4),
 		(double)timerefday/10, ctime( &t));
 	}
 #endif
 
-	tmp->circum = CINT16(buf,6);
-	recint = 10 * buf[8] / buf[9];
-	bcnt = CINT16(buf,10);
-	mcnt = CINT16(buf,12) +1;
-	DPRINTF( "srmio_file_read bcnt=%u mcnt=%u,", bcnt, mcnt );
+	tmp->circum = buf_get_luint16( buf, 6);
+	recint = 10 * buf_get_uint8( buf, 8 )
+		/ buf_get_uint8( buf, 9 );
+	bcnt = buf_get_luint16( buf, 10);
+	mcnt = buf_get_luint16( buf, 12) +1;
+	DPRINTF( "bcnt=%u mcnt=%u,", bcnt, mcnt );
 
-	/* "notes" is preceeded by length + zero padded. Ignore length... */
-	if( NULL == (tmp->notes = malloc(71) )){
-		ERRMSG("malloc failed: %s", strerror(errno));
+	/* "notes" is preceeded by length + zero padded */
+	/* TODO: iconv notes cp850 -> internal */
+	if( NULL == (tmp->notes = buf_get_string( buf, 16, 70 ))){
+		ERRMSG("buf_get_string failed: %s", strerror(errno));
 		goto clean2;
 	}
-	/* TODO: iconv notes cp850 -> internal */
-	memcpy( tmp->notes, (char*)&buf[16], 70 );
-	tmp->notes[70] = 0;
 
 	/* marker */
 	if( NULL == (tmp->marker = malloc( (mcnt +1) * sizeof(srmio_marker_t *)))){
@@ -365,9 +318,8 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 	for( ; tmp->mused < mcnt; ++tmp->mused ){
 		srmio_marker_t tm;
 
-		if( 0 > _xread( fd, buf, mcmtlen + 15 ))
+		if( ! _xread( fh, buf, mcmtlen + 15 ))
 			goto clean2;
-		DUMPHEX( "srmio_file_read marker", buf, mcmtlen + 15 );
 
 		if( NULL == (tm = srmio_marker_new())){
 			ERRMSG("srmio_marker_new failed: %s", strerror(errno));
@@ -377,8 +329,8 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 		tmp->marker[tmp->mused] = tm;
 		tmp->marker[tmp->mused+1] = NULL;
 
-		tm->first = CINT16(buf,mcmtlen +1)-1;
-		tm->last = CINT16(buf,mcmtlen +3)-1;
+		tm->first = buf_get_luint16( buf, mcmtlen +1)-1;
+		tm->last = buf_get_luint16( buf, mcmtlen +3)-1;
 
 		if( NULL == (tm->notes = malloc(mcmtlen +1))){
 			ERRMSG("malloc failed: %s", strerror(errno));
@@ -388,7 +340,7 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 		memcpy( tm->notes, (char*)buf, mcmtlen );
 		tm->notes[mcmtlen] = 0;
 
-		DPRINTF( "srmio_file_read marker %u %u %s",
+		DPRINTF( "marker %u %u %s",
 			tm->first,
 			tm->last,
 			tm->notes );
@@ -404,9 +356,8 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 	for( i = 0; i < bcnt; ++i ){
 		struct _srm_block_t *tb;
 
-		if( 0 > _xread( fd, buf, 6 ))
+		if( ! _xread( fh, buf, 6 ))
 			goto clean3;
-		DUMPHEX( "srmio_file_read block", buf, 6 );
 
 		if( NULL == (tb = malloc(sizeof(struct _srm_block_t)))){
 			ERRMSG("malloc failed: %s", strerror(errno));
@@ -416,13 +367,13 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 		blocks[i] = tb;
 		blocks[i+1] = NULL;;
 
-		tb->daydelta = CINT32(buf,0) / 10;
-		tb->chunks = CINT16(buf,4);
+		tb->daydelta = buf_get_luint32( buf, 0) / 10;
+		tb->chunks = buf_get_luint16( buf, 4);
 
 #ifdef DEBUG
 		{
 		time_t t = (timerefday + tb->daydelta) / 10;
-		DPRINTF( "srmio_file_read block %.1f %u %s",
+		DPRINTF( "block %.1f %u %s",
 			(double)tb->daydelta/10,
 			tb->chunks,
 			ctime( &t) );
@@ -432,14 +383,14 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 	}
 
 	/* calibration */
-	if( 0 > _xread( fd, buf, 7 ))
+	if( ! _xread( fh, buf, 7 ))
 		goto clean3;
-	DUMPHEX( "srmio_file_read calibration", buf, 7 );
+	DUMPHEX( "calibration", buf, 7 );
 
-	tmp->zeropos = CINT16(buf, 0);
-	tmp->slope = (double)(CINT16(buf, 2) * 140) / 42781;
-	ckcnt = CINT16(buf, 4);
-	DPRINTF( "srmio_file_read cal zpos=%d slope=%.1f, chunks=%u",
+	tmp->zeropos = buf_get_luint16( buf, 0);
+	tmp->slope = (double)(buf_get_luint16( buf, 2) * 140) / 42781;
+	ckcnt = buf_get_luint16( buf, 4);
+	DPRINTF( "cal zpos=%d slope=%.1f, chunks=%u",
 		tmp->zeropos, tmp->slope, ckcnt );
 
 	/* synthesize block for SRM5 files */
@@ -462,7 +413,7 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 		for( ci = 0; ci < blocks[i]->chunks; ++ci ){
 			srmio_chunk_t ck;
 
-			if( 0 > _xread( fd, buf, chunklen )){
+			if( ! _xread( fh, buf, chunklen )){
 				// TODO: log( "failed to read all chunks" );
 				if( tmp->cused )
 					goto clean4;
@@ -484,7 +435,21 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 				goto clean3;
 			}
 
-			if( 0 > srmio_data_add_chunkp( tmp, ck ) ){
+			DPRINTF( "chunk "
+				"time=%.1f, "
+				"temp=%.1f, "
+				"pwr=%u, "
+				"spd=%.3f, "
+				"cad=%u, "
+				"hr=%u ",
+				(double)ck->time/10,
+				ck->temp,
+				ck->pwr,
+				ck->speed,
+				ck->cad,
+				ck->hr );
+
+			if( ! srmio_data_add_chunkp( tmp, ck ) ){
 				ERRMSG("add chunk failed: %s", strerror(errno));
 				goto clean3;
 			}
@@ -496,7 +461,6 @@ srmio_data_t srmio_file_srm_read( const char *fname )
 	free( blocks );
 
 
-	close(fd);
 	return tmp;
 
 clean4:
@@ -511,7 +475,6 @@ clean4:
 			mk->last = ckcnt;
 	}
 
-	close(fd);
 	return tmp;
 
 clean3:
@@ -520,31 +483,8 @@ clean3:
 	free( blocks );
 
 clean2:
-	close(fd);
-
-clean1:
 	srmio_data_free(tmp);
 	return NULL;
-}
-
-static int _xwrite( int fd, unsigned char *buf, size_t len )
-{
-	int ret;
-
-	ret = write( fd, buf, len );
-
-	if( ret < 0){
-		ERRMSG("write failed: %s", strerror(errno));
-		return -1;
-	}
-
-	if( (size_t)ret < len ){
-		ERRMSG("write was truncated %d/%d", ret, len );
-		errno = EIO;
-		return -1;
-	}
-
-	return ret;
 }
 
 /* TODO: srmio_file_srm6_write */
@@ -552,10 +492,9 @@ static int _xwrite( int fd, unsigned char *buf, size_t len )
 /*
  * write contents of data structure into specified file
  */
-int srmio_file_srm7_write( srmio_data_t data, const char *fname )
+bool srmio_file_srm7_write( srmio_data_t data, FILE *fh )
 {
 	unsigned char buf[1024];
-	int fd;
 	srmio_marker_t *blocks;
 	srmio_time_t timerefday;
 	srmio_time_t recint;
@@ -564,35 +503,35 @@ int srmio_file_srm7_write( srmio_data_t data, const char *fname )
 	if( ! data ){
 		ERRMSG( "no data to write" );
 		errno = EINVAL;
-		return -1;
+		return false;
 	}
 
 	if( data->notes && strlen(data->notes) > 255 ){
 		ERRMSG( "notes are too long" );
 		errno = EINVAL;
-		return -1;
+		return false;
 	}
 
 	if( data->cused < 1 || data->cused > UINT16_MAX ){
 		ERRMSG( "too few/many chunks" );
 		errno = EINVAL;
-		return -1;
+		return false;
 	}
 
 	if( data->mused < 1 || data->mused > UINT16_MAX ){
 		ERRMSG( "too few/many marker" );
 		errno = EINVAL;
-		return -1;
+		return false;
 	}
 
-	if( 0 == ( recint = srmio_data_recint( data ) )){
+	if( ! srmio_data_recint( data, &recint ) ){
 		ERRMSG( "cannot identify recint" );
 		errno = EINVAL;
-		return -1;
+		return false;
 	}
 
 	if( NULL == (blocks = srmio_data_blocks( data )))
-		return -1;
+		return false;
 
 	/* header */
 	{
@@ -616,7 +555,7 @@ int srmio_file_srm7_write( srmio_data_t data, const char *fname )
 		if( (srmio_time_t)-1 == (timerefday = _srm_mktime( days  )))
 			goto clean1;
 
-		DPRINTF( "srmio_file_write mcnt=%u bcnt=%lu "
+		DPRINTF( "mcnt=%u bcnt=%lu "
 			"mintime=%.1f "
 			"days=%u timerefday=%.1f "
 			"'%s'",
@@ -633,49 +572,54 @@ int srmio_file_srm7_write( srmio_data_t data, const char *fname )
 			goto clean1;
 		}
 
-		if( 0 >= (fd = open( fname, O_WRONLY | O_CREAT | O_TRUNC,
-			S_IRUSR | S_IWUSR |
-			S_IRGRP | S_IWGRP |
-			S_IROTH | S_IWOTH ))){
-
-			ERRMSG("open failed: %s", strerror(errno));
-			goto clean1;
-		}
-
 		/* header */
 		memcpy( buf, "SRM7", 4 );
-		if( 0 > _setuint16( buf, 4, days ) ){
+		if( ! buf_set_luint16( buf, 4, days ) ){
 			ERRMSG( "failed to convert date: %s", strerror(errno));
 			goto clean1;
 		}
-		if( 0 > _setuint16( buf, 6, data->circum ) ){
+		if( ! buf_set_luint16( buf, 6, data->circum ) ){
 			ERRMSG( "failed to convert circum: %s", strerror(errno));
 			goto clean1;
 		}
 		if( recint < 10 ){
-			buf[8] = (unsigned char)(recint % 10 );
-			buf[9] = 10u;
+			buf_set_uint8( buf, 8, (unsigned char)(recint % 10) );
+			buf_set_uint8( buf, 9, 10u );
 		} else {
-			if( 0 > _setuint8( buf, 8, recint / 10 ) ){
+			if( ! buf_set_uint8( buf, 8, recint / 10 ) ){
 				ERRMSG( "failed to convert recint: %s", strerror(errno));
 				goto clean1;
 			}
-			buf[9] = 1u;
+			buf_set_uint8( buf, 9, 1u );
 		}
-		if( 0 > _setuint16( buf, 10, bcnt ) ){
+		if( ! buf_set_luint16( buf, 10, bcnt ) ){
 			ERRMSG( "failed to convert bcnt: %s", strerror(errno));
 			goto clean1;
 		}
-		if( 0 > _setuint16( buf, 12, mcnt ) ){
+		if( ! buf_set_luint16( buf, 12, mcnt ) ){
 			ERRMSG( "failed to convert mcnt: %s", strerror(errno));
 			goto clean1;
 		}
-		buf[14] = 0;
-		buf[15] = data->notes ? strlen( data->notes) : 0;
-		/* TODO: iconv notes -> cp850 */
-		strncpy( (char*)&buf[16], data->notes ? data->notes : "", 70 );
+		buf_set_uint8( buf, 14, 0 );
 
-		if( 0 > _xwrite( fd, buf, 86 ))
+		{
+			int len = 0;
+
+			if( data->notes )
+				len = strlen( data->notes );
+
+			if( len > 70 ){
+				ERRMSG( "notes are too long, truncating" );
+				len = 70;
+			}
+
+			buf_set_uint8( buf, 15, len );
+		}
+
+		/* TODO: iconv notes -> cp850 */
+		buf_set_string( buf, 16, data->notes, 70 );
+
+		if( ! _xwrite( fh, buf, 86 ))
 			goto clean2;
 	}
 
@@ -687,25 +631,25 @@ int srmio_file_srm7_write( srmio_data_t data, const char *fname )
 		unsigned last = mk->last+1;
 
 		/* TODO: iconv notes -> cp850 */
-		strncpy( (char*)buf, mk->notes ? mk->notes : "", 255 );
-		buf[255] = 1; /* active */
-		if( 0 > _setuint16( buf, 256, first ) ){
+		buf_set_string( buf, 0, mk->notes, 255 );
+		buf_set_uint8( buf, 255, 1 ); /* active */
+		if( ! buf_set_luint16( buf, 256, first ) ){
 			ERRMSG( "failed to convert marker index: %s", strerror(errno));
 			goto clean1;
 		}
-		if( 0 > _setuint16( buf, 258, last ) ){
+		if( ! buf_set_luint16( buf, 258, last ) ){
 			ERRMSG( "failed to convert marker index: %s", strerror(errno));
 			goto clean1;
 		}
 		memset( &buf[260], 0, 10 );
 
-		DPRINTF( "srmio_file_write marker @%x %u %u %s",
-			(int)lseek( fd, 0, SEEK_CUR),
+		DPRINTF( "marker @0x%lx %u %u %s",
+			(unsigned long)ftell(fh),
 			first,
 			last,
 			mk->notes );
 
-		if( 0 > _xwrite( fd, buf, 270 ))
+		if( ! _xwrite( fh, buf, 270 ))
 			goto clean2;
 	}
 
@@ -739,93 +683,93 @@ int srmio_file_srm7_write( srmio_data_t data, const char *fname )
 		}
 		blockdelta *= 10;
 
-		DPRINTF( "srmio_file_write block @%x %.1f %u",
-			(int)lseek( fd, 0, SEEK_CUR),
+		DPRINTF( "block @0x%lx %.1f %u",
+			(unsigned long)ftell( fh ),
 			(double)ck->time/10,
 			blockdelta );
-		if( 0 > _setuint32( buf, 0, blockdelta) ){
+		if( ! buf_set_luint32( buf, 0, blockdelta) ){
 			ERRMSG( "failed to convert block time: %s", strerror(errno));
 			goto clean1;
 		}
-		if( 0 > _setuint16( buf, 4, len) ){
+		if( ! buf_set_luint16( buf, 4, len) ){
 			ERRMSG( "failed to convert block length: %s", strerror(errno));
 			goto clean1;
 		}
 
-		if( 0 > _xwrite( fd, buf, 6 ))
+		if( ! _xwrite( fh, buf, 6 ))
 			goto clean2;
 	}
 
 
 	/* calibration */
-	DPRINTF( "srmio_file_write cal @%x",
-		(int)lseek( fd, 0, SEEK_CUR) );
+	DPRINTF( "cal @0x%lx", (unsigned long)ftell( fh ) );
 	{
+		/* TODO: check overflow: slope */
 		unsigned slope = 0.5 + ( data->slope * 42781) / 140;
 
-		if( 0 > _setuint16( buf, 0, data->zeropos ) ){
+		if( ! buf_set_luint16( buf, 0, data->zeropos ) ){
 			ERRMSG( "failed to convert zeropos: %s", strerror(errno));
 			goto clean1;
 		}
-		if( 0 > _setuint16( buf, 2, slope ) ){
+		if( ! buf_set_luint16( buf, 2, slope ) ){
 			ERRMSG( "failed to convert slope: %s", strerror(errno));
 			goto clean1;
 		}
-		if( 0 > _setuint16( buf, 4, data->cused ) ){
+		if( ! buf_set_luint16( buf, 4, data->cused ) ){
 			ERRMSG( "failed to convert chunk count: %s", strerror(errno));
 			goto clean1;
 		}
-		buf[6] = 0;
+		buf_set_uint8( buf, 6, 0 );
 
-		if( 0 > _xwrite( fd, buf, 7 ))
+		if( ! _xwrite( fh, buf, 7 ))
 			goto clean2;
 
 	}
 
 
 	/* data */
-	DPRINTF( "srmio_file_write data @%x",
-		(int)lseek( fd, 0, SEEK_CUR) );
+	DPRINTF( "data @0x%lx", (unsigned long)ftell( fh ) );
 	for( i = 0; blocks[i]; ++i ){
 		srmio_marker_t bk = blocks[i];
 		unsigned ci;
 
-		DPRINTF( "srmio_file_write block#%u from %u to %u",
+		DPRINTF( "block#%u from %u to %u",
 			i,
 			bk->first,
 			bk->last );
 
 		for( ci = bk->first; ci <= bk->last; ++ci ){
 			srmio_chunk_t ck = data->chunks[ci];
-			unsigned speed = 0.5 + ( ck->speed * 1000) / 3.6;
-			int temp = 0.5 + ck->temp * 10;
+			/* TODO: check overflow: speed, temp */
+			int32_t speed = 0.5 + ( ck->speed * 1000) / 3.6;
+			int16_t temp = 0.5 + ck->temp * 10;
 
-			if( 0 > _setuint16( buf, 0, ck->pwr ) ){
+			if( ! buf_set_luint16( buf, 0, ck->pwr ) ){
 				ERRMSG( "failed to convert power: %s", strerror(errno));
 				goto clean1;
 			}
-			if( 0 > _setuint8( buf, 2, ck->cad ) ){
+			if( ! buf_set_uint8( buf, 2, ck->cad ) ){
 				ERRMSG( "failed to convert cadence: %s", strerror(errno));
 				goto clean1;
 			}
-			if( 0 > _setuint8( buf, 3, ck->hr ) ){
+			if( ! buf_set_uint8( buf, 3, ck->hr ) ){
 				ERRMSG( "failed to convert hr: %s", strerror(errno));
 				goto clean1;
 			}
-			if( 0 > _setuint32( buf, 4, speed ) ){
+			if( ! buf_set_lint32( buf, 4, speed ) ){
 				ERRMSG( "failed to convert speed: %s", strerror(errno));
 				goto clean1;
 			}
-			if( 0 > _setint32( buf, 8, ck->ele ) ){
+			if( ! buf_set_lint32( buf, 8, ck->ele ) ){
 				ERRMSG( "failed to convert ele: %s", strerror(errno));
 				goto clean1;
 			}
-			if( 0 > _setint16( buf, 12, temp ) ){
+			if( ! buf_set_lint16( buf, 12, temp ) ){
 				ERRMSG( "failed to convert temp: %s", strerror(errno));
 				goto clean1;
 			}
 
-			if( 0 > _xwrite( fd, buf, 14 ))
+			if( ! _xwrite( fh, buf, 14 ))
 				goto clean2;
 		}
 
@@ -833,12 +777,11 @@ int srmio_file_srm7_write( srmio_data_t data, const char *fname )
 	}
 	free( blocks );
 
-	return 0;
+	return true;
 
 clean2:
-	close(fd);
 clean1:
-	return -1;
+	return false;
 }
 
 

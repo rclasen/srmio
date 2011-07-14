@@ -20,7 +20,7 @@ static const char *type_names[srmio_ftype_max] = {
 	"wkt",
 };
 
-static srmio_data_t (*rfunc[srmio_ftype_max])( const char *fname) = {
+static srmio_data_t (*rfunc[srmio_ftype_max])( FILE *fh) = {
 	NULL,
 	srmio_file_srm_read,
 	srmio_file_srm_read,
@@ -28,7 +28,7 @@ static srmio_data_t (*rfunc[srmio_ftype_max])( const char *fname) = {
 	NULL, /* TODO: srmio_file_wkt_read, */
 };
 
-static int (*wfunc[srmio_ftype_max])(srmio_data_t data, const char *fname) = {
+static bool (*wfunc[srmio_ftype_max])(srmio_data_t data, FILE *fh) = {
 	NULL,
 	NULL, /* TODO: srmio_file_srm5_write */
 	NULL, /* TODO: srmio_file_srm6_write */
@@ -55,7 +55,7 @@ srmio_ftype_t srmio_ftype_from_string( const char *type )
 /*
  * read file of specified type
  */
-srmio_data_t srmio_file_ftype_read( srmio_ftype_t ftype, const char *fname )
+srmio_data_t srmio_file_ftype_read( srmio_ftype_t ftype, FILE *fh )
 {
 	if( rfunc[ftype] == NULL ){
 		ERRMSG("reading %s files is not supported",
@@ -64,21 +64,21 @@ srmio_data_t srmio_file_ftype_read( srmio_ftype_t ftype, const char *fname )
 		return NULL;
 	}
 
-	return (rfunc[ftype])( fname );
+	return (rfunc[ftype])( fh );
 }
 
 /*
  * write file of specified type
  */
-int srmio_file_ftype_write( srmio_data_t data, srmio_ftype_t ftype, const char *fname )
+bool srmio_file_ftype_write( srmio_data_t data, srmio_ftype_t ftype, FILE *fh )
 {
 	if( wfunc[ftype] == NULL ){
 		ERRMSG("writing %s files is not supported",
 			type_names[ftype] );
 		errno = ENOTSUP;
-		return -1;
+		return false;
 	}
 
-	return (wfunc[ftype])( data, fname );
+	return (wfunc[ftype])( data, fh );
 }
 

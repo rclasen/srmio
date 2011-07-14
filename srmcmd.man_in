@@ -17,6 +17,10 @@ Options available for the
 .B srmcmd
 command:
 .TP
+\fB\-b\fR, \fB\-\-baud\fR=\fIrate\fR
+Use specified baudrate, only. By default all supported baudrates are
+probed. PCV factory setting is 9600 baud.
+.TP
 \fB\-c\fR, \fB\-\-clear\fR
 Delete data on PC. Well, actually just mark it as deleted. You're still
 able to get it with --get=all.
@@ -24,12 +28,6 @@ able to get it with --get=all.
 \fB\-d\fR, \fB\-\-date\fR
 Print start date of recorded data as seconds since 1970-01-01. This is
 useful for creating srmwin compatible filenames.
-.TP
-\fB\-F\fR, \fB\-\-force\fR
-Ignore builtin whitelist of known working PCV Firmware versions. This
-options might be quite DANGEROUSE if an unknown Firmware expects 
-to be addressed differently. Writing unexpected stuff to PCV proved to be
-a *BAD* Idea.
 .TP
 \fB\-x\fR, \fB\-\-fixup\fR
 Try to fix time glitches in retrieved data. The PCV sends 11 Tuples in
@@ -66,6 +64,13 @@ Defaults to srm7.
 .TP
 \fB\-t\fR, \fB\-\-time\fR
 Set the PCs time to the current system time.
+.TP
+\fB\-s\fR, \fB\-\-split\fR=\fItime\fR
+Split data on gaps of specified minimum length. Time is given as
+10*seconds - same as --recint. With a non-zero time, the argument given
+to --write will be used as template for mkstemps. So it has to have
+'XXXXXX' in it - that's exactly 6 uppercase X. The generated filenames are
+printed to stdout.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 Enable verbose status messages.

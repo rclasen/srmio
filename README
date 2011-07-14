@@ -111,6 +111,9 @@ Notes:
 
 Of course I'm open to all suggestions, comments and patches.
 
+Sorry for my home-brewn "object model" for C, but I didn't want to pay the
+GObject price.
+
 If you experience problems with *your* PCV, please
  - recompile with -DVERBOSE -DDEBUG enabled. 
    (./configure CFLAGS="-g -DVERBOSE -DDEBUG -Wall -Wextra")
