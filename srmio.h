@@ -142,20 +142,9 @@ int srmio_file_ftype_write( srmio_data_t data, srmio_ftype_t ftype, const char *
  *
  ************************************************************/
 
-#define SRM_BUFSIZE	1024
-#define SRM_BLOCKCHUNKS	11u
-
 typedef void (*srmio_log_callback_t)( const char *msg );
 
 /* connection handle */
-struct _srmio_pc_t {
-	int		fd;
-	struct termios	oldios;
-	int		stxetx;	/* use stx/etx headers + encoding? */
-	time_t		nready;	/* PC accepts next command */
-	srmio_log_callback_t	lfunc;	/* logging callback */
-	int		cmd_running; /* command is going on */
-};
 typedef struct _srmio_pc_t *srmio_pc_t;
 
 
@@ -182,26 +171,6 @@ int srmio_pc_set_recint( srmio_pc_t conn, srmio_time_t recint );
 
 
 /* handle that's used within srmio_pc_get_chunks* */
-struct _srmio_pc_get_chunk_t {
-	/* whole downlad */
-	srmio_pc_t		conn;
-	struct tm		pctime;
-	unsigned		blocks;
-	unsigned char		buf[SRM_BUFSIZE];
-	int			finished;
-
-	/* current block */
-	unsigned		blocknum;	/* 0..blocks-1 */
-	srmio_time_t		bstart;
-	unsigned long		dist;
-	int			temp;
-	srmio_time_t		recint;
-
-	/* current chunk */
-	unsigned		chunknum;	/* within block 0..10 */
-	int			isfirst;	/* ... of marker */
-	int			iscont;		/* ... of marker */
-};
 typedef struct _srmio_pc_get_chunk_t *srmio_pc_get_chunk_t;
 
 srmio_pc_get_chunk_t srmio_pc_get_chunk_start( srmio_pc_t conn, int getall );

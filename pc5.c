@@ -19,6 +19,40 @@
 #define BLOCK_NAK	((const unsigned char *)"\x15")
 #define BLOCK_ABRT	((const unsigned char *)"\xaa")
 
+#define SRM_BUFSIZE	1024
+#define SRM_BLOCKCHUNKS	11u
+
+struct _srmio_pc_t {
+	int		fd;
+	struct termios	oldios;
+	int		stxetx;	/* use stx/etx headers + encoding? */
+	time_t		nready;	/* PC accepts next command */
+	srmio_log_callback_t	lfunc;	/* logging callback */
+	int		cmd_running; /* command is going on */
+};
+
+struct _srmio_pc_get_chunk_t {
+	/* whole downlad */
+	srmio_pc_t		conn;
+	struct tm		pctime;
+	unsigned		blocks;
+	unsigned char		buf[SRM_BUFSIZE];
+	int			finished;
+
+	/* current block */
+	unsigned		blocknum;	/* 0..blocks-1 */
+	srmio_time_t		bstart;
+	unsigned long		dist;
+	int			temp;
+	srmio_time_t		recint;
+
+	/* current chunk */
+	unsigned		chunknum;	/* within block 0..10 */
+	int			isfirst;	/* ... of marker */
+	int			iscont;		/* ... of marker */
+};
+
+
 /*
  * I'm a chicken and won't touch any SRM I don't know.
  *
