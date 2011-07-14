@@ -22,7 +22,7 @@ extern "C"
 
 /************************************************************
  *
- * from srmdata.c
+ * from data.c
  *
  ************************************************************/
 
@@ -98,7 +98,7 @@ void srm_data_free( srm_data_t data );
 
 /************************************************************
  *
- * from srmfile.c
+ * from file_srm.c
  *
  ************************************************************/
 
@@ -108,10 +108,38 @@ int srm_data_write_srm7( srm_data_t data, const char *fname );
 
 
 
+/************************************************************
+ *
+ * from file_wkt.c
+ *
+ ************************************************************/
+
+int srm_data_write_wkt( srm_data_t data, const char *fname );
+
 
 /************************************************************
  *
- * from srmpc.c
+ * from ftypes.c
+ *
+ ************************************************************/
+
+typedef enum {
+	srm_ftype_unknown,
+	srm_ftype_srm5,
+	srm_ftype_srm6,
+	srm_ftype_srm7,
+	srm_ftype_wkt,
+	srm_ftype_max,
+} srm_ftype_t;
+
+srm_ftype_t srm_ftype_from_string( const char *type );
+
+srm_data_t srm_data_read_ftype( srm_ftype_t ftype, const char *fname );
+int srm_data_write_ftype( srm_data_t data, srm_ftype_t ftype, const char *fname );
+
+/************************************************************
+ *
+ * from pc5.c
  *
  ************************************************************/
 
@@ -190,34 +218,6 @@ int srmpc_get_chunks( srmpc_conn_t conn, int getall,
 int srmpc_clear_chunks( srmpc_conn_t conn );
 
 srm_data_t srmpc_get_data( srmpc_conn_t conn, int getall, int fixup );
-
-/************************************************************
- *
- * from ftypes.c
- *
- ************************************************************/
-
-typedef enum {
-	srm_ftype_unknown,
-	srm_ftype_srm5,
-	srm_ftype_srm6,
-	srm_ftype_srm7,
-	srm_ftype_wkt,
-	srm_ftype_max,
-} srm_ftype_t;
-
-srm_ftype_t srm_ftype_from_string( const char *type );
-
-srm_data_t srm_data_read_ftype( srm_ftype_t ftype, const char *fname );
-int srm_data_write_ftype( srm_data_t data, srm_ftype_t ftype, const char *fname );
-
-/************************************************************
- *
- * from wkt.c
- *
- ************************************************************/
-
-int srm_data_write_wkt( srm_data_t data, const char *fname );
 
 # ifdef __cplusplus
 }

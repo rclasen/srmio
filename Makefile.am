@@ -34,10 +34,10 @@ libsrmio_la_SOURCES= \
 	common.h \
 	\
 	ftypes.c \
-	srmdata.c \
-	srmfile.c \
-	srmpc.c \
-	wkt.c
+	data.c \
+	file_srm.c \
+	file_wkt.c \
+	pc5.c
 
 bin_PROGRAMS=srmcmd
 
