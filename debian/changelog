@@ -1,3 +1,9 @@
+srmio (0.1.0~git0) unstable; urgency=low
+
+  * prepared next development version
+
+ -- Rainer Clasen <bj@zuto.de>  Thu, 14 Jul 2011 14:02:20 +0200
+
 srmio (0.0.6) unstable; urgency=low
 
   * srmpc: try to catch mktime errors properly
