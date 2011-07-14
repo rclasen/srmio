@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2008 Rainer Clasen
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms described in the file LICENSE included in this
  * distribution.
@@ -60,7 +60,7 @@ void srm_marker_free( srm_marker_t marker );
 
 
 
-/* data structure to hold all information retrieved 
+/* data structure to hold all information retrieved
  * from PCV or file */
 struct _srm_data_t {
 	double		slope;
@@ -169,8 +169,8 @@ void srmpc_close( srmpc_conn_t conn );
 int srmpc_get_version( srmpc_conn_t conn );
 char *srmpc_get_athlete( srmpc_conn_t conn );
 
-int srmpc_get_time( srmpc_conn_t conn, struct tm *timep ); 
-int srmpc_set_time( srmpc_conn_t conn, struct tm *timep ); 
+int srmpc_get_time( srmpc_conn_t conn, struct tm *timep );
+int srmpc_set_time( srmpc_conn_t conn, struct tm *timep );
 
 int srmpc_get_circum( srmpc_conn_t conn );
 
@@ -195,7 +195,7 @@ struct _srmpc_get_chunk_t {
 	unsigned		blocknum;	/* 0..blocks-1 */
 	srm_time_t		bstart;
 	unsigned long		dist;
-	int			temp;	
+	int			temp;
 	srm_time_t		recint;
 
 	/* current chunk */

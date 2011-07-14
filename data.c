@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2008 Rainer Clasen
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms described in the file LICENSE included in this
  * distribution.
@@ -399,7 +399,7 @@ int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
 			return -1;
 		}
 
-		if( NULL == (tmp = realloc( data->chunks, 
+		if( NULL == (tmp = realloc( data->chunks,
 			(data->cavail + 1001) * sizeof(srm_chunk_t))))
 			return -1;
 
@@ -446,7 +446,7 @@ int srm_data_add_markerp( srm_data_t data, srm_marker_t mk )
 			return -1;
 		}
 
-		if( NULL == (tmp = realloc( data->marker, 
+		if( NULL == (tmp = realloc( data->marker,
 			(data->mavail + 11) * sizeof(srm_marker_t))))
 			return -1;
 
@@ -475,8 +475,8 @@ int srm_data_add_marker( srm_data_t data, unsigned first, unsigned last )
 {
 	srm_marker_t mk;
 
-	DPRINTF( "srm_data_add_marker: %u to %u", 
-		first, 
+	DPRINTF( "srm_data_add_marker: %u to %u",
+		first,
 		last );
 
 	if( first >= data->cused || first > last ){
@@ -573,7 +573,7 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 					goto clean2;
 				}
 
-				if( NULL == (tmp = realloc(blocks, (1+ ns) 
+				if( NULL == (tmp = realloc(blocks, (1+ ns)
 					* (sizeof(srm_marker_t)) )))
 
 					goto clean2;
@@ -583,15 +583,15 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 			}
 
 			DPRINTF("srm_data_blocks found gap @%u "
-				"%.1f - %.1f = %.1f", 
+				"%.1f - %.1f = %.1f",
 				i,
-				(double)prev->time/10, 
+				(double)prev->time/10,
 				(double)this->time/10,
 				(double)(this->time - prev->time)/10);
 
 			if( NULL == (blocks[used] = srm_marker_new() ) )
 				goto clean2;
-				
+
 			blocks[used-1]->last = i -1;
 			blocks[used]->first = i;
 			blocks[used]->last = data->cused -1;
@@ -619,7 +619,7 @@ void srm_data_free( srm_data_t data )
 
 	if( data == NULL )
 		return;
-	
+
 	for( i=0; i < data->cused; ++i )
 		srm_chunk_free(data->chunks[i]);
 	free(data->chunks);

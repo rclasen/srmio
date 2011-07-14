@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2008 Rainer Clasen
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms described in the file LICENSE included in this
  * distribution.
@@ -63,11 +63,11 @@ static const int _srmpc_baudnames[_srmpc_baud_max] = {
 	2400,
 };
 
-static int _srmpc_msg_decode( 
+static int _srmpc_msg_decode(
 	unsigned char *out, size_t olen,
 	const unsigned char *in, size_t ilen );
 
-static int _srmpc_msg_send( srmpc_conn_t conn, 
+static int _srmpc_msg_send( srmpc_conn_t conn,
 	char cmd, const unsigned char *arg, size_t alen );
 
 
@@ -94,7 +94,7 @@ static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
 		return
 		;
 	va_end( ap );
-	
+
 	DPRINTF("_srm_log: %s", buf );
 #ifdef DEBUG
 	if( conn->lfunc )
@@ -109,7 +109,7 @@ static void _srm_log( srmpc_conn_t conn, const char *fmt, ... )
  ************************************************************/
 
 /*
- * send data towards SRM, 
+ * send data towards SRM,
  * automagically take care of pending IOFLUSH
  *
  * returns number of chars written
@@ -149,7 +149,7 @@ static int _srmpc_read( srmpc_conn_t conn, unsigned char *buf, size_t want )
 {
 	size_t got = 0;
 	int ret;
-	
+
 	while( got < want ){
 		ret = read( conn->fd, &buf[got], 1 );
 		if( ret < 0 )
@@ -189,8 +189,8 @@ static int _srmpc_init(
 	}
 
 	conn->stxetx = 1;
-	_srm_log( conn, "trying comm %d/8%c1", 
-		_srmpc_baudnames[baudrate], 
+	_srm_log( conn, "trying comm %d/8%c1",
+		_srmpc_baudnames[baudrate],
 		parity ? 'e' : 'n' );
 
 #ifdef HAVE_CFMAKERAW
@@ -295,9 +295,9 @@ static int _srmpc_init_all( srmpc_conn_t conn )
 
 			ret = _srmpc_init( conn, baudrate, parity );
 			if( ret >= 0 ){
-				_srm_log( conn, "found PCV version 0x%x at %d/8%c1", 
-					(unsigned)ret, 
-					_srmpc_baudnames[baudrate], 
+				_srm_log( conn, "found PCV version 0x%x at %d/8%c1",
+					(unsigned)ret,
+					_srmpc_baudnames[baudrate],
 					parity ? 'e' : 'n' );
 
 				return ret;
@@ -444,12 +444,12 @@ void srmpc_close( srmpc_conn_t conn )
  *
  *  - computer sends STX <command_char> <optional_data> ETX - SRM responds
  *  with STX <command_char> <optional_data> ETX
- * 
+ *
  * command_char is a single char. The same command_char is used to - get
  * the SRM's individual settings or - adjust the SRM's settings.
  *
- * When optional data is encoded the "ASCII-friendly" way, 
- *  - each byte's actual value is converted to a hex string, 
+ * When optional data is encoded the "ASCII-friendly" way,
+ *  - each byte's actual value is converted to a hex string,
  *  - each hex-digit is used as a seperate byte + 0x30.
  * eg. 0x3f is encoded as 0x33,0x3f
  *
@@ -480,9 +480,9 @@ void srmpc_close( srmpc_conn_t conn )
  * returns number of encoded bytes
  * on error errno is set and returns -1
  */
-static int _srmpc_msg_encode( 
+static int _srmpc_msg_encode(
 	unsigned char *out, size_t olen,
-	const unsigned char *in, size_t ilen ) 
+	const unsigned char *in, size_t ilen )
 {
 	size_t i;
 	size_t o=0;
@@ -494,8 +494,8 @@ static int _srmpc_msg_encode(
 	}
 
 	if( olen < 2 * ilen ){
-		ERRMSG( "_srmpc_msg_encode: dst buffer too small %lu/%lu", 
-			(unsigned long)ilen, 
+		ERRMSG( "_srmpc_msg_encode: dst buffer too small %lu/%lu",
+			(unsigned long)ilen,
 			(unsigned long)olen);
 		errno = ERANGE;
 		return -1;
@@ -517,9 +517,9 @@ static int _srmpc_msg_encode(
  * returns number of decoded bytes
  * on error errno is set and returns -1
  */
-static int _srmpc_msg_decode( 
+static int _srmpc_msg_decode(
 	unsigned char *out, size_t olen,
-	const unsigned char *in, size_t ilen ) 
+	const unsigned char *in, size_t ilen )
 {
 	int o=0;
 
@@ -667,7 +667,7 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize
 		/* stx, etc, encoding */
 		want = 2*want +2;
 
- 	/* cmd char */
+	/* cmd char */
 	++want;
 
 
@@ -693,8 +693,8 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize
 			DUMPHEX( "_srmpc_msg_recv", buf, rlen );
 			return -1; /* read failed */
 
-		} 
-		
+		}
+
 		/* timeout */
 		if( ret < 1 ){
 			_srm_log( conn, "read msg timeout" );
@@ -712,7 +712,7 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize
 	}
 	DPRINTF( "_srmpc_msg_recv got %lu chars", (unsigned long)rlen );
 	DUMPHEX( "_srmpc_msg_recv", buf, rlen );
-	
+
 	if( ! rlen ){
 		_srm_log( conn, "response timed out" );
 		errno = ETIMEDOUT;
@@ -767,7 +767,7 @@ static int _srmpc_msg_recv( srmpc_conn_t conn, unsigned char *rbuf, size_t rsize
 }
 
 /*
- * Some commands keep the PCV busy after it responded. This 
+ * Some commands keep the PCV busy after it responded. This
  * sets the time to wait until the PC accepts new commands.
  *
  * parameters:
@@ -786,7 +786,7 @@ static int _srmpc_msg_busy( srmpc_conn_t conn, unsigned delay )
 }
 
 /*
- * Wait for PCV to finish last command and become ready to 
+ * Wait for PCV to finish last command and become ready to
  * accept the next one (if necessary)
  *
  * returns 0 on success
@@ -810,15 +810,15 @@ static int _srmpc_msg_ready( srmpc_conn_t conn )
 }
 
 /*
- * process one complete command (send, receive), 
+ * process one complete command (send, receive),
  * retry if necesssary
  *
  * returns 0 on success
  * on error errno is set and returns -1
  */
-static int _srmpc_msg( srmpc_conn_t conn, char cmd, 
+static int _srmpc_msg( srmpc_conn_t conn, char cmd,
 	const unsigned char *arg,
-	size_t alen, 
+	size_t alen,
 	unsigned char *buf,
 	size_t blen,
 	size_t want )
@@ -995,7 +995,7 @@ int srmpc_set_time( srmpc_conn_t conn, struct tm *timep )
 
 	if( 0 > _srmpc_msg( conn, 'M', buf, 6, NULL, 0, 0 ))
 		return -1;
-		
+
 	DPRINTF( "srmpc_set_time set %s", asctime(timep) );
 	_srmpc_msg_busy( conn, 2 );
 	return 0;
@@ -1031,7 +1031,7 @@ int srmpc_get_circum( srmpc_conn_t conn )
 		return -1;
 	}
 
-	circum = ( buf[0] << 8 ) 
+	circum = ( buf[0] << 8 )
 		| ( buf[1] );
 	DPRINTF( "srmpc_get_circum circum=%d", circum );
 	return circum;
@@ -1113,9 +1113,9 @@ int srmpc_get_zeropos( srmpc_conn_t conn )
  * setting:	recording interval
  * command:	R
  * argument:	unsigned char, ASCII-friendly
- * 
- * if bit7 == 0 
- * 	bits 0-3 have the actual recint in seconds: 1-15
+ *
+ * if bit7 == 0
+ *	bits 0-3 have the actual recint in seconds: 1-15
  * else
  *	bits 0-3 have the digit behind the decimal point: 0.1 - 0.9
  */
@@ -1143,8 +1143,8 @@ int srmpc_get_recint( srmpc_conn_t conn )
 		errno = EPROTO;
 		return -1;
 	}
-	
-	recint = ( *buf & 0x80 ) 
+
+	recint = ( *buf & 0x80 )
 		? *buf & 0x0f
 		: *buf * 10;
 
@@ -1175,7 +1175,7 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
 	/* 0.1 .. 0.9 sec? */
 	if( recint < 10 ){
 		raw = 0x80 | recint;
-	
+
 	/* 1 .. 15 sec? */
 	} else {
 		if( recint > 150 || recint % 10 ){
@@ -1226,11 +1226,11 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
  *
  * num_blocks is encoded as 16bit big-endian integer.
  *
- * The 64 byte blocks comes with a 9 byte "header" followed by 11 data 
+ * The 64 byte blocks comes with a 9 byte "header" followed by 11 data
  * chunks.
  *
  * block header bytes:
- *  - byte 0-4: timestamp of first chunk + recint, 
+ *  - byte 0-4: timestamp of first chunk + recint,
  *  - byte 0:
  *    - bit 0-3: day decimal digit 0
  *    - bit 4-5: day decimal digit 1
@@ -1267,7 +1267,7 @@ int srmpc_set_recint( srmpc_conn_t conn, srm_time_t recint )
  * up to 2sec automatically with averaged data.
  *
  * I've found some other occasional differences to the data srmwin saves
- * to disk, but couldn't identify what's causing them. 
+ * to disk, but couldn't identify what's causing them.
  *
  * Alternatively all (incl. "deleted") chunks may be downloaded with
  * 'y' instead of 'A'.
@@ -1716,7 +1716,7 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
 
 /************************************************************
  *
- * use srmpc_get_chunks() to fill srm_data_t structure 
+ * use srmpc_get_chunks() to fill srm_data_t structure
  * with all chunks.
  *
  * Also serves as example on how to use the download API.
@@ -1728,7 +1728,7 @@ int srmpc_clear_chunks( srmpc_conn_t conn )
  *
  * parameter:
  *  conn: connection handle
- *  deleted: instruct PCV to send deleted data, too (when != 0). 
+ *  deleted: instruct PCV to send deleted data, too (when != 0).
  *          Same as pressing shift while downloading in srmwin.
  *  fixup: postprocess data (fix timestamps, fill micro-gaps, ...) (when != 0)
  *

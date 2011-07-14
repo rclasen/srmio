@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2008 Rainer Clasen
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms described in the file LICENSE included in this
  * distribution.
@@ -188,9 +188,9 @@ static unsigned _srm_mkdays( srm_time_t input )
 
 	year = tm.tm_year + 1900;
 
-	days = 365 * year 
-		+ (year - 1)/4 
-		- (year - 1)/100 
+	days = 365 * year
+		+ (year - 1)/4
+		- (year - 1)/100
 		+ (year - 1)/400
 
 		+ cumul_days[tm.tm_mon]
@@ -214,7 +214,7 @@ static unsigned _srm_mkdays( srm_time_t input )
 	}
 	days -= DAYS_SRM;
 
-	DPRINTF( "_srm_mkdays %.1f -> %u", 
+	DPRINTF( "_srm_mkdays %.1f -> %u",
 		(double)input/10,
 		days );
 	return days;
@@ -229,9 +229,9 @@ static srm_chunk_t _srm_data_chunk_srm6( const unsigned char *buf )
 	if( NULL == (ck = srm_chunk_new() ))
 		return NULL;
 
-	ck->pwr = ( buf[1] & 0x0f) 
+	ck->pwr = ( buf[1] & 0x0f)
 		| ( buf[2] << 4 );
-	ck->speed = (double)( ((buf[1] & 0xf0) << 3) 
+	ck->speed = (double)( ((buf[1] & 0xf0) << 3)
 		| (buf[0] & 0x7f) ) * 3 / 26;
 	ck->cad = buf[5];
 	ck->hr = buf[4];
@@ -239,7 +239,7 @@ static srm_chunk_t _srm_data_chunk_srm6( const unsigned char *buf )
 	return ck;
 }
 
-	
+
 static srm_chunk_t _srm_data_chunk_srm7( const unsigned char *buf )
 {
 	srm_chunk_t ck;
@@ -340,10 +340,10 @@ srm_data_t srm_data_read_srm( const char *fname )
 	if( (srm_time_t)-1 == (timerefday = _srm_mktime( CINT16(buf,4) )))
 		goto clean2;
 #ifdef DEBUG
-	{ 
+	{
 	time_t t = timerefday / 10;
-	DPRINTF( "srm_data_read timerefday %u %.1f %s", 
-		(unsigned)CINT16(buf,4), 
+	DPRINTF( "srm_data_read timerefday %u %.1f %s",
+		(unsigned)CINT16(buf,4),
 		(double)timerefday/10, ctime( &t));
 	}
 #endif
@@ -412,7 +412,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 
 	for( i = 0; i < bcnt; ++i ){
 		struct _srm_block_t *tb;
-		
+
 		if( 0 > _xread( fd, buf, 6 ))
 			goto clean3;
 		DUMPHEX( "srm_data_read block", buf, 6 );
@@ -431,7 +431,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 #ifdef DEBUG
 		{
 		time_t t = (timerefday + tb->daydelta) / 10;
-		DPRINTF( "srm_data_read block %.1f %u %s", 
+		DPRINTF( "srm_data_read block %.1f %u %s",
 			(double)tb->daydelta/10,
 			tb->chunks,
 			ctime( &t) );
@@ -612,7 +612,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		unsigned days;
 
 		for( bcnt = 0; blocks[bcnt] && bcnt <= ULONG_MAX; ++bcnt );
-	
+
 		/* time-jumps in PCV lead to nonlinear timestamps, find
 		 * lowest one: */
 		for( ck = data->chunks; *ck; ++ck ){
@@ -642,7 +642,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			goto clean1;
 		}
 
-		if( 0 >= (fd = open( fname, O_WRONLY | O_CREAT | O_TRUNC, 
+		if( 0 >= (fd = open( fname, O_WRONLY | O_CREAT | O_TRUNC,
 			S_IRUSR | S_IWUSR |
 			S_IRGRP | S_IWGRP |
 			S_IROTH | S_IWOTH ))){
@@ -650,7 +650,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			ERRMSG("open failed: %s", strerror(errno));
 			goto clean1;
 		}
-	
+
 		/* header */
 		memcpy( buf, "SRM7", 4 );
 		if( 0 > _setuint16( buf, 4, days ) ){
@@ -760,14 +760,14 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			ERRMSG( "failed to convert block length: %s", strerror(errno));
 			goto clean1;
 		}
-		
+
 		if( 0 > _xwrite( fd, buf, 6 ))
 			goto clean2;
 	}
 
 
 	/* calibration */
-	DPRINTF( "srm_data_write cal @%x", 
+	DPRINTF( "srm_data_write cal @%x",
 		(int)lseek( fd, 0, SEEK_CUR) );
 	{
 		unsigned slope = 0.5 + ( data->slope * 42781) / 140;
@@ -790,10 +790,10 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			goto clean2;
 
 	}
-	
+
 
 	/* data */
-	DPRINTF( "srm_data_write data @%x", 
+	DPRINTF( "srm_data_write data @%x",
 		(int)lseek( fd, 0, SEEK_CUR) );
 	for( i = 0; blocks[i]; ++i ){
 		srm_marker_t bk = blocks[i];

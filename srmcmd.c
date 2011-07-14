@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2008 Rainer Clasen
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms described in the file LICENSE included in this
  * distribution.
@@ -11,10 +11,10 @@
  *
  *        !!!!! WARNING !!!!!
  *
- * USE THIS ONLY AT YOUR OWN RISK! 
+ * USE THIS ONLY AT YOUR OWN RISK!
  * THIS MIGHT DESTROY YOUR SRM POWERCONTROL.
  *
- * FYI: If any the powercontrol has only lax input checking. 
+ * FYI: If any the powercontrol has only lax input checking.
  * So by sending a garbled/misformed command you might turn
  * it into a brick. So far srmwin could fix things for me, but
  * you might be the first without this luck.
@@ -156,16 +156,16 @@ int main( int argc, char **argv )
 
 		  case 'g':
 			++opt_get;
-		  	if( optarg && 0 == strcmp( optarg, "all" ))
+			if( optarg && 0 == strcmp( optarg, "all" ))
 				++opt_all;
 			break;
 
 		  case 'h':
-		  	++opt_help;
+			++opt_help;
 			break;
 
 		  case 'i':
-		  	opt_int = atoi(optarg);
+			opt_int = atoi(optarg);
 			break;
 
 		  case 'n':
@@ -173,7 +173,7 @@ int main( int argc, char **argv )
 			break;
 
 		  case 'r':
-		  	++opt_read;
+			++opt_read;
 			break;
 
 		  case 'R':
@@ -198,7 +198,7 @@ int main( int argc, char **argv )
 			break;
 
 		  case 'w':
-		  	opt_write = optarg;
+			opt_write = optarg;
 			break;
 
 		  case 'W':
@@ -268,16 +268,16 @@ int main( int argc, char **argv )
 				fprintf( stderr, "no data available\n" );
 				return 1;
 			}
-			printf( "%s\n", srmdata->marker[0]->notes 
+			printf( "%s\n", srmdata->marker[0]->notes
 				? srmdata->marker[0]->notes
 				: "" );
-			
+
 		} else if( opt_date ){
 			if( ! srmdata->cused ){
 				fprintf( stderr, "no data available\n" );
 				return 1;
 			}
-			printf( "%.0f\n", 
+			printf( "%.0f\n",
 				(double)srm_data_time_start(srmdata) / 10 );
 
 
@@ -301,7 +301,7 @@ int main( int argc, char **argv )
 		return 0;
 	}
 
-	if( NULL == (srm = srmpc_open( fname, opt_force, 
+	if( NULL == (srm = srmpc_open( fname, opt_force,
 		opt_verb ? logfunc : NULL  ))){
 
 		fprintf( stderr, "srmpc_open(%s) failed: %s\n",
@@ -318,7 +318,7 @@ int main( int argc, char **argv )
 		}
 		printf( "%s\n", name );
 		free( name );
-	
+
 	} else if( opt_get || opt_date ){
 		srm_data_t srmdata;
 
@@ -333,7 +333,7 @@ int main( int argc, char **argv )
 				fprintf( stderr, "no data available\n" );
 				return 1;
 			}
-			printf( "%.0f\n", 
+			printf( "%.0f\n",
 				(double)srm_data_time_start(srmdata) / 10 );
 
 		} else if( opt_write ){
@@ -351,8 +351,8 @@ int main( int argc, char **argv )
 			csvdump( srmdata );
 		}
 		srm_data_free( srmdata );
-	
-	} 
+
+	}
 
 	if( opt_clear ){
 		if( 0 > srmpc_clear_chunks( srm ) ){
@@ -381,7 +381,7 @@ int main( int argc, char **argv )
 	}
 
 	srmpc_close( srm );
-	
+
 	return 0;
 }
 
@@ -405,7 +405,7 @@ static void usage( char *name )
 " --time|-t           set current time\n"
 " --verbose|-v        increase verbosity\n"
 " --version|-V        show version number and exit\n"
-" --write=<fname>|-w  save data as specified .srm file\n" 
+" --write=<fname>|-w  save data as specified .srm file\n"
 " --write-type=<t>|-W save data with specified file format\n"
 , name );
 }
