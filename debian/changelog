@@ -1,8 +1,38 @@
-srmio (0.0.5.git0) unstable; urgency=low
+srmio (0.0.6) unstable; urgency=low
 
-  * prepared next release
+  * srmpc: try to catch mktime errors properly
+  * srmwinget: also use athlete name for filenames
+  * corrected data fixup for recint > 1sec
+  * improved handling of varying recint
+  * added support for writing different file formats
+  * srmpc: added PCV version 6b.08 to whitelist
+  * optionally build with verbose error reporting
+  * support reading partial files
+  * Added SRM5 file format read support
+  * srmpc: cleaned error handling during init
+  * srmpc: debug logging when restoring ios fails
+  * srmpc: fixed some log messages
+  * more detailed debug messages when fixup fails
+  * srmdata: fixed data correction to keep circum
+  * srmfile: refuse to write broken files
+  * srmpc: log msg before postprocessing data
+  * srmpc: fixed recint in downloaded data
+  * srmpc: redefined ACK/NAK/ABORT as strings
+  * srmpc: re-submit commands to PCV on failure
+  * srmpc: updated comments regarding chunk download
+  * srmpc: allow aborting downloads
+  * srmpc: converted srmpc_get_data to new API
+  * srmpc: added non-callback interface
+  * srmpc: don't skip debug output in non-verbose mode
+  * moved data fixup from download to srmdata
+  * srmdata: added srm_marker_clone function
+  * srmdata: added accessor functions for data
+  * srmpc: fix subsecond recint in srmpc_get_recint
+  * added firmware 34.04 to whitelist
+  * srmpc: log when download turned PCV unresponsive
+  * srmpc: include log messages in debug output
 
- -- Rainer Clasen <bj@zuto.de>  Thu, 21 Jan 2010 10:23:49 +0100
+ -- Rainer Clasen <bj@zuto.de>  Thu, 14 Jul 2011 13:10:20 +0200
 
 srmio (0.0.5) unstable; urgency=low
 
