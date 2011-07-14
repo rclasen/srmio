@@ -12,7 +12,7 @@
 /*
  * write contents of data structure into specified file
  */
-int srm_data_write_wkt( srm_data_t data, const char *fname )
+int srmio_file_wkt_write( srmio_data_t data, const char *fname )
 {
 	int fd;
 	FILE *fh;
@@ -79,7 +79,7 @@ int srm_data_write_wkt( srm_data_t data, const char *fname )
 	}
 
 	for( i=0; i < data->cused; ++i ){
-		srm_chunk_t ck = data->chunks[i];
+		srmio_chunk_t ck = data->chunks[i];
 
 		if( 0 > fprintf( fh,
 			"%.1lf\t"	/* time */
@@ -111,9 +111,9 @@ int srm_data_write_wkt( srm_data_t data, const char *fname )
 	}
 
 	for( i=1; i < data->mused; ++i ){
-		srm_marker_t mk = data->marker[i];
-		srm_chunk_t first = data->chunks[mk->first];
-		srm_chunk_t last = data->chunks[mk->last];
+		srmio_marker_t mk = data->marker[i];
+		srmio_chunk_t first = data->chunks[mk->first];
+		srmio_chunk_t last = data->chunks[mk->last];
 
 		if( 0 > fprintf( fh, "%.1lf\t%.1lf\t%s\n",
 			(double)( (first->time - first->dur) / 10 ),

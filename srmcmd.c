@@ -54,10 +54,10 @@
 
 
 
-static void csvdump( srm_data_t data )
+static void csvdump( srmio_data_t data )
 {
-	srm_chunk_t *ck;
-	srm_time_t recint = srm_data_recint( data );
+	srmio_chunk_t *ck;
+	srmio_time_t recint = srmio_data_recint( data );
 
 	printf(
 		"time\t"
@@ -112,12 +112,12 @@ int main( int argc, char **argv )
 	int opt_int = 0;
 	int opt_name = 0;
 	int opt_read = 0;
-	srm_ftype_t opt_rtype = srm_ftype_srm7;
+	srmio_ftype_t opt_rtype = srmio_ftype_srm7;
 	int opt_time = 0;
 	int opt_verb = 0;
 	int opt_version = 0;
 	char *opt_write = NULL;
-	srm_ftype_t opt_wtype = srm_ftype_srm7;
+	srmio_ftype_t opt_wtype = srmio_ftype_srm7;
 	int needhelp = 0;
 	struct option lopts[] = {
 		{ "clear", no_argument, NULL, 'c' },
@@ -137,7 +137,7 @@ int main( int argc, char **argv )
 		{ "write-type", required_argument, NULL, 'W' },
 	};
 	char c;
-	srmpc_conn_t srm;
+	srmio_pc_t srm;
 
 	/* TODO: option to filter data by timerange */
 	while( -1 != ( c = getopt_long( argc, argv, "cdFg::hi:nrR:tVvw:W:x", lopts, NULL ))){
@@ -177,8 +177,8 @@ int main( int argc, char **argv )
 			break;
 
 		  case 'R':
-			if( srm_ftype_unknown == (
-				opt_rtype = srm_ftype_from_string( optarg)) ){
+			if( srmio_ftype_unknown == (
+				opt_rtype = srmio_ftype_from_string( optarg)) ){
 
 				fprintf( stderr, "invalid read file type: %s\n", optarg );
 				++needhelp;
@@ -202,8 +202,8 @@ int main( int argc, char **argv )
 			break;
 
 		  case 'W':
-			if( srm_ftype_unknown == (
-				opt_wtype = srm_ftype_from_string( optarg)) ){
+			if( srmio_ftype_unknown == (
+				opt_wtype = srmio_ftype_from_string( optarg)) ){
 
 				fprintf( stderr, "invalid write file type: %s\n", optarg );
 				++needhelp;
@@ -242,24 +242,24 @@ int main( int argc, char **argv )
 
 
 	if( opt_read ){
-		srm_data_t srmdata;
+		srmio_data_t srmdata;
 
-		if( NULL == (srmdata = srm_data_read_ftype( opt_rtype, fname ))){
-			fprintf( stderr, "srm_data_read(%s) failed: %s\n",
+		if( NULL == (srmdata = srmio_file_ftype_read( opt_rtype, fname ))){
+			fprintf( stderr, "srmio_file_read(%s) failed: %s\n",
 				fname, strerror(errno) );
 			return 1;
 		}
 
 		if( opt_fixup ){
-			srm_data_t fixed;
+			srmio_data_t fixed;
 
-			if( NULL == ( fixed = srm_data_fixup( srmdata ) )){
-				fprintf( stderr, "srm_data_fixup failed: %s\n",
+			if( NULL == ( fixed = srmio_data_fixup( srmdata ) )){
+				fprintf( stderr, "srmio_data_fixup failed: %s\n",
 					strerror(errno));
 				return -1;
 			}
 
-			srm_data_free( srmdata );
+			srmio_data_free( srmdata );
 			srmdata = fixed;
 		}
 
@@ -278,7 +278,7 @@ int main( int argc, char **argv )
 				return 1;
 			}
 			printf( "%.0f\n",
-				(double)srm_data_time_start(srmdata) / 10 );
+				(double)srmio_data_time_start(srmdata) / 10 );
 
 
 		} else if( opt_write ){
@@ -286,8 +286,8 @@ int main( int argc, char **argv )
 				fprintf( stderr, "no data available\n" );
 				return 1;
 			}
-			if( 0 > srm_data_write_ftype( srmdata, opt_wtype, opt_write ) ){
-				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
+			if( 0 > srmio_file_ftype_write( srmdata, opt_wtype, opt_write ) ){
+				fprintf( stderr, "srmio_file_write(%s) failed: %s\n",
 					opt_write, strerror(errno) );
 				return 1;
 			}
@@ -296,15 +296,15 @@ int main( int argc, char **argv )
 			csvdump( srmdata );
 		}
 
-		srm_data_free(srmdata);
+		srmio_data_free(srmdata);
 
 		return 0;
 	}
 
-	if( NULL == (srm = srmpc_open( fname, opt_force,
+	if( NULL == (srm = srmio_pc_open( fname, opt_force,
 		opt_verb ? logfunc : NULL  ))){
 
-		fprintf( stderr, "srmpc_open(%s) failed: %s\n",
+		fprintf( stderr, "srmio_pc_open(%s) failed: %s\n",
 			fname, strerror(errno) );
 		return 1;
 	}
@@ -312,19 +312,19 @@ int main( int argc, char **argv )
 	if( opt_name ){
 		char *name;
 
-		if( NULL == (name = srmpc_get_athlete( srm ))){
-			perror("srmpc_get_athlete failed");
+		if( NULL == (name = srmio_pc_get_athlete( srm ))){
+			perror("srmio_pc_get_athlete failed");
 			return 1;
 		}
 		printf( "%s\n", name );
 		free( name );
 
 	} else if( opt_get || opt_date ){
-		srm_data_t srmdata;
+		srmio_data_t srmdata;
 
 		/* get new/all chunks */
-		if( NULL == (srmdata = srmpc_get_data( srm, opt_all, opt_fixup ))){
-			perror( "srmpc_get_data failed" );
+		if( NULL == (srmdata = srmio_pc_get_data( srm, opt_all, opt_fixup ))){
+			perror( "srmio_pc_get_data failed" );
 			return 1;
 		}
 
@@ -334,15 +334,15 @@ int main( int argc, char **argv )
 				return 1;
 			}
 			printf( "%.0f\n",
-				(double)srm_data_time_start(srmdata) / 10 );
+				(double)srmio_data_time_start(srmdata) / 10 );
 
 		} else if( opt_write ){
 			if( ! srmdata->cused ){
 				fprintf( stderr, "no data available\n" );
 				return 1;
 			}
-			if( 0 > srm_data_write_ftype( srmdata, opt_wtype, opt_write ) ){
-				fprintf( stderr, "srm_data_write(%s) failed: %s\n",
+			if( 0 > srmio_file_ftype_write( srmdata, opt_wtype, opt_write ) ){
+				fprintf( stderr, "srmio_file_write(%s) failed: %s\n",
 					opt_write, strerror(errno) );
 				return 1;
 			}
@@ -350,20 +350,20 @@ int main( int argc, char **argv )
 		} else {
 			csvdump( srmdata );
 		}
-		srm_data_free( srmdata );
+		srmio_data_free( srmdata );
 
 	}
 
 	if( opt_clear ){
-		if( 0 > srmpc_clear_chunks( srm ) ){
-			perror( "srmpc_clear_chunks failed" );
+		if( 0 > srmio_pc_clear_chunks( srm ) ){
+			perror( "srmio_pc_clear_chunks failed" );
 			return 1;
 		}
 	}
 
 	if( opt_int ){
-		if( 0 > srmpc_set_recint( srm, opt_int ) ){
-			perror( "srmpc_set_recint failed" );
+		if( 0 > srmio_pc_set_recint( srm, opt_int ) ){
+			perror( "srmio_pc_set_recint failed" );
 			return 1;
 		}
 	}
@@ -374,13 +374,13 @@ int main( int argc, char **argv )
 
 		time( &now );
 		nows = localtime( &now );
-		if( 0 > srmpc_set_time( srm, nows ) ){
-			perror( "srmpc_set_time failed" );
+		if( 0 > srmio_pc_set_time( srm, nows ) ){
+			perror( "srmio_pc_set_time failed" );
 			return 1;
 		}
 	}
 
-	srmpc_close( srm );
+	srmio_pc_close( srm );
 
 	return 0;
 }

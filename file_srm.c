@@ -11,7 +11,7 @@
 
 /* used for list of blocks within SRM files */
 struct _srm_block_t {
-	srm_time_t	daydelta;
+	srmio_time_t	daydelta;
 	unsigned	chunks;
 };
 
@@ -116,8 +116,8 @@ static inline int _setint32( unsigned char *buf, size_t pos, int64_t x )
 #define DAYS_EPOCH 719528u
 #define SRM2EPOCH (DAYS_EPOCH - DAYS_SRM)
 
-/* convert "days since 1880-01-01" to srm_time_t */
-static srm_time_t _srm_mktime( unsigned days )
+/* convert "days since 1880-01-01" to srmio_time_t */
+static srmio_time_t _srm_mktime( unsigned days )
 {
 	time_t ret;
 	struct tm t;
@@ -132,18 +132,18 @@ static srm_time_t _srm_mktime( unsigned days )
 		 * with misadjusted SRM clocks or other time glitches */
 		ERRMSG("date is before supported range" );
 		errno = ENOTSUP;
-		return (srm_time_t)-1;
+		return (srmio_time_t)-1;
 	}
 	t.tm_mday += days - SRM2EPOCH;
 
 	ret = mktime( &t );
 	if( ret == (time_t) -1 ){
 		ERRMSG("mktime failed: %s", strerror(errno));
-		return (srm_time_t)-1;
+		return (srmio_time_t)-1;
 	}
 
 	DPRINTF( "_srm_mktime %u days -> %lu", days, (unsigned long)ret );
-	return (srm_time_t)ret * 10;
+	return (srmio_time_t)ret * 10;
 }
 
 const unsigned cumul_days[12] = {
@@ -162,7 +162,7 @@ const unsigned cumul_days[12] = {
 };
 
 /* convert time_t into "days since 1880-01-01" */
-static unsigned _srm_mkdays( srm_time_t input )
+static unsigned _srm_mkdays( srmio_time_t input )
 {
 	time_t tstamp;
 	struct tm tm;
@@ -220,13 +220,13 @@ static unsigned _srm_mkdays( srm_time_t input )
 	return days;
 }
 
-typedef srm_chunk_t (*srm_data_read_cfunc)( const unsigned char *buf );
+typedef srmio_chunk_t (*srmio_file_read_cfunc)( const unsigned char *buf );
 
-static srm_chunk_t _srm_data_chunk_srm6( const unsigned char *buf )
+static srmio_chunk_t _srmio_data_chunk_srm6( const unsigned char *buf )
 {
-	srm_chunk_t ck;
+	srmio_chunk_t ck;
 
-	if( NULL == (ck = srm_chunk_new() ))
+	if( NULL == (ck = srmio_chunk_new() ))
 		return NULL;
 
 	ck->pwr = ( buf[1] & 0x0f)
@@ -240,11 +240,11 @@ static srm_chunk_t _srm_data_chunk_srm6( const unsigned char *buf )
 }
 
 
-static srm_chunk_t _srm_data_chunk_srm7( const unsigned char *buf )
+static srmio_chunk_t _srmio_data_chunk_srm7( const unsigned char *buf )
 {
-	srm_chunk_t ck;
+	srmio_chunk_t ck;
 
-	if( NULL == (ck = srm_chunk_new() ))
+	if( NULL == (ck = srmio_chunk_new() ))
 		return NULL;
 
 	ck->pwr = CINT16(buf, 0);
@@ -259,11 +259,11 @@ static srm_chunk_t _srm_data_chunk_srm7( const unsigned char *buf )
 
 /*
  * backwards compatibility wrapper
- * TODO: srm_data_read is obsolete, will go away
+ * TODO: srmio_file_read is obsolete, will go away
  */
-srm_data_t srm_data_read( const char *fname )
+srmio_data_t srmio_file_read( const char *fname )
 {
-	return srm_data_read_srm( fname );
+	return srmio_file_srm_read( fname );
 }
 
 /*
@@ -272,14 +272,14 @@ srm_data_t srm_data_read( const char *fname )
  * on success data pointer is returned.
  * returns NULL and sets errno on failure.
  */
-srm_data_t srm_data_read_srm( const char *fname )
+srmio_data_t srmio_file_srm_read( const char *fname )
 {
-	srm_data_t tmp;
+	srmio_data_t tmp;
 	int fd;
 	unsigned char buf[1024];
-	srm_time_t recint;
-	srm_time_t timerefday;
-	srm_data_read_cfunc cfunc = NULL;
+	srmio_time_t recint;
+	srmio_time_t timerefday;
+	srmio_file_read_cfunc cfunc = NULL;
 	unsigned chunklen;
 	unsigned mcmtlen;
 	unsigned bcnt;
@@ -288,8 +288,8 @@ srm_data_t srm_data_read_srm( const char *fname )
 	unsigned ckcnt;
 	unsigned i;
 
-	if( NULL == (tmp = srm_data_new())){
-		ERRMSG("srm_data_new failed: %s", strerror(errno));
+	if( NULL == (tmp = srmio_data_new())){
+		ERRMSG("srmio_data_new failed: %s", strerror(errno));
 		return NULL;
 	}
 
@@ -303,7 +303,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 
 	if( 0 > _xread( fd, buf, 86 ) )
 		goto clean2;
-	DUMPHEX( "srm_data_read head", buf, 86 );
+	DUMPHEX( "srmio_file_read head", buf, 86 );
 
 	if( 0 != strncmp( (char*)buf, "SRM", 3 )){
 		ERRMSG("unrecognized file format");
@@ -316,19 +316,19 @@ srm_data_t srm_data_read_srm( const char *fname )
 	  case '5':
 		mcmtlen = 3;
 		chunklen = 5;
-		cfunc = _srm_data_chunk_srm6;
+		cfunc = _srmio_data_chunk_srm6;
 		break;
 
 	  case '6':
 		mcmtlen = 255;
 		chunklen = 5;
-		cfunc = _srm_data_chunk_srm6;
+		cfunc = _srmio_data_chunk_srm6;
 		break;
 
 	  case '7':
 		mcmtlen = 255;
 		chunklen = 14;
-		cfunc = _srm_data_chunk_srm7;
+		cfunc = _srmio_data_chunk_srm7;
 		break;
 
 	  default:
@@ -337,12 +337,12 @@ srm_data_t srm_data_read_srm( const char *fname )
 		goto clean2;
 	}
 
-	if( (srm_time_t)-1 == (timerefday = _srm_mktime( CINT16(buf,4) )))
+	if( (srmio_time_t)-1 == (timerefday = _srm_mktime( CINT16(buf,4) )))
 		goto clean2;
 #ifdef DEBUG
 	{
 	time_t t = timerefday / 10;
-	DPRINTF( "srm_data_read timerefday %u %.1f %s",
+	DPRINTF( "srmio_file_read timerefday %u %.1f %s",
 		(unsigned)CINT16(buf,4),
 		(double)timerefday/10, ctime( &t));
 	}
@@ -352,7 +352,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 	recint = 10 * buf[8] / buf[9];
 	bcnt = CINT16(buf,10);
 	mcnt = CINT16(buf,12) +1;
-	DPRINTF( "srm_data_read bcnt=%u mcnt=%u,", bcnt, mcnt );
+	DPRINTF( "srmio_file_read bcnt=%u mcnt=%u,", bcnt, mcnt );
 
 	/* "notes" is preceeded by length + zero padded. Ignore length... */
 	if( NULL == (tmp->notes = malloc(71) )){
@@ -364,7 +364,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 	tmp->notes[70] = 0;
 
 	/* marker */
-	if( NULL == (tmp->marker = malloc( (mcnt +1) * sizeof(srm_marker_t *)))){
+	if( NULL == (tmp->marker = malloc( (mcnt +1) * sizeof(srmio_marker_t *)))){
 		ERRMSG("malloc failed: %s", strerror(errno));
 		goto clean2;
 	}
@@ -372,14 +372,14 @@ srm_data_t srm_data_read_srm( const char *fname )
 	tmp->mavail = mcnt;
 
 	for( ; tmp->mused < mcnt; ++tmp->mused ){
-		srm_marker_t tm;
+		srmio_marker_t tm;
 
 		if( 0 > _xread( fd, buf, mcmtlen + 15 ))
 			goto clean2;
-		DUMPHEX( "srm_data_read marker", buf, mcmtlen + 15 );
+		DUMPHEX( "srmio_file_read marker", buf, mcmtlen + 15 );
 
-		if( NULL == (tm = srm_marker_new())){
-			ERRMSG("srm_marker_new failed: %s", strerror(errno));
+		if( NULL == (tm = srmio_marker_new())){
+			ERRMSG("srmio_marker_new failed: %s", strerror(errno));
 			goto clean2;
 		}
 
@@ -397,7 +397,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 		memcpy( tm->notes, (char*)buf, mcmtlen );
 		tm->notes[mcmtlen] = 0;
 
-		DPRINTF( "srm_data_read marker %u %u %s",
+		DPRINTF( "srmio_file_read marker %u %u %s",
 			tm->first,
 			tm->last,
 			tm->notes );
@@ -415,7 +415,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 
 		if( 0 > _xread( fd, buf, 6 ))
 			goto clean3;
-		DUMPHEX( "srm_data_read block", buf, 6 );
+		DUMPHEX( "srmio_file_read block", buf, 6 );
 
 		if( NULL == (tb = malloc(sizeof(struct _srm_block_t)))){
 			ERRMSG("malloc failed: %s", strerror(errno));
@@ -431,7 +431,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 #ifdef DEBUG
 		{
 		time_t t = (timerefday + tb->daydelta) / 10;
-		DPRINTF( "srm_data_read block %.1f %u %s",
+		DPRINTF( "srmio_file_read block %.1f %u %s",
 			(double)tb->daydelta/10,
 			tb->chunks,
 			ctime( &t) );
@@ -443,12 +443,12 @@ srm_data_t srm_data_read_srm( const char *fname )
 	/* calibration */
 	if( 0 > _xread( fd, buf, 7 ))
 		goto clean3;
-	DUMPHEX( "srm_data_read calibration", buf, 7 );
+	DUMPHEX( "srmio_file_read calibration", buf, 7 );
 
 	tmp->zeropos = CINT16(buf, 0);
 	tmp->slope = (double)(CINT16(buf, 2) * 140) / 42781;
 	ckcnt = CINT16(buf, 4);
-	DPRINTF( "srm_data_read cal zpos=%d slope=%.1f, chunks=%u",
+	DPRINTF( "srmio_file_read cal zpos=%d slope=%.1f, chunks=%u",
 		tmp->zeropos, tmp->slope, ckcnt );
 
 	/* synthesize block for SRM5 files */
@@ -469,7 +469,7 @@ srm_data_t srm_data_read_srm( const char *fname )
 		unsigned ci;
 
 		for( ci = 0; ci < blocks[i]->chunks; ++ci ){
-			srm_chunk_t ck;
+			srmio_chunk_t ck;
 
 			if( 0 > _xread( fd, buf, chunklen )){
 				// TODO: log( "failed to read all chunks" );
@@ -488,12 +488,12 @@ srm_data_t srm_data_read_srm( const char *fname )
 				ci * recint;
 			ck->dur = recint;
 			if( ck->time < timerefday ){
-				ERRMSG("srm_data_read: timespan too large");
+				ERRMSG("srmio_file_read: timespan too large");
 				errno = EOVERFLOW;
 				goto clean3;
 			}
 
-			if( 0 > srm_data_add_chunkp( tmp, ck ) ){
+			if( 0 > srmio_data_add_chunkp( tmp, ck ) ){
 				ERRMSG("add chunk failed: %s", strerror(errno));
 				goto clean3;
 			}
@@ -512,7 +512,7 @@ clean4:
 	/* premature end of file, fix marker */
 	ckcnt = tmp->cused -1;
 	for( i = 0; i < tmp->mused; ++i ){
-		srm_marker_t mk = tmp->marker[i];
+		srmio_marker_t mk = tmp->marker[i];
 
 		if( mk->first > ckcnt )
 			mk->first = ckcnt;
@@ -532,7 +532,7 @@ clean2:
 	close(fd);
 
 clean1:
-	srm_data_free(tmp);
+	srmio_data_free(tmp);
 	return NULL;
 }
 
@@ -556,18 +556,18 @@ static int _xwrite( int fd, unsigned char *buf, size_t len )
 	return ret;
 }
 
-/* TODO: srm_data_write_srm6 */
+/* TODO: srmio_file_srm6_write */
 
 /*
  * write contents of data structure into specified file
  */
-int srm_data_write_srm7( srm_data_t data, const char *fname )
+int srmio_file_srm7_write( srmio_data_t data, const char *fname )
 {
 	unsigned char buf[1024];
 	int fd;
-	srm_marker_t *blocks;
-	srm_time_t timerefday;
-	srm_time_t recint;
+	srmio_marker_t *blocks;
+	srmio_time_t timerefday;
+	srmio_time_t recint;
 	unsigned i;
 
 	if( ! data ){
@@ -594,19 +594,19 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		return -1;
 	}
 
-	if( 0 == ( recint = srm_data_recint( data ) )){
+	if( 0 == ( recint = srmio_data_recint( data ) )){
 		ERRMSG( "cannot identify recint" );
 		errno = EINVAL;
 		return -1;
 	}
 
-	if( NULL == (blocks = srm_data_blocks( data )))
+	if( NULL == (blocks = srmio_data_blocks( data )))
 		return -1;
 
 	/* header */
 	{
-		srm_chunk_t *ck;
-		srm_time_t mintime = -1;
+		srmio_chunk_t *ck;
+		srmio_time_t mintime = -1;
 		unsigned long bcnt;
 		unsigned mcnt = data->mused -1;
 		unsigned days;
@@ -622,10 +622,10 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 		if( (unsigned)-1 == ( days = _srm_mkdays( mintime )))
 			goto clean1;
-		if( (srm_time_t)-1 == (timerefday = _srm_mktime( days  )))
+		if( (srmio_time_t)-1 == (timerefday = _srm_mktime( days  )))
 			goto clean1;
 
-		DPRINTF( "srm_data_write mcnt=%u bcnt=%lu "
+		DPRINTF( "srmio_file_write mcnt=%u bcnt=%lu "
 			"mintime=%.1f "
 			"days=%u timerefday=%.1f "
 			"'%s'",
@@ -637,7 +637,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 			data->notes );
 
 		if( timerefday > mintime ){
-			ERRMSG("srm_data_write: failed to determin time reference" );
+			ERRMSG("srmio_file_write: failed to determin time reference" );
 			errno = EOVERFLOW;
 			goto clean1;
 		}
@@ -691,7 +691,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 	/* marker */
 	for( i = 0; i < data->mused; ++i ){
-		srm_marker_t mk = data->marker[i];
+		srmio_marker_t mk = data->marker[i];
 		unsigned first = mk->first+1;
 		unsigned last = mk->last+1;
 
@@ -708,7 +708,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		}
 		memset( &buf[260], 0, 10 );
 
-		DPRINTF( "srm_data_write marker @%x %u %u %s",
+		DPRINTF( "srmio_file_write marker @%x %u %u %s",
 			(int)lseek( fd, 0, SEEK_CUR),
 			first,
 			last,
@@ -720,23 +720,23 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 	/* blocks */
 	for( i = 0; blocks[i]; ++i ){
-		srm_marker_t bk = blocks[i];
-		srm_chunk_t ck = data->chunks[bk->first];
+		srmio_marker_t bk = blocks[i];
+		srmio_chunk_t ck = data->chunks[bk->first];
 		unsigned blockdelta;
 		unsigned len = bk->last - bk->first +1;
 
 		blockdelta = ck->time - timerefday;
 		if( blockdelta * 10 < blockdelta ){
 			int j;
-			ERRMSG("srm_data_write_srm7: "
+			ERRMSG("srmio_file_srm7_write: "
 				"block %u ref=%.1f: "
 				"timespan %u too large",
 				i,
 				(double)timerefday/10,
 				blockdelta );
 			for( j = 0; blocks[j]; ++j ){
-				srm_marker_t b = blocks[j];
-				srm_chunk_t c = data->chunks[b->first];
+				srmio_marker_t b = blocks[j];
+				srmio_chunk_t c = data->chunks[b->first];
 				unsigned l = b->last - b->first +1;
 
 				ERRMSG(" block %d: time=%.1f len=%u",
@@ -748,7 +748,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 		}
 		blockdelta *= 10;
 
-		DPRINTF( "srm_data_write block @%x %.1f %u",
+		DPRINTF( "srmio_file_write block @%x %.1f %u",
 			(int)lseek( fd, 0, SEEK_CUR),
 			(double)ck->time/10,
 			blockdelta );
@@ -767,7 +767,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 
 	/* calibration */
-	DPRINTF( "srm_data_write cal @%x",
+	DPRINTF( "srmio_file_write cal @%x",
 		(int)lseek( fd, 0, SEEK_CUR) );
 	{
 		unsigned slope = 0.5 + ( data->slope * 42781) / 140;
@@ -793,19 +793,19 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 
 
 	/* data */
-	DPRINTF( "srm_data_write data @%x",
+	DPRINTF( "srmio_file_write data @%x",
 		(int)lseek( fd, 0, SEEK_CUR) );
 	for( i = 0; blocks[i]; ++i ){
-		srm_marker_t bk = blocks[i];
+		srmio_marker_t bk = blocks[i];
 		unsigned ci;
 
-		DPRINTF( "srm_data_write block#%u from %u to %u",
+		DPRINTF( "srmio_file_write block#%u from %u to %u",
 			i,
 			bk->first,
 			bk->last );
 
 		for( ci = bk->first; ci <= bk->last; ++ci ){
-			srm_chunk_t ck = data->chunks[ci];
+			srmio_chunk_t ck = data->chunks[ci];
 			unsigned speed = 0.5 + ( ck->speed * 1000) / 3.6;
 			int temp = 0.5 + ck->temp * 10;
 
@@ -838,7 +838,7 @@ int srm_data_write_srm7( srm_data_t data, const char *fname )
 				goto clean2;
 		}
 
-		srm_marker_free(blocks[i]);
+		srmio_marker_free(blocks[i]);
 	}
 	free( blocks );
 

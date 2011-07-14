@@ -12,7 +12,7 @@
 /*
  * local lists for mapping file types
  */
-static const char *type_names[srm_ftype_max] = {
+static const char *type_names[srmio_ftype_max] = {
 	NULL,
 	"srm5",
 	"srm6",
@@ -20,42 +20,42 @@ static const char *type_names[srm_ftype_max] = {
 	"wkt",
 };
 
-static srm_data_t (*rfunc[srm_ftype_max])( const char *fname) = {
+static srmio_data_t (*rfunc[srmio_ftype_max])( const char *fname) = {
 	NULL,
-	srm_data_read_srm,
-	srm_data_read_srm,
-	srm_data_read_srm,
-	NULL, /* TODO: srm_data_read_wkt, */
+	srmio_file_srm_read,
+	srmio_file_srm_read,
+	srmio_file_srm_read,
+	NULL, /* TODO: srmio_file_wkt_read, */
 };
 
-static int (*wfunc[srm_ftype_max])(srm_data_t data, const char *fname) = {
+static int (*wfunc[srmio_ftype_max])(srmio_data_t data, const char *fname) = {
 	NULL,
-	NULL, /* TODO: srm_data_write_srm5 */
-	NULL, /* TODO: srm_data_write_srm6 */
-	srm_data_write_srm7,
-	srm_data_write_wkt,
+	NULL, /* TODO: srmio_file_srm5_write */
+	NULL, /* TODO: srmio_file_srm6_write */
+	srmio_file_srm7_write,
+	srmio_file_wkt_write,
 };
 
 /*
  * return numeric file type from textual name
  */
-srm_ftype_t srm_ftype_from_string( const char *type )
+srmio_ftype_t srmio_ftype_from_string( const char *type )
 {
-	srm_ftype_t i;
+	srmio_ftype_t i;
 
-	for( i = srm_ftype_unknown +1; i < srm_ftype_max; ++i ){
+	for( i = srmio_ftype_unknown +1; i < srmio_ftype_max; ++i ){
 		if( strcmp(type, type_names[i] ) == 0 ){
 			return i;
 		}
 	}
 
-	return srm_ftype_unknown;
+	return srmio_ftype_unknown;
 }
 
 /*
  * read file of specified type
  */
-srm_data_t srm_data_read_ftype( srm_ftype_t ftype, const char *fname )
+srmio_data_t srmio_file_ftype_read( srmio_ftype_t ftype, const char *fname )
 {
 	if( rfunc[ftype] == NULL ){
 		ERRMSG("reading %s files is not supported",
@@ -70,7 +70,7 @@ srm_data_t srm_data_read_ftype( srm_ftype_t ftype, const char *fname )
 /*
  * write file of specified type
  */
-int srm_data_write_ftype( srm_data_t data, srm_ftype_t ftype, const char *fname )
+int srmio_file_ftype_write( srmio_data_t data, srmio_ftype_t ftype, const char *fname )
 {
 	if( wfunc[ftype] == NULL ){
 		ERRMSG("writing %s files is not supported",

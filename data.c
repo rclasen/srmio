@@ -37,14 +37,14 @@ void DUMPHEX( const char *prefix, const unsigned char *buf, size_t blen )
  * on success pointer is returned
  * returns NULL on error and sets errno.
  */
-srm_chunk_t srm_chunk_new( void )
+srmio_chunk_t srmio_chunk_new( void )
 {
-	srm_chunk_t tmp;
+	srmio_chunk_t tmp;
 
-	if( NULL == (tmp = malloc( sizeof(struct _srm_chunk_t)) ))
+	if( NULL == (tmp = malloc( sizeof(struct _srmio_chunk_t)) ))
 		return NULL;
 
-	memset( tmp, 0, sizeof(struct _srm_chunk_t));
+	memset( tmp, 0, sizeof(struct _srmio_chunk_t));
 	return tmp;
 }
 
@@ -54,21 +54,21 @@ srm_chunk_t srm_chunk_new( void )
  * on success pointer is returned
  * returns NULL on error and sets errno.
  */
-srm_chunk_t srm_chunk_clone( srm_chunk_t chunk )
+srmio_chunk_t srmio_chunk_clone( srmio_chunk_t chunk )
 {
-	srm_chunk_t tmp;
+	srmio_chunk_t tmp;
 
-	if( NULL == (tmp = malloc( sizeof(struct _srm_chunk_t)) ))
+	if( NULL == (tmp = malloc( sizeof(struct _srmio_chunk_t)) ))
 		return NULL;
 
-	memcpy( tmp, chunk, sizeof(struct _srm_chunk_t));
+	memcpy( tmp, chunk, sizeof(struct _srmio_chunk_t));
 	return tmp;
 }
 
 /*
  * free chunk memory
  */
-void srm_chunk_free( srm_chunk_t chunk )
+void srmio_chunk_free( srmio_chunk_t chunk )
 {
 	free( chunk );
 }
@@ -83,14 +83,14 @@ void srm_chunk_free( srm_chunk_t chunk )
  * on success pointer is returned
  * returns NULL on error and sets errno.
  */
-srm_marker_t srm_marker_new( void )
+srmio_marker_t srmio_marker_new( void )
 {
-	srm_marker_t tmp;
+	srmio_marker_t tmp;
 
-	if( NULL == (tmp = malloc( sizeof(struct _srm_marker_t)) ))
+	if( NULL == (tmp = malloc( sizeof(struct _srmio_marker_t)) ))
 		return NULL;
 
-	memset( tmp, 0, sizeof(struct _srm_marker_t));
+	memset( tmp, 0, sizeof(struct _srmio_marker_t));
 	return tmp;
 }
 
@@ -101,11 +101,11 @@ srm_marker_t srm_marker_new( void )
  * on success pointer is returned
  * returns NULL on error and sets errno.
  */
-srm_marker_t srm_marker_clone( srm_marker_t marker )
+srmio_marker_t srmio_marker_clone( srmio_marker_t marker )
 {
-	srm_marker_t tmp;
+	srmio_marker_t tmp;
 
-	if( NULL == (tmp = srm_marker_new()))
+	if( NULL == (tmp = srmio_marker_new()))
 		return NULL;
 
 	tmp->first = marker->first;
@@ -117,7 +117,7 @@ srm_marker_t srm_marker_clone( srm_marker_t marker )
 	return tmp;
 
 clean1:
-	srm_marker_free( tmp );
+	srmio_marker_free( tmp );
 	return NULL;
 }
 
@@ -125,7 +125,7 @@ clean1:
 /*
  * free marker memory
  */
-void srm_marker_free( srm_marker_t block )
+void srmio_marker_free( srmio_marker_t block )
 {
 	if( ! block )
 		return;
@@ -144,19 +144,19 @@ void srm_marker_free( srm_marker_t block )
  * on success pointer is returned
  * returns NULL on error and sets errno.
  */
-srm_data_t srm_data_new( void )
+srmio_data_t srmio_data_new( void )
 {
-	srm_data_t data;
+	srmio_data_t data;
 
-	if( NULL == (data = malloc( sizeof( struct _srm_data_t) )) )
+	if( NULL == (data = malloc( sizeof( struct _srmio_data_t) )) )
 		return NULL;
-	memset( data, 0, sizeof(struct _srm_data_t));
+	memset( data, 0, sizeof(struct _srmio_data_t));
 
-	if( NULL == (data->chunks = malloc(sizeof(srm_chunk_t *))))
+	if( NULL == (data->chunks = malloc(sizeof(srmio_chunk_t *))))
 		goto clean1;
 	*data->chunks = NULL;
 
-	if( NULL == (data->marker = malloc(sizeof(srm_marker_t *))))
+	if( NULL == (data->marker = malloc(sizeof(srmio_marker_t *))))
 		goto clean2;
 	*data->marker = NULL;
 
@@ -178,16 +178,16 @@ clean1:
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
+int srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk )
 {
-	srm_chunk_t last = data->chunks[data->cused-1];
-	srm_time_t recint = chunk->dur;
-	srm_time_t lnext = last->time + recint;
+	srmio_chunk_t last = data->chunks[data->cused-1];
+	srmio_time_t recint = chunk->dur;
+	srmio_time_t lnext = last->time + recint;
 	unsigned miss;
 	unsigned i;
 
 	if( chunk->time < lnext ){
-		ERRMSG( "srm_data_add_fillp: data is overlapping, can't add" );
+		ERRMSG( "srmio_data_add_fillp: data is overlapping, can't add" );
 		errno = EINVAL;
 		return -1;
 	}
@@ -198,7 +198,7 @@ int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
 
 	/* ... adjust current time to fit n*recint */
 	if( chunk->time != lnext ){
-		DPRINTF("srm_data_add_fill: adjusting gap %.1f -> %.1f",
+		DPRINTF("srmio_data_add_fill: adjusting gap %.1f -> %.1f",
 			(double)chunk->time / 10,
 			(double)lnext / 10);
 		chunk->time = lnext;
@@ -207,12 +207,12 @@ int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
 	if( ! miss )
 		return 0;
 
-	DPRINTF( "srm_data_add_fill: synthesizing %d chunks @%.1f",
+	DPRINTF( "srmio_data_add_fill: synthesizing %d chunks @%.1f",
 		miss, (double)lnext / 10 );
 
 	/* ... adjust marker indices */
 	for( i=0; i < data->mused; ++i ){
-		srm_marker_t mark = data->marker[i];
+		srmio_marker_t mark = data->marker[i];
 
 		if( mark->first >= data->cused )
 			mark->first += miss;
@@ -223,10 +223,10 @@ int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
 
 	/* ... insert averaged data */
 	for( i = 1; i <= miss; ++i ){
-		srm_chunk_t fill;
+		srmio_chunk_t fill;
 		double part = (double)i / (miss +1 );
 
-		if( NULL == (fill = srm_chunk_new() ))
+		if( NULL == (fill = srmio_chunk_new() ))
 			return -1;
 
 		fill->time = last->time + (i * recint);
@@ -244,13 +244,13 @@ int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
 		fill->ele = part * (chunk->ele - last->ele)
 			+ last->ele + 0.5;
 
-		if( 0 > srm_data_add_chunkp( data, fill ) ){
-			srm_chunk_free(fill);
+		if( 0 > srmio_data_add_chunkp( data, fill ) ){
+			srmio_chunk_free(fill);
 			return -1;
 		}
 	}
 
-	if( 0 > srm_data_add_chunkp( data, chunk ) )
+	if( 0 > srmio_data_add_chunkp( data, chunk ) )
 		return -1;
 
 	return 0;
@@ -261,21 +261,21 @@ int srm_data_add_fillp( srm_data_t data, srm_chunk_t chunk )
  * fix small time leaps at block boundaries
  * fix timestamps of overlapping chunks
  * fill small gaps with averaged data
- * fixed data is copied to a new srm_data_t handle
+ * fixed data is copied to a new srmio_data_t handle
  *
- * returns pointer to newly allocated srm_data
+ * returns pointer to newly allocated srmio_data
  * returns NULL on failure
  */
-srm_data_t srm_data_fixup( srm_data_t data )
+srmio_data_t srmio_data_fixup( srmio_data_t data )
 {
-	srm_data_t fixed;
-	srm_time_t delta = 0;
+	srmio_data_t fixed;
+	srmio_time_t delta = 0;
 	unsigned c, m;
 
 	if( data->cused < 1 )
 		return NULL;
 
-	if( NULL == (fixed = srm_data_new() ))
+	if( NULL == (fixed = srmio_data_new() ))
 		return NULL;
 
 	/* copy global data */
@@ -287,27 +287,27 @@ srm_data_t srm_data_fixup( srm_data_t data )
 
 	/* copy marker */
 	for( m=0; m < data->mused; ++m ){
-		srm_marker_t mark;
+		srmio_marker_t mark;
 
-		if( NULL == ( mark = srm_marker_clone( data->marker[m]) ) )
+		if( NULL == ( mark = srmio_marker_clone( data->marker[m]) ) )
 			goto clean1;
 
-		if( 0 > srm_data_add_markerp( fixed, mark ) )
+		if( 0 > srmio_data_add_markerp( fixed, mark ) )
 			goto clean1;
 	}
 
 	/* copy chunks + fix smaller gaps/overlaps */
 
-	if( 0 > srm_data_add_chunk( fixed, data->chunks[0] ) )
+	if( 0 > srmio_data_add_chunk( fixed, data->chunks[0] ) )
 		goto clean1;
 
 	for( c=1; c < data->cused; ++c ){
-		srm_chunk_t last = fixed->chunks[fixed->cused-1];
-		srm_chunk_t this;
-		srm_time_t recint;
-		srm_time_t lnext;
+		srmio_chunk_t last = fixed->chunks[fixed->cused-1];
+		srmio_chunk_t this;
+		srmio_time_t recint;
+		srmio_time_t lnext;
 
-		if( NULL == ( this = srm_chunk_clone( data->chunks[c] )))
+		if( NULL == ( this = srmio_chunk_clone( data->chunks[c] )))
 			goto clean1;
 
 		recint = this->dur;
@@ -317,24 +317,24 @@ srm_data_t srm_data_fixup( srm_data_t data )
 		if( this->time < lnext
 			&& lnext - last->time < 10 ){
 
-			DPRINTF("srm_data_fixup: adjusting overlap %.1f -> %.1f",
+			DPRINTF("srmio_data_fixup: adjusting overlap %.1f -> %.1f",
 				(double)this->time / 10,
 				(double)lnext / 10);
 			this->time = lnext;
 
-			if( 0 > srm_data_add_chunkp( fixed, this ) )
+			if( 0 > srmio_data_add_chunkp( fixed, this ) )
 				goto clean1;
 
 		/* small gap > recint ... fill/shift  */
 		} else if( lnext < this->time
 			&& this->time - lnext <= 2*recint ){
 
-			if( 0 > srm_data_add_fillp( fixed, this ))
+			if( 0 > srmio_data_add_fillp( fixed, this ))
 				goto clean1;
 
 		/* nothing to fix (yet) */
 		} else {
-			if( 0 > srm_data_add_chunkp( fixed, this ) )
+			if( 0 > srmio_data_add_chunkp( fixed, this ) )
 				goto clean1;
 
 		}
@@ -343,14 +343,14 @@ srm_data_t srm_data_fixup( srm_data_t data )
 
 	/* fix "severe" overlaping */
 	for( c = fixed->cused -1; c > 0; --c ){
-		srm_chunk_t this = fixed->chunks[c-1];
-		srm_chunk_t next = fixed->chunks[c];
-		srm_time_t recint = next->dur;
-		srm_time_t nprev = next->time - recint - delta;
+		srmio_chunk_t this = fixed->chunks[c-1];
+		srmio_chunk_t next = fixed->chunks[c];
+		srmio_time_t recint = next->dur;
+		srmio_time_t nprev = next->time - recint - delta;
 
 		if( nprev < this->time ){
 			delta += this->time - nprev;
-			DPRINTF( "srm_data_fixup overlaping blocks @%d, "
+			DPRINTF( "srmio_data_fixup overlaping blocks @%d, "
 				"new delta: %.1f",
 				c,
 				(double)delta/10 );
@@ -361,7 +361,7 @@ srm_data_t srm_data_fixup( srm_data_t data )
 	return fixed;
 
 clean1:
-	srm_data_free( fixed );
+	srmio_data_free( fixed );
 	return NULL;
 }
 
@@ -373,9 +373,9 @@ clean1:
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
+int srmio_data_add_chunkp( srmio_data_t data, srmio_chunk_t chunk )
 {
-	DPRINTF( "srm_data_add_chunk %u:"
+	DPRINTF( "srmio_data_add_chunk %u:"
 		"time=%.1f, "
 		"temp=%.1f, "
 		"pwr=%u, "
@@ -391,7 +391,7 @@ int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
 		chunk->hr );
 
 	if( data->cused >= data->cavail ){
-		srm_chunk_t *tmp;
+		srmio_chunk_t *tmp;
 
 		if( data->cavail > UINT_MAX - 1001 ){
 			ERRMSG("too many chunks");
@@ -400,7 +400,7 @@ int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
 		}
 
 		if( NULL == (tmp = realloc( data->chunks,
-			(data->cavail + 1001) * sizeof(srm_chunk_t))))
+			(data->cavail + 1001) * sizeof(srmio_chunk_t))))
 			return -1;
 
 		data->cavail += 1000;
@@ -419,13 +419,13 @@ int srm_data_add_chunkp( srm_data_t data, srm_chunk_t chunk )
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-int srm_data_add_chunk( srm_data_t data, srm_chunk_t chunk )
+int srmio_data_add_chunk( srmio_data_t data, srmio_chunk_t chunk )
 {
-	srm_chunk_t nc;
+	srmio_chunk_t nc;
 
-	if( NULL == (nc = srm_chunk_clone(chunk)))
+	if( NULL == (nc = srmio_chunk_clone(chunk)))
 		return -1;
-	return srm_data_add_chunkp( data, nc );
+	return srmio_data_add_chunkp( data, nc );
 }
 
 /*
@@ -435,10 +435,10 @@ int srm_data_add_chunk( srm_data_t data, srm_chunk_t chunk )
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-int srm_data_add_markerp( srm_data_t data, srm_marker_t mk )
+int srmio_data_add_markerp( srmio_data_t data, srmio_marker_t mk )
 {
 	if( data->mused >= data->mavail ){
-		srm_marker_t *tmp;
+		srmio_marker_t *tmp;
 
 		if( data->mavail > UINT_MAX - 11 ){
 			ERRMSG("too many marker");
@@ -447,7 +447,7 @@ int srm_data_add_markerp( srm_data_t data, srm_marker_t mk )
 		}
 
 		if( NULL == (tmp = realloc( data->marker,
-			(data->mavail + 11) * sizeof(srm_marker_t))))
+			(data->mavail + 11) * sizeof(srmio_marker_t))))
 			return -1;
 
 		data->mavail += 10;
@@ -471,11 +471,11 @@ int srm_data_add_markerp( srm_data_t data, srm_marker_t mk )
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-int srm_data_add_marker( srm_data_t data, unsigned first, unsigned last )
+int srmio_data_add_marker( srmio_data_t data, unsigned first, unsigned last )
 {
-	srm_marker_t mk;
+	srmio_marker_t mk;
 
-	DPRINTF( "srm_data_add_marker: %u to %u",
+	DPRINTF( "srmio_data_add_marker: %u to %u",
 		first,
 		last );
 
@@ -485,12 +485,12 @@ int srm_data_add_marker( srm_data_t data, unsigned first, unsigned last )
 		return -1;
 	}
 
-	if( NULL == (mk = srm_marker_new() ))
+	if( NULL == (mk = srmio_marker_new() ))
 		return -1;
 	mk->first = first;
 	mk->last = last;
 
-	if( 0 > srm_data_add_markerp( data, mk ) )
+	if( 0 > srmio_data_add_markerp( data, mk ) )
 		goto clean1;
 
 	return 0;
@@ -504,10 +504,10 @@ clean1:
 /*
  * return start time of first chunk
  */
-srm_time_t srm_data_time_start( srm_data_t data )
+srmio_time_t srmio_data_time_start( srmio_data_t data )
 {
 	if( data->cused < 1 )
-		return (srm_time_t) -1;
+		return (srmio_time_t) -1;
 
 	return data->chunks[0]->time;
 }
@@ -516,7 +516,7 @@ srm_time_t srm_data_time_start( srm_data_t data )
 /*
  * return common recording interval
  */
-srm_time_t srm_data_recint( srm_data_t data )
+srmio_time_t srmio_data_recint( srmio_data_t data )
 {
 	if( ! data->cused )
 		return 0;
@@ -535,9 +535,9 @@ srm_time_t srm_data_recint( srm_data_t data )
  * on success pointer to list is returned
  * returns NULL on error and sets errno.
  */
-srm_marker_t *srm_data_blocks( srm_data_t data )
+srmio_marker_t *srmio_data_blocks( srmio_data_t data )
 {
-	srm_marker_t *blocks;
+	srmio_marker_t *blocks;
 	unsigned avail = 10;
 	unsigned used = 1;
 	unsigned i;
@@ -548,23 +548,23 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 		return NULL;
 	}
 
-	if( NULL == (blocks = malloc( (1+ avail) * (sizeof(srm_marker_t)))))
+	if( NULL == (blocks = malloc( (1+ avail) * (sizeof(srmio_marker_t)))))
 		return NULL;
 
-	if( NULL == (*blocks = srm_marker_new()))
+	if( NULL == (*blocks = srmio_marker_new()))
 		goto clean1;
 	blocks[0]->first = 0;
 	blocks[0]->last = data->cused -1;
 	blocks[1] = NULL;
 
 	for( i=1; i < data->cused; ++i ){
-		srm_chunk_t prev = data->chunks[i-1];
-		srm_chunk_t this = data->chunks[i];
+		srmio_chunk_t prev = data->chunks[i-1];
+		srmio_chunk_t this = data->chunks[i];
 
 		if( prev->time + this->dur != this->time ){
 
 			if( used >= avail ){
-				srm_marker_t *tmp;
+				srmio_marker_t *tmp;
 				unsigned ns = avail + 10;
 
 				if( ns < avail ){
@@ -574,7 +574,7 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 				}
 
 				if( NULL == (tmp = realloc(blocks, (1+ ns)
-					* (sizeof(srm_marker_t)) )))
+					* (sizeof(srmio_marker_t)) )))
 
 					goto clean2;
 
@@ -582,14 +582,14 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 				avail = ns;
 			}
 
-			DPRINTF("srm_data_blocks found gap @%u "
+			DPRINTF("srmio_data_blocks found gap @%u "
 				"%.1f - %.1f = %.1f",
 				i,
 				(double)prev->time/10,
 				(double)this->time/10,
 				(double)(this->time - prev->time)/10);
 
-			if( NULL == (blocks[used] = srm_marker_new() ) )
+			if( NULL == (blocks[used] = srmio_marker_new() ) )
 				goto clean2;
 
 			blocks[used-1]->last = i -1;
@@ -603,7 +603,7 @@ srm_marker_t *srm_data_blocks( srm_data_t data )
 
 clean2:
 	for( i=0; i < used; ++i )
-		srm_marker_free( blocks[i] );
+		srmio_marker_free( blocks[i] );
 
 clean1:
 	free(blocks);
@@ -613,7 +613,7 @@ clean1:
 /*
  * free all memory held in data structure
  */
-void srm_data_free( srm_data_t data )
+void srmio_data_free( srmio_data_t data )
 {
 	unsigned i;
 
@@ -621,11 +621,11 @@ void srm_data_free( srm_data_t data )
 		return;
 
 	for( i=0; i < data->cused; ++i )
-		srm_chunk_free(data->chunks[i]);
+		srmio_chunk_free(data->chunks[i]);
 	free(data->chunks);
 
 	for( i=0; i < data->mused; ++i )
-		srm_marker_free(data->marker[i]);
+		srmio_marker_free(data->marker[i]);
 	free(data->marker);
 
 	free(data->notes);
