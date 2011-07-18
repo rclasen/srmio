@@ -55,7 +55,7 @@ bool srmio_pc_open( srmio_pc_t pch )
 	}
 
 	if( ! srmio_io_is_open( pch->io ) ){
-		errno = EBADFD;
+		errno = EINVAL;
 		return false;
 	}
 
