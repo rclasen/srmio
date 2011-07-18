@@ -229,6 +229,7 @@ int main( int argc, char **argv )
 	int opt_help = 0;
 	int opt_int = 0;
 	int opt_name = 0;
+	int opt_pc = 5;
 	int opt_read = 0;
 	srmio_time_t opt_split = 0;
 	srmio_ftype_t opt_rtype = srmio_ftype_srm7;
@@ -247,6 +248,7 @@ int main( int argc, char **argv )
 		{ "help", no_argument, NULL, 'h' },
 		{ "int", required_argument, NULL, 'i' },
 		{ "name", no_argument, NULL, 'n' },
+		{ "pc", required_argument, NULL, 'p' },
 		{ "read", no_argument, NULL, 'r' },
 		{ "read-type", required_argument, NULL, 'R' },
 		{ "split", required_argument, NULL, 's' },
@@ -261,7 +263,7 @@ int main( int argc, char **argv )
 	srmio_pc_t srm;
 
 	/* TODO: option to filter data by timerange */
-	while( -1 != ( c = getopt_long( argc, argv, "b:cdg::hi:nrR:s:tVvw:W:x", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "b:cdg::hi:np:rR:s:tVvw:W:x", lopts, NULL ))){
 		switch(c){
 		  case 'b':
 			if( ! srmio_io_name2baud( atoi(optarg), &opt_baud)){
@@ -294,6 +296,10 @@ int main( int argc, char **argv )
 
 		  case 'n':
 			++opt_name;
+			break;
+
+		  case 'p':
+			opt_pc = atoi(optarg);
 			break;
 
 		  case 'r':
@@ -439,9 +445,26 @@ int main( int argc, char **argv )
 		return 1;
 	}
 
-	if( NULL == (srm = srmio_pc5_new() )){
-		fprintf( stderr, "srmio_pc5_new failed: %s\n",
-			strerror(errno) );
+	switch( opt_pc ){
+	  case 5:
+		if( NULL == (srm = srmio_pc5_new() )){
+			fprintf( stderr, "srmio_pc5_new failed: %s\n",
+				strerror(errno) );
+			return 1;
+		}
+		break;
+
+	  case 6:
+	  case 7:
+		if( NULL == (srm = srmio_pc7_new() )){
+			fprintf( stderr, "srmio_pc7_new failed: %s\n",
+				strerror(errno) );
+			return 1;
+		}
+		break;
+
+	  default:
+		fprintf( stderr, "invalid power control type: %d", opt_pc);
 		return 1;
 	}
 
@@ -552,7 +575,7 @@ static void usage( char *name )
 {
 	printf(
 "usage: %s [options] <device_or_fname>\n"
-"downloads from PCV or reads SRM files\n"
+"downloads from PowerControl or reads SRM files\n"
 "\n"
 "options:\n"
 " --baud=<rate>|-b    use fixed baud rate instead of auto-probing\n"
@@ -565,6 +588,7 @@ static void usage( char *name )
 " --name              get athlete name\n"
 " --read|-r           read from speciefied file instead of device\n"
 " --read-type=<t>|-R  read data as specified file format\n"
+" --pc=<type>|-p      power control version: 5, 6 or 7\n"
 " --split=<gap>|-s    split data on gaps of specified length\n"
 " --time|-t           set current time\n"
 " --verbose|-v        increase verbosity\n"

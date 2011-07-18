@@ -46,6 +46,7 @@ libsrmio_la_SOURCES= \
 	marker.c \
 	pc.c \
 	pc5.c \
+	pc7.c \
 	split.c
 
 bin_PROGRAMS=srmcmd

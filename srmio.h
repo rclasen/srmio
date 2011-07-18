@@ -29,7 +29,7 @@ extern "C"
 
 typedef uint64_t srmio_time_t;	/* seconds since epoch * 10 */
 
-/* actual data tuple as retrieved from PCV or file */
+/* actual data tuple as retrieved from PowerControl or file */
 struct _srmio_chunk_t {
 	srmio_time_t	time;	/* chunk end time */
 	srmio_time_t	dur;	/* chunk duration */
@@ -72,7 +72,7 @@ void srmio_marker_free( srmio_marker_t marker );
  ************************************************************/
 
 /* data structure to hold all information retrieved
- * from PCV or file */
+ * from PowerControl or file */
 struct _srmio_data_t {
 	double		slope;
 	unsigned	zeropos;
@@ -310,6 +310,7 @@ bool srmio_pc_xfer_all( srmio_pc_t conn,
 
 srmio_pc_t srmio_pc5_new( void );
 
+// TODO: obsolete, need migration
 bool srmio_pc5_cmd_get_time( srmio_pc_t conn, struct tm *timep );
 bool srmio_pc5_cmd_get_circum( srmio_pc_t conn, unsigned *circum );
 bool srmio_pc5_cmd_get_slope( srmio_pc_t conn, double *slope );
@@ -317,8 +318,20 @@ bool srmio_pc5_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos );
 bool srmio_pc5_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint );
 
 
+/************************************************************
+ *
+ * from pc7.c
+ *
+ ************************************************************/
 
+srmio_pc_t srmio_pc7_new( void );
 
+// TODO: obsolete, need migration
+bool srmio_pc7_cmd_get_time( srmio_pc_t conn, struct tm *timep );
+bool srmio_pc7_cmd_get_circum( srmio_pc_t conn, unsigned *circum );
+bool srmio_pc7_cmd_get_slope( srmio_pc_t conn, double *slope );
+bool srmio_pc7_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos );
+bool srmio_pc7_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint );
 
 # ifdef __cplusplus
 }

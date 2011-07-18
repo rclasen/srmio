@@ -118,7 +118,7 @@ bool srmio_pc_get_device( srmio_pc_t pch, srmio_io_t *h )
 }
 
 /*
- * sets the baudrate to use for communication with the PCV.
+ * sets the baudrate to use for communication with the PowerControl.
  * with srmio_io_baud_max, all supported baud rates are probed.
  */
 bool srmio_pc_set_baudrate( srmio_pc_t pch, srmio_io_baudrate_t rate )
@@ -137,7 +137,7 @@ bool srmio_pc_set_baudrate( srmio_pc_t pch, srmio_io_baudrate_t rate )
 
 
 /*
- * sets the parity to use for communication with the PCV.
+ * sets the parity to use for communication with the PowerControl.
  * with srmio_io_parity_max, all supported parity settings are probed.
  */
 bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity )
