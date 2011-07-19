@@ -32,14 +32,17 @@ struct _srmio_pc7_packet_t {
 
 
 struct _srmio_pc7_t {
+	/* xfer block */
+	size_t			block_num;
 	srmio_time_t		block_recint;
 	srmio_time_t		block_time;
-	size_t			block_cnt;
-	size_t			block_num;
+	size_t			chunk_cnt;
 
+	/* xfer pkt */
 	struct _srmio_pc7_packet_t pkt;
 	size_t			pkt_num;
-	size_t			chunk_cnt;
+
+	/* xfer chunk */
 	size_t			chunk_num;
 	bool			is_intervall;
 };
@@ -579,15 +582,15 @@ static bool _srmio_pc7_cmd_clear( srmio_pc_t conn )
  */
 
 
-static srmio_pc_xfer_state_t _srmio_pc7_xfer_status(
-	srmio_pc_t conn, size_t *done )
+static bool _srmio_pc7_xfer_block_progress(
+	srmio_pc_t conn, size_t *block_done )
 {
 	assert( conn );
 
-	if( done )
-		*done = SELF(conn)->chunk_num;
+	if( block_done )
+		*block_done = SELF(conn)->chunk_num;
 
-	return conn->xfer_state;
+	return true;
 }
 
 // TODO: is 0x0401 only getting the block count, or does it "rewind", as well?
@@ -616,8 +619,8 @@ static bool _srmio_pc7_xfer_start( srmio_pc_t conn )
 
 	conn->xfer_state = srmio_pc_xfer_state_running;
 
-	SELF(conn)->block_cnt = buf_get_buint16( recv.data, 0 );
-	DPRINTF("blocks: %d", SELF(conn)->block_cnt);
+	conn->block_cnt = buf_get_buint16( recv.data, 0 );
+	DPRINTF("blocks: %d", conn->block_cnt);
 
 	return true;
 
@@ -673,7 +676,7 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 	if( conn->xfer_state != srmio_pc_xfer_state_running )
 		return false;
 
-	if( SELF(conn)->block_num >= SELF(conn)->block_cnt ){
+	if( SELF(conn)->block_num >= conn->block_cnt ){
 		conn->xfer_state = srmio_pc_xfer_state_success;
 		return false;
 	}
@@ -957,8 +960,8 @@ static const srmio_pc_methods_t _pc7_methods = {
 	.cmd_clear		= _srmio_pc7_cmd_clear,
 	.xfer_start		= _srmio_pc7_xfer_start,
 	.xfer_block_next	= _srmio_pc7_xfer_block_next,
+	.xfer_block_progress	= _srmio_pc7_xfer_block_progress,
 	.xfer_chunk_next	= _srmio_pc7_xfer_chunk_next,
-	.xfer_status		= _srmio_pc7_xfer_status,
 	.xfer_finish		= _srmio_pc7_xfer_finish,
 };
 
@@ -975,6 +978,7 @@ srmio_pc_t srmio_pc7_new( void )
 	if( NULL == ( conn = srmio_pc_new( &_pc7_methods, (void*)self ) ))
 		goto clean1;
 
+	conn->can_preview = true;
 	conn->baudrate = srmio_io_baud_38400;
 	conn->parity = srmio_io_parity_none;
 

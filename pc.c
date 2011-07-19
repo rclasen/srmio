@@ -179,6 +179,22 @@ bool srmio_pc_set_xfer( srmio_pc_t pch, srmio_pc_xfer_type_t type )
 	return true;
 }
 
+bool srmio_pc_can_preview( srmio_pc_t conn )
+{
+	assert(conn);
+
+	return conn->can_preview;
+}
+
+bool srmio_pc_xfer_get_blocks( srmio_pc_t conn, size_t *blocks )
+{
+	assert( conn );
+	assert( blocks );
+
+	*blocks = conn->block_cnt;
+
+	return true;
+}
 
 
 bool srmio_pc_cmd_get_athlete( srmio_pc_t pch, char **athlete )
@@ -241,11 +257,18 @@ bool srmio_pc_xfer_finish( srmio_pc_t pch )
 	return (*pch->methods->xfer_finish)( pch );
 }
 
-srmio_pc_xfer_state_t srmio_pc_xfer_status( srmio_pc_t pch, size_t *block_done )
+srmio_pc_xfer_state_t srmio_pc_xfer_status( srmio_pc_t pch )
 {
 	assert( pch );
 
-	return (*pch->methods->xfer_status)( pch, block_done );
+	return pch->xfer_state;
+}
+
+bool srmio_pc_xfer_block_progress( srmio_pc_t pch, size_t *block_done )
+{
+	assert( pch );
+
+	return (*pch->methods->xfer_block_progress)( pch, block_done );
 }
 
 
@@ -312,7 +335,7 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 			if( pfunc && 0 == data->cused % 16 ){
 				size_t done;
 
-				srmio_pc_xfer_status( pch, &done );
+				srmio_pc_xfer_block_progress( pch, &done );
 				(*pfunc)( total, 1+ done, user_data );
 			}
 
@@ -355,7 +378,7 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 		goto clean2;
 	}
 
-	result = srmio_pc_xfer_status( pch, NULL );
+	result = srmio_pc_xfer_status( pch );
 	srmio_pc_xfer_finish( pch );
 
 	return result == srmio_pc_xfer_state_success;

@@ -240,7 +240,7 @@ int main( int argc, char **argv )
 		}
 	}
 
-	if( srmio_pc_xfer_state_success != srmio_pc_xfer_status( srm, NULL) ){
+	if( srmio_pc_xfer_state_success != srmio_pc_xfer_status( srm ) ){
 		fprintf( stderr, "srmio_pc_xfer failed\n" );
 		return 1;
 	}

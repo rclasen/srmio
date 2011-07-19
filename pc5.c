@@ -30,15 +30,16 @@
  * connection handle
  */
 struct _srmio_pc5_t {
+	/* connnection */
 	int			stxetx;	/* use stx/etx headers + encoding? */
 	time_t			nready;	/* PC accepts next command */
 
-	/* whole downlad */
+	/* xfer */
 	struct tm		pctime;
-	unsigned		pkt_cnt;
-	unsigned char		pkt_data[PC5_BUFSIZE];
 	struct _srmio_pc_xfer_block_t block;
 	size_t			block_num;
+	unsigned char		pkt_data[PC5_BUFSIZE];
+	unsigned		pkt_cnt;
 
 	/* current pkt */
 	unsigned		pkt_num;	/* 0..pkts-1 */
@@ -1461,6 +1462,7 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn )
 
 	conn->xfer_state = srmio_pc_xfer_state_running;
 	conn->xfer_type = srmio_pc_xfer_type_new;
+	conn->block_cnt = 1;
 	SELF(conn)->block_num = 0;
 	SELF(conn)->chunk_num = PC5_PKT_CHUNKS;
 
@@ -1690,13 +1692,13 @@ static bool _srmio_pc5_xfer_finish( srmio_pc_t conn )
  * gets current transfer status and progress
  *
  */
-static srmio_pc_xfer_state_t _srmio_pc5_xfer_status( srmio_pc_t conn,
-	size_t *done )
+static bool _srmio_pc5_xfer_block_progress( srmio_pc_t conn,
+	size_t *block_done )
 {
 	assert( conn );
 
-	if( done )
-		*done = SELF(conn)->pkt_num;
+	if( block_done )
+		*block_done = SELF(conn)->pkt_num;
 
 	return conn->xfer_state;
 }
@@ -1717,18 +1719,18 @@ static void _srmio_pc5_free( srmio_pc_t conn )
 }
 
 static const srmio_pc_methods_t _pc5_methods = {
-	.free                   = _srmio_pc5_free,
-	.open                   = _srmio_pc5_open,
-	.close                  = _srmio_pc5_close,
-	.cmd_get_athlete        = _srmio_pc5_cmd_get_athlete,
-	.cmd_set_time           = _srmio_pc5_cmd_set_time,
-	.cmd_set_recint         = _srmio_pc5_cmd_set_recint,
-	.cmd_clear              = _srmio_pc5_cmd_clear,
-	.xfer_start             = _srmio_pc5_xfer_start,
-	.xfer_block_next        = _srmio_pc5_xfer_block_next,
-	.xfer_chunk_next        = _srmio_pc5_xfer_chunk_next,
-	.xfer_status            = _srmio_pc5_xfer_status,
-	.xfer_finish            = _srmio_pc5_xfer_finish,
+	.free				= _srmio_pc5_free,
+	.open				= _srmio_pc5_open,
+	.close				= _srmio_pc5_close,
+	.cmd_get_athlete		= _srmio_pc5_cmd_get_athlete,
+	.cmd_set_time			= _srmio_pc5_cmd_set_time,
+	.cmd_set_recint			= _srmio_pc5_cmd_set_recint,
+	.cmd_clear			= _srmio_pc5_cmd_clear,
+	.xfer_start			= _srmio_pc5_xfer_start,
+	.xfer_block_next		= _srmio_pc5_xfer_block_next,
+	.xfer_block_progress		= _srmio_pc5_xfer_block_progress,
+	.xfer_chunk_next		= _srmio_pc5_xfer_chunk_next,
+	.xfer_finish			= _srmio_pc5_xfer_finish,
 };
 
 /*
@@ -1747,6 +1749,7 @@ srmio_pc_t srmio_pc5_new( void )
 	if( NULL == ( conn = srmio_pc_new( &_pc5_methods, (void*)self )))
 		goto clean1;
 
+	conn->can_preview = false;
 	conn->baudrate = srmio_io_baud_max;
 	conn->parity = srmio_io_parity_max;
 

@@ -286,17 +286,20 @@ bool srmio_pc_cmd_set_recint( srmio_pc_t conn, srmio_time_t recint );
 bool srmio_pc_cmd_clear( srmio_pc_t conn );
 
 bool srmio_pc_set_xfer( srmio_pc_t conn, srmio_pc_xfer_type_t type );
+bool srmio_pc_can_preview( srmio_pc_t conn );
 
 
 typedef void (*srmio_progress_t)( size_t total, size_t done,
 	void *user_data );
 
 bool srmio_pc_xfer_start( srmio_pc_t conn );
+bool srmio_pc_xfer_get_blocks( srmio_pc_t conn, size_t *blocks );
 bool srmio_pc_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t block );
 bool srmio_pc_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 	bool *is_intervall, bool *start_intervall );
 bool srmio_pc_xfer_finish( srmio_pc_t conn );
-srmio_pc_xfer_state_t srmio_pc_xfer_status( srmio_pc_t conn, size_t *block_done );
+srmio_pc_xfer_state_t srmio_pc_xfer_status( srmio_pc_t conn );
+bool srmio_pc_xfer_block_progress( srmio_pc_t conn, size_t *block_done );
 
 bool srmio_pc_xfer_all( srmio_pc_t conn,
 	srmio_data_t data,
