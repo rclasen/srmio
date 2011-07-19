@@ -1420,6 +1420,20 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn )
 		return false;
 	}
 
+	switch( conn->xfer_type ){
+	  case srmio_pc_xfer_type_new:
+		cmd = 'A';
+		break;
+
+	  case srmio_pc_xfer_type_all:
+		cmd = 'y';
+		break;
+
+	  default:
+		errno = EINVAL;
+		return false;
+	}
+
 	SELF(conn)->block.athlete = NULL;
 	if( ! srmio_pc5_cmd_get_time( conn, &SELF(conn)->pctime ))
 		return false;
@@ -1443,19 +1457,6 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn )
 
 	if(  _srmio_pc5_msg_ready( conn ))
 		goto clean1;
-
-	switch( conn->xfer_type ){
-	  case srmio_pc_xfer_type_new:
-		cmd = 'A';
-		break;
-
-	  case srmio_pc_xfer_type_all:
-		cmd = 'y';
-		break;
-
-	  default:
-		goto clean1;
-	}
 
 	DPRINTF("starting %c", cmd );
 	if( _srmio_pc5_msg_send( conn, cmd, NULL, 0 ) )
