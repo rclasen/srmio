@@ -1,0 +1,61 @@
+.TH SRMCMD 1 "9 Mar 2011" "SRM access tool" "Version %PACKAGE_VERSION%"
+.SH NAME
+srmdump \- download your SRM PowerControl
+
+.SH SYNOPSIS
+.B srmdump
+[options] \fIpath\fR
+
+.SH DESCRIPTION
+.B srmdump
+implemets the serial protocols for SRM's PowerControl V, VI and 7. It allows you to
+download data from the PC attached to the serial device at \fIpath\fR.
+This is mostly an example application showing the API use of srmio.
+
+.SH OPTIONS
+Options available for the
+.B srmdump
+command:
+.TP
+\fB\-b\fR, \fB\-\-baud\fR=\fIrate\fR
+Use specified baudrate, only. By default all supported baudrates are
+probed. PCV factory setting is 9600 baud. PCVI and PV7 always use 38400.
+.TP
+\fB\-a\fR, \fB\-\-all\fR
+Download newly recorded data from PC. With \fIall\fR specified, the
+"deletion" on the PCV is ignored and all data (that's not yet overwriten)
+is retrieved from the PCV (PCVI and PC7 don't seem to support getting
+"deleted" data). By default data is written to stdout as
+tab-seperated list.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+A brief message.
+.TP
+\fB\-p\fR, \fB\-\-pc\fR=\fItype\fR
+Type of PowerControl protocol to use. Supported are PowerControl 5, 6, and 7.
+Default is "5".
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Enable verbose status messages.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+show srmdump version number and exit.
+
+.SH EXAMPLES
+
+ srmdump /dev/ttyUSB0		# linux
+ srmdump -p 7 /dev/ttyUSB0	# linux, PowerControl 7
+ srmdump /dev/ttyS1		# cygwin, com1
+ srmdump /dev/cu.usbserial*	# Mac OS X, prolific driver (good luck)
+ srmdump /dev/cu.PL2303-*	# Mac OS X with http://osx-pl2303.sourceforge.net/
+
+.SH "SEE ALSO"
+This is just a very simplistic frontend for the lib. Please check the
+source distribution for details.
+
+.SH BUGS
+Yes. For sure. Just keep in mind, that protocoll and file formats are
+reverse engineered...
+
+.SH AUTHORS
+Rainer Clasen

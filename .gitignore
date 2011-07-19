@@ -25,5 +25,6 @@ ltmain.sh
 missing
 stamp-h1
 srmcmd
+srmdump
 autoscan.log
 srmio_config.h

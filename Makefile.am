@@ -3,8 +3,8 @@ AUTOMAKE_OPTIONS=foreign
 #AM_CFLAGS=-g -Wall -Wextra -DDEBUG
 
 
-man1_INS=srmcmd.man_in
-man1_MANS=srmcmd.man
+man1_INS=srmcmd.man_in srmdump.man_in
+man1_MANS=srmcmd.man srmdump.man
 # TODO: build _MANS automagically
 
 man_INS=$(man1_INS)
@@ -49,11 +49,15 @@ libsrmio_la_SOURCES= \
 	pc7.c \
 	split.c
 
-bin_PROGRAMS=srmcmd
+bin_PROGRAMS=srmcmd srmdump
 
 srmcmd_LDFLAGS= -lsrmio
 srmcmd_SOURCES= \
 	srmcmd.c
+
+srmdump_LDFLAGS= -lsrmio
+srmdump_SOURCES= \
+	srmdump.c
 
 CLEANFILES=$(MANS)
 .man_in.man:

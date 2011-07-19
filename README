@@ -23,7 +23,7 @@ If you just want to use it, please check
  man srmcmd
 
 Please check the comments in the source (start with srmio.h) if you want
-to use the lib.
+to use the lib. srmdump is intended as "simple" example, as well.
 
 Many thanks to Hiroyuki OYAMA who did the real investigation for PC7 and
 published his work on https://github.com/oyama/libsrmpc7
