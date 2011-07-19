@@ -190,9 +190,12 @@ srmio_data_t srmio_data_fixup( srmio_data_t data )
 
 		if( nprev < this->time ){
 			delta += this->time - nprev;
-			DPRINTF( "overlaping blocks @%d, "
+			DPRINTF( "overlaping blocks #%d "
+				"@.%.1lf - %.1lf, "
 				"new delta: %.1f",
 				c,
+				0.1 * this->time,
+				0.1 * next->time,
 				(double)delta/10 );
 		}
 		this->time -= delta;

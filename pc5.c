@@ -1272,7 +1272,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 			/* request retransmit */
 			_srm_log( conn, "received bad pkt %u, "
 				"requesting retransmit", SELF(conn)->pkt_num );
-			sleep(1);
+			_srmio_pc5_read( conn, SELF(conn)->pkt_data, 64 );
 
 			if( ! srmio_io_flush( conn->io ) ){
 				conn->xfer_state = srmio_pc_xfer_state_failed;
