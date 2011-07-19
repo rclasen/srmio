@@ -298,7 +298,8 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 	struct _srmio_pc_xfer_block_t block;
 	struct _srmio_chunk_t chunk;
 	size_t done_chunks = 0;
-	size_t total;
+	size_t block_cnt, block_num;
+	size_t prog_prev = 0, prog_sum=0;
 	srmio_pc_xfer_state_t result;
 
 	assert( pch );
@@ -311,9 +312,31 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 	if( ! srmio_pc_xfer_start( pch ) )
 		goto clean1;
 
+	if( ! srmio_pc_xfer_get_blocks( pch, &block_cnt ) )
+		goto clean2;
+
+	if( block_cnt > 1 ){
+		if( srmio_pc_can_preview( pch ) ){
+			while( srmio_pc_xfer_block_next( pch, &block ) ){
+				prog_sum += block.total;
+				if( block.athlete )
+					free( block.athlete );
+				block.athlete = NULL;
+			}
+			DPRINTF("prog_sum %u", prog_sum );
+
+			/* finalize / restart xfer */
+			srmio_pc_xfer_finish( pch );
+
+			if( ! srmio_pc_xfer_start( pch ) )
+				goto clean2;
+		}
+	}
+
 	while( srmio_pc_xfer_block_next( pch, &block ) ){
 		bool is_int;
 		bool is_first;
+		size_t prog_total;
 
 		DPRINTF( "next block" );
 
@@ -326,17 +349,38 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 			data->athlete = strdup(block.athlete);
 		}
 
-		/* TODO: sum total for > 1 blocks */
-		total = block.total +1;
+		if( prog_sum ){
+			prog_total = prog_sum;
+
+		} else if( block_cnt == 1 ){
+			prog_total = block.total +1;
+
+		} else {
+			prog_total = block_cnt * 1000;
+		}
+		DPRINTF( "prog_total %u", prog_total );
 
 		while( srmio_pc_xfer_chunk_next( pch, &chunk, &is_int, &is_first  ) ){
 			DPRINTF( "next chunk" );
 
-			if( pfunc && 0 == data->cused % 16 ){
-				size_t done;
+			if( pfunc && 0 == done_chunks % 16 ){
+				size_t block_done = 0;
 
-				srmio_pc_xfer_block_progress( pch, &done );
-				(*pfunc)( total, 1+ done, user_data );
+				srmio_pc_xfer_block_progress( pch, &block_done );
+				if( prog_sum ){
+					block_done += prog_prev;
+
+				} else if( block_cnt == 1 ){
+					/* unchanged */
+
+				} else {
+					block_done = (double)block_num * 1000 + 1000 *
+						block.total / block_done;
+				}
+
+				DPRINTF( "prog_prev %d, block_done %d",
+					prog_prev, block_done );
+				(*pfunc)( prog_total, block_done, user_data );
 			}
 
 
@@ -360,6 +404,8 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 				mfirst = -1;
 
 			}
+
+			++block_num;
 		}
 
 		/* finalize marker at block end */
@@ -367,6 +413,11 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 			srmio_data_add_marker( data, mfirst, data->cused -1 );
 			mfirst = -1;
 		}
+
+		if( prog_sum )
+			prog_prev += block.total;
+		else
+			prog_prev += 1000;
 
 		free( block.athlete );
 		block.athlete = NULL;
