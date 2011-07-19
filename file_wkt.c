@@ -25,7 +25,9 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh )
 	if( 0 > fprintf( fh,
 		"[Params]\n"
 		"Version=1\n"
-		"Columns=time,dur,work,cad,hr,dist,ele,temp\n"
+		"Athlete=%s\n"
+		"Columns=time,dur,work,cad,hr,dist,ele,temp\n",
+		data->athlete ? data->athlete : ""
 		) ){
 
 		ERRMSG("fprintf failed: %s", strerror(errno));

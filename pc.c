@@ -276,7 +276,6 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 	struct _srmio_chunk_t chunk;
 	size_t done_chunks = 0;
 	size_t total;
-	srmio_marker_t mk;
 	srmio_pc_xfer_state_t result;
 
 	assert( pch );
@@ -285,18 +284,6 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 	block.athlete = NULL;
 
 	DPRINTF("");
-
-	if( NULL == (mk = srmio_marker_new() )){
-		_srm_log( pch, "srmio_marker_new failed: %s", strerror(errno));
-		goto clean1;
-	}
-
-	if( ! srmio_data_add_markerp( data, mk )){
-		_srm_log( pch, "adding marker failed: %s", strerror(errno));
-		srmio_marker_free( mk );
-		goto clean1;
-	}
-
 
 	if( ! srmio_pc_xfer_start( pch ) )
 		goto clean1;
@@ -311,9 +298,9 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 		data->zeropos = block.zeropos;
 		data->circum = block.circum;
 		if( block.athlete ){
-			if( mk->notes )
-				free(mk->notes);
-			mk->notes = strdup(block.athlete);
+			if( data->athlete )
+				free(data->athlete);
+			data->athlete = strdup(block.athlete);
 		}
 
 		/* TODO: sum total for > 1 blocks */
@@ -370,10 +357,6 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 
 	result = srmio_pc_xfer_status( pch, NULL );
 	srmio_pc_xfer_finish( pch );
-
-
-	/* finalize all-workout marker */
-	mk->last = data->cused-1;
 
 	return result == srmio_pc_xfer_state_success;
 

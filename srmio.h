@@ -78,6 +78,7 @@ struct _srmio_data_t {
 	unsigned	zeropos;
 	unsigned	circum;
 	char		*notes;
+	char		*athlete;	/* athlete name */
 
 	/* array of chunks */
 	srmio_chunk_t	 *chunks;

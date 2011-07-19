@@ -297,8 +297,8 @@ srmio_data_t srmio_file_srm_read( FILE *fh )
 	recint = 10 * buf_get_uint8( buf, 8 )
 		/ buf_get_uint8( buf, 9 );
 	bcnt = buf_get_luint16( buf, 10);
-	mcnt = buf_get_luint16( buf, 12) +1;
-	DPRINTF( "bcnt=%u mcnt=%u,", bcnt, mcnt );
+	mcnt = buf_get_luint16( buf, 12);
+	DPRINTF( "bcnt=%u mcnt=%u(+1)", bcnt, mcnt );
 
 	/* "notes" is preceeded by length + zero padded */
 	/* TODO: iconv notes cp850 -> internal */
@@ -315,6 +315,15 @@ srmio_data_t srmio_file_srm_read( FILE *fh )
 	*tmp->marker = NULL;
 	tmp->mavail = mcnt;
 
+	/* first marker is just used for the athlete name */
+	if( ! _xread( fh, buf, mcmtlen + 15 ))
+		goto clean2;
+
+	if( NULL == (tmp->athlete = buf_get_string( buf, 0, mcmtlen )))
+		goto clean2;
+	/* TODO: iconv athlete cp850 -> internal */
+
+	/* remaining marker */
 	for( ; tmp->mused < mcnt; ++tmp->mused ){
 		srmio_marker_t tm;
 
@@ -332,13 +341,9 @@ srmio_data_t srmio_file_srm_read( FILE *fh )
 		tm->first = buf_get_luint16( buf, mcmtlen +1)-1;
 		tm->last = buf_get_luint16( buf, mcmtlen +3)-1;
 
-		if( NULL == (tm->notes = malloc(mcmtlen +1))){
-			ERRMSG("malloc failed: %s", strerror(errno));
+		if( NULL == (tm->notes = buf_get_string( buf, 0, mcmtlen )))
 			goto clean2;
-		}
 		/* TODO: iconv notes cp850 -> internal */
-		memcpy( tm->notes, (char*)buf, mcmtlen );
-		tm->notes[mcmtlen] = 0;
 
 		DPRINTF( "marker %u %u %s",
 			tm->first,
@@ -489,6 +494,26 @@ clean2:
 
 /* TODO: srmio_file_srm6_write */
 
+bool set_marker( unsigned char *buf, char *note, unsigned first,
+	unsigned last )
+{
+	/* TODO: iconv notes -> cp850 */
+	buf_set_string( buf, 0, note, 255 );
+	buf_set_uint8( buf, 255, 1 ); /* active */
+	if( ! buf_set_luint16( buf, 256, first ) ){
+		ERRMSG( "failed to convert marker index: %s", strerror(errno));
+		return false;
+	}
+	if( ! buf_set_luint16( buf, 258, last ) ){
+		ERRMSG( "failed to convert marker index: %s", strerror(errno));
+		return false;
+	}
+	memset( &buf[260], 0, 10 );
+
+	return true;
+}
+
+
 /*
  * write contents of data structure into specified file
  */
@@ -512,14 +537,20 @@ bool srmio_file_srm7_write( srmio_data_t data, FILE *fh )
 		return false;
 	}
 
+	if( data->athlete && strlen(data->athlete) > 255 ){
+		ERRMSG( "athlete name are too long" );
+		errno = EINVAL;
+		return false;
+	}
+
 	if( data->cused < 1 || data->cused > UINT16_MAX ){
 		ERRMSG( "too few/many chunks" );
 		errno = EINVAL;
 		return false;
 	}
 
-	if( data->mused < 1 || data->mused > UINT16_MAX ){
-		ERRMSG( "too few/many marker" );
+	if( data->mused > UINT16_MAX ){
+		ERRMSG( "too many marker" );
 		errno = EINVAL;
 		return false;
 	}
@@ -538,9 +569,10 @@ bool srmio_file_srm7_write( srmio_data_t data, FILE *fh )
 		srmio_chunk_t *ck;
 		srmio_time_t mintime = -1;
 		unsigned long bcnt;
-		unsigned mcnt = data->mused -1;
+		unsigned mcnt = data->mused; /* +1 for all_workout marker */
 		unsigned days;
 
+		/* count blocks */
 		for( bcnt = 0; blocks[bcnt] && bcnt <= ULONG_MAX; ++bcnt );
 
 		/* time-jumps in PCV lead to nonlinear timestamps, find
@@ -623,25 +655,21 @@ bool srmio_file_srm7_write( srmio_data_t data, FILE *fh )
 			goto clean2;
 	}
 
+	/* first "marker" for athlete name */
+	if( ! set_marker( buf, data->athlete, 1, data->cused ) )
+		goto clean2;
 
-	/* marker */
+	if( ! _xwrite( fh, buf, 270 ))
+		goto clean2;
+
+	/* other markers */
 	for( i = 0; i < data->mused; ++i ){
 		srmio_marker_t mk = data->marker[i];
 		unsigned first = mk->first+1;
 		unsigned last = mk->last+1;
 
-		/* TODO: iconv notes -> cp850 */
-		buf_set_string( buf, 0, mk->notes, 255 );
-		buf_set_uint8( buf, 255, 1 ); /* active */
-		if( ! buf_set_luint16( buf, 256, first ) ){
-			ERRMSG( "failed to convert marker index: %s", strerror(errno));
-			goto clean1;
-		}
-		if( ! buf_set_luint16( buf, 258, last ) ){
-			ERRMSG( "failed to convert marker index: %s", strerror(errno));
-			goto clean1;
-		}
-		memset( &buf[260], 0, 10 );
+		if( ! set_marker( buf, mk->notes, first, last ))
+			goto clean2;
 
 		DPRINTF( "marker @0x%lx %u %u %s",
 			(unsigned long)ftell(fh),

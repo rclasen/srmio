@@ -398,8 +398,8 @@ int main( int argc, char **argv )
 				fprintf( stderr, "no data available\n" );
 				return 1;
 			}
-			printf( "%s\n", srmdata->marker[0]->notes
-				? srmdata->marker[0]->notes
+			printf( "%s\n", srmdata->athlete
+				? srmdata->athlete
 				: "" );
 
 		} else if( opt_date ){
