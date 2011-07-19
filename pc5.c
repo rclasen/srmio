@@ -1420,6 +1420,7 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn )
 		return false;
 	}
 
+	SELF(conn)->block.athlete = NULL;
 	if( ! srmio_pc5_cmd_get_time( conn, &SELF(conn)->pctime ))
 		return false;
 

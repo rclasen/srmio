@@ -672,6 +672,7 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 	assert( conn );
 
 	DPRINTF("get block #%d", SELF(conn)->block_num );
+	block->athlete = NULL;
 
 	if( conn->xfer_state != srmio_pc_xfer_state_running )
 		return false;
@@ -727,8 +728,6 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 		block->recint = SELF(conn)->block_recint;
 
 		// TODO: athlete encoding
-		if( block->athlete )
-			free( block->athlete );
 		if( NULL == (block->athlete = buf_get_string( recv.data, 11, 20 ) ))
 			goto fail;
 
@@ -746,6 +745,9 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 	return true;
 
 fail:
+	if( block->athlete )
+		free( block->athlete );
+
 	conn->xfer_state = srmio_pc_xfer_state_failed;
 	return false;
 }

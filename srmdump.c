@@ -65,8 +65,6 @@ int main( int argc, char **argv )
 	struct _srmio_pc_xfer_block_t block;
 	struct _srmio_chunk_t chunk;
 
-	block.athlete = NULL;
-
 	while( -1 != ( c = getopt_long( argc, argv, "b:g::hp:V", lopts, NULL ))){
 		switch(c){
 		  case 'a':
@@ -238,6 +236,9 @@ int main( int argc, char **argv )
 				chunk.ele);
 
 		}
+
+		free( block.athlete );
+		block.athlete = NULL;
 	}
 
 	if( srmio_pc_xfer_state_success != srmio_pc_xfer_status( srm ) ){
