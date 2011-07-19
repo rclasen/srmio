@@ -120,11 +120,11 @@ bool do_fixup( srmio_data_t *srmdata, bool fixup )
 	return true;
 }
 
-bool write_files( srmio_data_t srmdata, bool fixup, char *fname,
+bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 	srmio_ftype_t type, srmio_time_t split )
 {
 
-	if( ! srmdata->cused ){
+	if( ! (*srmdata)->cused ){
 		fprintf( stderr, "no data available\n" );
 		return false;
 	}
@@ -132,7 +132,7 @@ bool write_files( srmio_data_t srmdata, bool fixup, char *fname,
 	if( split == 0 ){
 		FILE *fh;
 
-		if( ! do_fixup( &srmdata, fixup ))
+		if( ! do_fixup( srmdata, fixup ))
 			return false;
 
 		if( NULL == ( fh = fopen( fname, "w" ) )){
@@ -141,7 +141,7 @@ bool write_files( srmio_data_t srmdata, bool fixup, char *fname,
 			return false;
 		}
 
-		if( ! srmio_file_ftype_write( srmdata, type, fh ) ){
+		if( ! srmio_file_ftype_write( *srmdata, type, fh ) ){
 			fprintf( stderr, "srmio_file_write(%s) failed: %s\n",
 				fname, strerror(errno) );
 			return false;
@@ -166,7 +166,7 @@ bool write_files( srmio_data_t srmdata, bool fixup, char *fname,
 		suffixlen = strlen(fname);
 		suffixlen -= (match - fname) +1;
 
-		if( NULL == ( list = srmio_data_split( srmdata, split, 500)))
+		if( NULL == ( list = srmio_data_split( *srmdata, split, 500)))
 			return false;
 
 		for( dat = list; *dat; ++dat ){
@@ -417,7 +417,7 @@ int main( int argc, char **argv )
 
 
 		} else if( opt_write ){
-			if( ! write_files( srmdata, opt_fixup, opt_write, opt_wtype, opt_split ))
+			if( ! write_files( &srmdata, opt_fixup, opt_write, opt_wtype, opt_split ))
 				return 1;
 
 		} else {
@@ -527,7 +527,7 @@ int main( int argc, char **argv )
 			printf( "%.0f\n", (double)start / 10 );
 
 		} else if( opt_write ){
-			if( ! write_files( srmdata, opt_fixup, opt_write, opt_wtype, opt_split ))
+			if( ! write_files( &srmdata, opt_fixup, opt_write, opt_wtype, opt_split ))
 				return 1;
 
 		} else {
