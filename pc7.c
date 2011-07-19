@@ -618,6 +618,7 @@ static bool _srmio_pc7_xfer_start( srmio_pc_t conn )
 	}
 
 	conn->xfer_state = srmio_pc_xfer_state_running;
+	SELF(conn)->block_num = 0;
 
 	conn->block_cnt = buf_get_buint16( recv.data, 0 );
 	DPRINTF("blocks: %d", conn->block_cnt);
@@ -935,8 +936,9 @@ static bool _srmio_pc7_xfer_finish( srmio_pc_t conn )
 	}
 
 	srmio_io_flush( conn->io );
+	conn->xfer_state = srmio_pc_xfer_state_new;
 
-	return false;
+	return true;
 }
 
 /************************************************************

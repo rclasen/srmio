@@ -1465,7 +1465,8 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn )
 	conn->xfer_type = srmio_pc_xfer_type_new;
 	conn->block_cnt = 1;
 	SELF(conn)->block_num = 0;
-	SELF(conn)->chunk_num = PC5_PKT_CHUNKS;
+	SELF(conn)->pkt_num = 0;
+	SELF(conn)->chunk_num = PC5_PKT_CHUNKS; /* triggers first pkt xfer */
 
 
 	/* get header + number of pkts to read */
