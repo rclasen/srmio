@@ -10,9 +10,6 @@
 
 #include "pc.h"
 
-// TODO: replace _srm_log
-#define _srm_log(x,y, ...) DPRINTF(y, ##__VA_ARGS__)
-
 srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child )
 {
 	srmio_pc_t pch;
@@ -380,10 +377,8 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 			}
 
 
-			if( ! srmio_data_add_chunk( data, &chunk ) ){
-				_srm_log( pch, "add chunk failed: %s", strerror(errno));
+			if( ! srmio_data_add_chunk( data, &chunk ) )
 				goto clean2;
-			}
 
 			++done_chunks;
 
@@ -420,7 +415,6 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 	}
 
 	if( ! done_chunks ){
-		_srm_log( pch, "no data available" );
 		errno = ENODATA;
 		goto clean2;
 	}
