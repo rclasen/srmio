@@ -14,7 +14,6 @@
  */
 
 #include "pc.h"
-#include <stdarg.h>
 
 #define PC7_MAGIC		0xa4b0
 #define PC7_CMD_BUFSIZE		512
@@ -132,14 +131,13 @@ static bool _srmio_pc7_msg_recv( srmio_pc_t conn,
 	assert( conn );
 	assert( pkt );
 
-	//DPRINTF("get pkt head: %d bytes", buflen );
-
 	ret = srmio_io_read( conn->io, buf, buflen );
 	if( ret < 0 )
 		return false;
 
-	//DPRINTF( "ret %d", ret );
-	//DUMPHEX( "got", buf, ret );
+#ifdef DEBUG_PKT2
+	DUMPHEX( "pkt header", buf, ret );
+#endif
 
 	if( (size_t)ret < buflen ){
 		errno = EIO;
@@ -151,7 +149,9 @@ static bool _srmio_pc7_msg_recv( srmio_pc_t conn,
 	pkt->cmd = buf_get_buint16( buf, 4 );
 	buflen += pkt->datalen + 1;
 
-	//DPRINTF( "get pkt body: %d bytes", pkt->datalen +1 );
+#ifdef DEBUG_PKT2
+	DPRINTF( "get pkt body: %d bytes", pkt->datalen +1 );
+#endif
 	if( pkt->datalen +1 > PC7_CMD_BUFSIZE ){
 		errno = EOVERFLOW;
 		return false;
@@ -161,8 +161,7 @@ static bool _srmio_pc7_msg_recv( srmio_pc_t conn,
 	if( ret < 0 )
 		return false;
 
-	DPRINTF( "ret %d", ret );
-	DUMPHEX( "got", &buf[PC7_PKTHEAD_SIZE], ret );
+	DUMPHEX( "got pkt body", &buf[PC7_PKTHEAD_SIZE], ret );
 
 	if( (size_t)ret < pkt->datalen +1 ){
 		errno = EIO;
@@ -741,8 +740,8 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 
 	DPRINTF("block %d, chunks=%d, time=%.1f, recint=%.1f",
 		block_num, SELF(conn)->chunk_cnt,
-		(double)SELF(conn)->block_time/10,
-		(double)SELF(conn)->block_recint/10);
+		0.1 * SELF(conn)->block_time,
+		0.1 * SELF(conn)->block_recint);
 	return true;
 
 fail:
@@ -785,7 +784,7 @@ static bool _srmio_pc7_xfer_pkt_next( srmio_pc_t conn )
 		goto fail;
 
 	if( SELF(conn)->pkt.datalen == 0 ){
-		DPRINTF("premature block end");
+		DPRINTF("empty pkt, premature block end");
 		SELF(conn)->chunk_num = SELF(conn)->chunk_cnt;
 		return false;
 	}
@@ -861,8 +860,6 @@ static bool _srmio_pc7_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 	assert( conn );
 	assert( chunk );
 
-	//DPRINTF( "get chunk #%d", SELF(conn)->chunk_num );
-
 	if( conn->xfer_state != srmio_pc_xfer_state_running )
 		return false;
 
@@ -879,7 +876,9 @@ static bool _srmio_pc7_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 
 	buf = SELF(conn)->pkt.data + 2 + (pkt_chunk * PC7_CHUNK_SIZE);
 
-	DUMPHEX( "unknown", &buf[10], 6 );
+#ifdef DEBUG_CHUNK
+	DUMPHEX( "", buf, PC7_CHUNK_SIZE );
+#endif
 
 	chunk->time = SELF(conn)->block_time + SELF(conn)->chunk_num *
 		SELF(conn)->block_recint;

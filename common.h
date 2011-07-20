@@ -97,8 +97,8 @@
 #include <ctype.h>
 
 #define DPRINTF(x, ...)	fprintf( stderr, "%s: " x "\n", __func__, ##__VA_ARGS__ );
-#define DUMPHEX(prefix, buf, blen) dumphex(__func__, prefix, buf, blen );
-void dumphex(const char *func, const char *prefix, const unsigned char *buf, size_t blen );
+#define DUMPHEX(prefix, buf, blen, ... ) dumphex(__func__, prefix, buf, blen, ##__VA_ARGS__ );
+void dumphex(const char *func, const char *prefix, const unsigned char *buf, int blen, ... );
 
 #else
 

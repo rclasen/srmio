@@ -338,8 +338,6 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 		bool is_first;
 		size_t prog_total;
 
-		DPRINTF( "next block" );
-
 		data->slope = block.slope;
 		data->zeropos = block.zeropos;
 		data->circum = block.circum;
@@ -358,10 +356,8 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 		} else {
 			prog_total = block_cnt * 1000;
 		}
-		DPRINTF( "prog_total %u", prog_total );
 
 		while( srmio_pc_xfer_chunk_next( pch, &chunk, &is_int, &is_first  ) ){
-			DPRINTF( "next chunk" );
 
 			if( pfunc && 0 == done_chunks % 16 ){
 				size_t block_done = 0;
@@ -378,8 +374,8 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 						block.total / block_done;
 				}
 
-				DPRINTF( "prog_prev %d, block_done %d",
-					prog_prev, block_done );
+				DPRINTF( "prog_total %d, prog_prev %d, block_done %d",
+					prog_total, prog_prev, block_done );
 				(*pfunc)( prog_total, block_done, user_data );
 			}
 

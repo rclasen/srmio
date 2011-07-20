@@ -8,19 +8,25 @@
  */
 
 #include "common.h"
+#include <stdarg.h>
 
 #ifdef DEBUG
-void dumphex( const char *func, const char *prefix, const unsigned char *buf, size_t blen )
+void dumphex( const char *func, const char *prefix, const unsigned char *buf, int blen, ... )
 {
-	size_t i;
+	va_list ap;
+	int i;
 
 	if( blen < 1 )
 		return;
 
-	fprintf( stderr, "%s", func );
-	if( prefix && strlen(prefix) )
-		fprintf( stderr, " %s", prefix );
-	fprintf( stderr, ": " );
+
+	fprintf( stderr, "%s ", func );
+
+	va_start( ap, blen );
+	vfprintf( stderr, prefix, ap );
+	va_end( ap );
+
+	fprintf( stderr, " %d: ", blen );
 
 	for( i=0; i < blen; ++i ){
 		unsigned char c = buf[i];
@@ -36,6 +42,4 @@ void dumphex( const char *func, const char *prefix, const unsigned char *buf, si
 	fprintf( stderr, "\n" );
 }
 #endif
-
-
 
