@@ -22,7 +22,7 @@
 #define PC5_PKT_CHUNKS	11u
 
 // TODO: replace _srm_log
-#define _srm_log(x,y, ...) DPRINTF(y, ##__VA_ARGS__)
+#define _srm_log(x,y, ...) STATMSG(y, ##__VA_ARGS__)
 
 
 /*
