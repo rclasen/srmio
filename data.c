@@ -57,6 +57,9 @@ srmio_data_t srmio_data_header( srmio_data_t src )
 	if( src->notes && NULL == ( dst->notes = strdup( src->notes ) ) )
 		goto clean1;
 
+	if( src->athlete && NULL == ( dst->athlete = strdup( src->athlete ) ) )
+		goto clean1;
+
 	dst->slope = src->slope;
 	dst->zeropos = src->zeropos;
 	dst->circum = src->circum;
