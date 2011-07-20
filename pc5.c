@@ -9,7 +9,6 @@
 
 
 #include "pc.h"
-#include <stdarg.h>
 
 
 #define STX	((char)0x2)
@@ -174,7 +173,6 @@ static bool _srmio_pc5_init(
 		goto clean1;
 
 	ret = _srmio_pc5_read( conn, buf, 20 );
-	DPRINTF( "ret %d", ret );
 	if( ret < 0 ){
 		_srm_log( conn, "srmio_pc5_read failed: %s", strerror(errno));
 		goto clean2;
@@ -468,8 +466,7 @@ static int _srmio_pc5_msg_send( srmio_pc_t conn, char cmd, const unsigned char *
 	unsigned len = 0;
 	int ret;
 
-	DPRINTF( "%c ...", cmd );
-	DUMPHEX( "", arg, alen );
+	DUMPHEX( "cmd=%c", arg, alen, cmd );
 
 
 	if( 2 * alen +3 < alen ){
@@ -581,16 +578,12 @@ static int _srmio_pc5_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsi
 	while( rlen < want ){
 		ret = _srmio_pc5_read( conn, &buf[rlen], 1 );
 
-		if( ret < 0 ){
-			_srm_log( conn, "read failed: %s", strerror(errno));
-			DUMPHEX( "", buf, rlen );
-			return -1; /* read failed */
-
-		}
+		if( ret < 0 )
+			break;
 
 		/* timeout */
 		if( ret < 1 ){
-			_srm_log( conn, "read msg timeout" );
+			errno = ETIMEDOUT;
 			break;
 		}
 
@@ -598,17 +591,15 @@ static int _srmio_pc5_msg_recv( srmio_pc_t conn, unsigned char *rbuf, size_t rsi
 
 		/* avoid running into timeout */
 		if( SELF(conn)->stxetx && buf[rlen-1] == ETX ){
-			DPRINTF( "ETX" );
+			DPRINTF( "msg complete - got ETX" );
 			break;
 		}
 
 	}
-	DPRINTF( "got %lu chars", (unsigned long)rlen );
 	DUMPHEX( "", buf, rlen );
 
-	if( ! rlen ){
-		_srm_log( conn, "response timed out" );
-		errno = ETIMEDOUT;
+	if( rlen < want ){
+		_srm_log( conn, "read failed: %s", strerror(errno) )
 		return -1;
 	}
 
@@ -830,7 +821,7 @@ static bool _srmio_pc5_cmd_get_athlete( srmio_pc_t conn, char **name )
 	}
 
 	*name = buf_get_string( buf, 0, 6 );
-	DPRINTF( "got=%s", (char*)*name );
+	DPRINTF( "athlete=%s", (char*)*name );
 	/* TODO: iconv cp850 -> internal ?? */
 
 	return true;
@@ -912,7 +903,7 @@ static bool _srmio_pc5_cmd_set_time( srmio_pc_t conn, struct tm *timep )
 	if( 0 > _srmio_pc5_msg( conn, 'M', buf, 6, NULL, 0, 0 ))
 		return false;
 
-	DPRINTF( "set %s", asctime(timep) );
+	DPRINTF( "time=%s", asctime(timep) );
 	_srmio_pc5_msg_busy( conn, 2 );
 	return true;
 }
@@ -1287,7 +1278,6 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 		}
 
 		ret = _srmio_pc5_read( conn, SELF(conn)->pkt_data, 64 );
-		DPRINTF( "got %d chars", ret );
 		DUMPHEX( "", SELF(conn)->pkt_data, ret );
 
 		if( ret < 0 ){
@@ -1472,13 +1462,12 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn )
 
 	/* get header + number of pkts to read */
 	ret = _srmio_pc5_read( conn, SELF(conn)->pkt_data, SELF(conn)->stxetx ? 4 : 3 );
-	DPRINTF( "read %d chars", ret );
+	DUMPHEX( "xfer response", SELF(conn)->pkt_data, ret );
 	if( ret < 0 ){
 		_srm_log( conn, "reading data failed: %s", strerror(errno));
 		goto clean2;
 	}
 
-	DUMPHEX( "read response", SELF(conn)->pkt_data, ret );
 	if( SELF(conn)->stxetx ){
 		/* TODO: how to distinguish "3 pkts" and 0 + ETX?
 		 * both: 0x02/  0x41/A 0x00/  0x03/
@@ -1564,7 +1553,6 @@ static bool _srmio_pc5_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 	assert( conn );
 	assert( chunk );
 
-	DPRINTF("");
 	while(1){
 		unsigned char *cbuf;
 
@@ -1581,7 +1569,9 @@ static bool _srmio_pc5_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 				return false;
 
 		cbuf = &SELF(conn)->pkt_data[9 + 5*SELF(conn)->chunk_num];
+#ifdef DEBUG_CHUNK
 		DUMPHEX( "", cbuf, 5 );
+#endif
 
 		is_first = cbuf[0] & 0x40;
 		is_int = cbuf[0] & 0x80;
