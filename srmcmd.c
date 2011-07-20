@@ -99,7 +99,7 @@ static void progress( size_t total, size_t done, void *data )
 {
 	(void)data;
 
-	fprintf( stderr, "progress: %u/%u\n", done, total );
+	fprintf( stderr, "progress: %u/%u\r", done, total );
 }
 
 bool do_fixup( srmio_data_t *srmdata, bool fixup )
