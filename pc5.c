@@ -19,6 +19,8 @@
 #define BLOCK_ABRT	((const unsigned char *)"\xaa")
 
 #define PC5_BUFSIZE	1024
+
+#define PC5_PKT_SIZE	64
 #define PC5_PKT_CHUNKS	11u
 
 // TODO: replace _srm_log
@@ -1249,6 +1251,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 	int ret;
 	time_t bstart;
 	int valid;
+	int flush = 0;
 
 	assert( conn );
 
@@ -1263,21 +1266,58 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 			/* request retransmit */
 			_srm_log( conn, "received bad pkt %u, "
 				"requesting retransmit", SELF(conn)->pkt_num );
-			_srmio_pc5_read( conn, SELF(conn)->pkt_data, 64 );
 
-			if( ! srmio_io_flush( conn->io ) ){
-				conn->xfer_state = srmio_pc_xfer_state_failed;
-				return false;
+			/*
+			 * PCV / prolific is a bitch:
+			 *
+			 * sometimes, read times out and there's no
+			 * further data arriving. so io_flush(), sleeping
+			 * or another read make no difference.
+			 *
+			 * though, the old data *does* arrive when writing
+			 * to the PCV, again. As a result, all further
+			 * data is off.
+			 */
+			while( flush > 0 ){
+				if( ! srmio_io_flush( conn->io ) ){
+					conn->xfer_state = srmio_pc_xfer_state_failed;
+					return false;
+				}
+
+				if( 0 > _srmio_pc5_write( conn, BLOCK_NAK, 1 ) ){
+					conn->xfer_state = srmio_pc_xfer_state_failed;
+					_srm_log( conn, "pkt NAK failed: %s", strerror(errno) );
+					return false;
+				}
+
+				flush += PC5_PKT_SIZE;
+				ret = _srmio_pc5_read( conn, SELF(conn)->pkt_data, flush);
+
+				DPRINTF("flushed %d bytes", ret );
+				if( ret < 0 ){
+					errno = EPROTO;
+					return false;
+				}
+
+				/* we got more than one pkt ... hopefully
+				 * that's everything... */
+				if( ret > PC5_PKT_SIZE )
+					break;
+
+				/* retransmit was incomplete, as well: */
+				flush = PC5_PKT_SIZE - ret;
 			}
+			flush = 0;
 
 			if( 0 > _srmio_pc5_write( conn, BLOCK_NAK, 1 ) ){
 				conn->xfer_state = srmio_pc_xfer_state_failed;
 				_srm_log( conn, "pkt NAK failed: %s", strerror(errno) );
 				return false;
 			}
+
 		}
 
-		ret = _srmio_pc5_read( conn, SELF(conn)->pkt_data, 64 );
+		ret = _srmio_pc5_read( conn, SELF(conn)->pkt_data, PC5_PKT_SIZE );
 		DUMPHEX( "", SELF(conn)->pkt_data, ret );
 
 		if( ret < 0 ){
@@ -1304,9 +1344,13 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 			conn->xfer_state = srmio_pc_xfer_state_failed;
 			return false;
 
-		} else if( ret < 64 ){
+		} else if( ret < PC5_PKT_SIZE ){
 			/* incomplete pkt, retry */
-			_srm_log( conn, "pkt is too short" );
+			_srm_log( conn, "pkt %d is too short: %d",
+				SELF(conn)->pkt_num,
+				ret );
+
+			flush += PC5_PKT_SIZE - ret;
 			continue;
 
 		}
