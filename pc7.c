@@ -571,8 +571,6 @@ static bool _srmio_pc7_cmd_clear( srmio_pc_t conn )
  * TODO: other_commands
 		.cmd = 0x0106, // online_status
 		.cmd = 0x010c, // TODO
-
-		.cmd = 0x0403, // TODO xfer_block_retry?
  */
 
 /************************************************************
@@ -663,7 +661,10 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 		.cmd = 0x0402, // xfer_block
 		.datalen = 0,
 	};
-	// TODO: retry 0x0403?
+	struct _srmio_pc7_packet_t retry = {
+		.cmd = 0x0403,
+		.datalen = 0,
+	};
 	struct _srmio_pc7_packet_t recv;
 	size_t block_num;
 	struct tm bstarts;
@@ -682,7 +683,7 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 		return false;
 	}
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, &retry, &recv ) )
 		goto fail;
 
 	if( recv.datalen == 0 ){
