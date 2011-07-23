@@ -500,11 +500,11 @@ bool set_marker( unsigned char *buf, char *note, unsigned first,
 	/* TODO: iconv notes -> cp850 */
 	buf_set_string( buf, 0, note, 255 );
 	buf_set_uint8( buf, 255, 1 ); /* active */
-	if( ! buf_set_luint16( buf, 256, first ) ){
+	if( ! buf_set_luint16( buf, 256, first+1 ) ){
 		ERRMSG( "failed to convert marker index: %s", strerror(errno));
 		return false;
 	}
-	if( ! buf_set_luint16( buf, 258, last ) ){
+	if( ! buf_set_luint16( buf, 258, last+1 ) ){
 		ERRMSG( "failed to convert marker index: %s", strerror(errno));
 		return false;
 	}
