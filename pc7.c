@@ -578,6 +578,24 @@ static bool _srmio_pc7_cmd_clear( srmio_pc_t conn )
  * data download
  */
 
+/*
+ * pc7 download happens in 3 stages:
+ * - first get number of "blocks"
+ * - while( get "block" header )
+ *   - get "pakets" - each with 16 chunks
+ *
+ * pc7 seems to end/start a new block when it doesn't record. There are no
+ * gaps within a block.
+ *
+ * pc7 remembers the "current" block/packet. You can only ask for the next
+ * or a retransmission of the current one.
+ *
+ * you don't have to fetch (all) blocks/packets. Getting the next block
+ * aborts the current block. Getting the block count, again, aborts the
+ * download and next block request will return the first block.
+ *
+ * timing seems to be quite uncritical.
+ */
 
 static bool _srmio_pc7_xfer_block_progress(
 	srmio_pc_t conn, size_t *block_done )
@@ -590,7 +608,9 @@ static bool _srmio_pc7_xfer_block_progress(
 	return true;
 }
 
-// TODO: is 0x0401 only getting the block count, or does it "rewind", as well?
+/*
+ * get block count and re-/start download
+ */
 static bool _srmio_pc7_xfer_start( srmio_pc_t conn )
 {
 	struct _srmio_pc7_packet_t send = {
@@ -628,6 +648,8 @@ fail:
 }
 
 /*
+ * get next block header from pc7
+ *
  * block response data packing:
  *
  * id	offset	len	type	comment
@@ -754,6 +776,8 @@ fail:
 }
 
 /*
+ * get next data packet from pc7
+ *
  * xfer response data packing:
  *
  * id	offset	len	type	comment
@@ -822,7 +846,7 @@ fail:
  * 3	5	1	uint8	heartrate (1/min)
  * 4	6	2	in16	elevation (m)
  * 5	8	2	in16	temperature * 10 (°C)
- * 6	10	1	uint8	interval(?) TODO
+ * 6	10	1	uint8	interval bool
  * 7	11	5		TODO: unknown
  */
 
@@ -891,6 +915,10 @@ static bool _srmio_pc7_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 	chunk->ele = buf_get_bint16( buf, 6 );
 	chunk->temp = 0.1 * buf_get_bint16( buf, 8 );
 
+	// TODO: hmm, this means, there has to be at least one chunk
+	// that's not part of a lap as seperator between two laps. pc5 had
+	// a seperate bit to indicate intervall start... couldn't find
+	// this for pc7
 	is_int = buf_get_uint8( buf, 10 );
 	is_first = ! SELF(conn)->is_intervall && is_int;
 	SELF(conn)->is_intervall = is_int;
@@ -930,7 +958,6 @@ static bool _srmio_pc7_xfer_finish( srmio_pc_t conn )
 
 	DPRINTF("");
 	if( SELF(conn)->pkt_num * PC7_PKT_CHUNKS < SELF(conn)->chunk_cnt ){
-		// TODO: abort needed?
 		DPRINTF("abort");
 		conn->xfer_state = srmio_pc_xfer_state_abort;
 	}
