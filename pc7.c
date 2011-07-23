@@ -881,7 +881,7 @@ static bool _srmio_pc7_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 	DUMPHEX( "", buf, PC7_CHUNK_SIZE );
 #endif
 
-	chunk->time = SELF(conn)->block_time + SELF(conn)->chunk_num *
+	chunk->time = SELF(conn)->block_time + (SELF(conn)->chunk_num -1) *
 		SELF(conn)->block_recint;
 	chunk->dur = SELF(conn)->block_recint;
 	chunk->pwr = buf_get_buint16( buf, 0 );
