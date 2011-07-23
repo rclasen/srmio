@@ -324,7 +324,7 @@ static bool get_time( const unsigned char *buf, size_t pos, struct tm *dst )
 	dst->tm_hour = buf[pos+4];
 	dst->tm_min = buf[pos+5];
 	dst->tm_sec = buf[pos+6];
-	dst->tm_isdst = 0;
+	dst->tm_isdst = -1;
 
 	return true;
 }
