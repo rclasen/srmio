@@ -59,7 +59,7 @@ srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
 				srmio_data_t *new;
 
 				if( NULL == (new = realloc( list,
-					sizeof(srmio_data_t) * ( alloc +10)  ) ))
+					sizeof(srmio_data_t) * ( alloc +1 +10)  ) ))
 					goto clean;
 
 				alloc += 10;
@@ -69,7 +69,7 @@ srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
 			if( NULL == (list[used] = srmio_data_header( src )))
 				goto clean;
 
-			++used;
+			list[++used] = NULL;
 		}
 
 		srmio_data_add_chunk( list[used-1], src->chunks[c] );
