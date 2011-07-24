@@ -295,7 +295,7 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 	struct _srmio_pc_xfer_block_t block;
 	struct _srmio_chunk_t chunk;
 	size_t done_chunks = 0;
-	size_t block_cnt, block_num;
+	size_t block_cnt, block_num = 0;
 	size_t prog_prev = 0, prog_sum=0;
 	srmio_pc_xfer_state_t result;
 
@@ -395,8 +395,6 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 				mfirst = -1;
 
 			}
-
-			++block_num;
 		}
 
 		/* finalize marker at block end */
@@ -412,6 +410,8 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 
 		free( block.athlete );
 		block.athlete = NULL;
+
+		++block_num;
 	}
 
 	if( ! done_chunks ){
