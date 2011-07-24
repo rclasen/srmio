@@ -486,6 +486,8 @@ int main( int argc, char **argv )
 		return 1;
 	}
 
+	// TODO: report probed baud/parity if verbose
+
 	if( opt_name ){
 		char *name;
 

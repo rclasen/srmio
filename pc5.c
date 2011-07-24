@@ -156,7 +156,7 @@ static bool _srmio_pc5_init(
 	srmio_io_baud2name( baudrate, &baudname );
 	srmio_io_parity2name( parity, &parityname );
 
-	_srm_log( conn, "trying comm %d/8%c1",
+	DPRINTF( "trying comm %d/8%c1",
 		baudname,
 		parityname );
 
@@ -217,7 +217,7 @@ static bool _srmio_pc5_init(
 	conn->parity = parity;
 	conn->firmware = buf_get_buint16( verbuf, 0 );
 
-	_srm_log( conn, "found PCV version 0x%x at %d/8%c1",
+	DPRINTF("found PCV version 0x%x at %d/8%c1",
 		conn->firmware,
 		baudname,
 		parityname );
@@ -1148,7 +1148,14 @@ static bool _srmio_pc5_cmd_clear( srmio_pc_t conn )
 }
 
 
-/* TODO: srmio_pc5_reset_battery */
+/* TODO: srmio_pc5_reset_battery
+non-stxetx firmware:
+0.00000 WRITE 59 02 3a 00
+0.00000  READ 59
+0.00000 WRITE 59 02 3b 00
+0.00000  READ 59
+ */
+
 /* TODO: implement srmio_pc5_cmd_set_* functions */
 /* TODO: investigate/implement other commands */
 

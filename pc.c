@@ -151,6 +151,29 @@ bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity )
 	return true;
 }
 
+bool srmio_pc_get_baudrate( srmio_pc_t pch, srmio_io_baudrate_t *rate )
+{
+	assert(pch);
+	assert(rate);
+
+	if( pch->baudrate >= srmio_io_baud_max )
+		return false;
+
+	*rate = pch->baudrate;
+	return true;
+}
+
+bool srmio_pc_get_parity( srmio_pc_t pch, srmio_io_parity_t *parity )
+{
+	assert(pch);
+	assert(parity);
+
+	if( pch->parity >= srmio_io_parity_max )
+		return false;
+
+	*parity = pch->parity;
+	return true;
+}
 
 /*
  * gets the firmware as discovered when opening the device

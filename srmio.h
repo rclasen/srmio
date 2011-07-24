@@ -276,6 +276,8 @@ bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity );
 
 bool srmio_pc_open( srmio_pc_t conn );
 bool srmio_pc_close( srmio_pc_t conn );
+bool srmio_pc_get_baudrate( srmio_pc_t pch, srmio_io_baudrate_t *rate );
+bool srmio_pc_get_parity( srmio_pc_t pch, srmio_io_parity_t *parity );
 bool srmio_pc_get_version( srmio_pc_t conn, unsigned *version );
 
 bool srmio_pc_cmd_get_athlete( srmio_pc_t conn, char **athlete );
