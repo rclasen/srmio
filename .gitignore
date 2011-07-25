@@ -5,6 +5,8 @@
 *.o
 *.man
 *.exe
+*.swp
+*~
 .deps
 .libs
 Makefile
@@ -27,4 +29,5 @@ stamp-h1
 srmcmd
 srmdump
 autoscan.log
+configure.scan
 srmio_config.h
