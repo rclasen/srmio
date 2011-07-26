@@ -311,7 +311,7 @@ bool _srmio_pc5_close( srmio_pc_t conn )
 {
 	assert( conn );
 
-	DPRINTF( "" );
+	(void) conn;
 
 	return true;
 }

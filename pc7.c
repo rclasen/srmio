@@ -271,6 +271,7 @@ static bool _srmio_pc7_close( srmio_pc_t conn )
 {
 	assert( conn );
 
+	(void) conn;
 	return true;
 }
 
