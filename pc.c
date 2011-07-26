@@ -32,6 +32,8 @@ srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child )
 
 void srmio_pc_free( srmio_pc_t pch )
 {
+	assert(pch->methods->free);
+
 	if( pch->is_open )
 		srmio_pc_close( pch );
 
@@ -43,6 +45,7 @@ bool srmio_pc_open( srmio_pc_t pch )
 {
 	assert( pch );
 	assert( pch->io );
+	assert(pch->methods->open);
 
 	DPRINTF("");
 
@@ -70,6 +73,7 @@ bool srmio_pc_close( srmio_pc_t pch )
 {
 	assert( pch );
 	assert( pch->io );
+	assert(pch->methods->close);
 
 	DPRINTF("");
 
@@ -220,6 +224,7 @@ bool srmio_pc_xfer_get_blocks( srmio_pc_t conn, size_t *blocks )
 bool srmio_pc_cmd_get_athlete( srmio_pc_t pch, char **athlete )
 {
 	assert(pch);
+	assert(pch->methods->cmd_get_athlete);
 
 	return (*pch->methods->cmd_get_athlete)( pch, athlete );
 }
@@ -227,6 +232,7 @@ bool srmio_pc_cmd_get_athlete( srmio_pc_t pch, char **athlete )
 bool srmio_pc_cmd_set_time( srmio_pc_t pch, struct tm *t )
 {
 	assert(pch);
+	assert(pch->methods->cmd_set_time);
 
 	return (*pch->methods->cmd_set_time)( pch, t );
 }
@@ -234,6 +240,7 @@ bool srmio_pc_cmd_set_time( srmio_pc_t pch, struct tm *t )
 bool srmio_pc_cmd_set_recint( srmio_pc_t pch, srmio_time_t t )
 {
 	assert(pch);
+	assert(pch->methods->cmd_set_recint);
 
 	return (*pch->methods->cmd_set_recint)( pch, t );
 }
@@ -241,6 +248,7 @@ bool srmio_pc_cmd_set_recint( srmio_pc_t pch, srmio_time_t t )
 bool srmio_pc_cmd_clear( srmio_pc_t pch )
 {
 	assert(pch);
+	assert(pch->methods->cmd_clear);
 
 	return (*pch->methods->cmd_clear)( pch );
 }
@@ -248,6 +256,7 @@ bool srmio_pc_cmd_clear( srmio_pc_t pch )
 bool srmio_pc_xfer_start( srmio_pc_t pch )
 {
 	assert(pch);
+	assert(pch->methods->xfer_start);
 
 	return (*pch->methods->xfer_start)( pch );
 }
@@ -256,6 +265,7 @@ bool srmio_pc_xfer_block_next( srmio_pc_t pch, srmio_pc_xfer_block_t block )
 {
 	assert(pch);
 	assert( block );
+	assert(pch->methods->xfer_block_next);
 
 	return (*pch->methods->xfer_block_next)( pch, block );
 }
@@ -265,6 +275,7 @@ bool srmio_pc_xfer_chunk_next( srmio_pc_t pch, srmio_chunk_t chunk,
 {
 	assert(pch);
 	assert( chunk );
+	assert(pch->methods->xfer_chunk_next);
 
 	return (*pch->methods->xfer_chunk_next)( pch, chunk,
 		is_intervall, start_intervall );
@@ -273,6 +284,7 @@ bool srmio_pc_xfer_chunk_next( srmio_pc_t pch, srmio_chunk_t chunk,
 bool srmio_pc_xfer_finish( srmio_pc_t pch )
 {
 	assert(pch);
+	assert(pch->methods->xfer_finish);
 
 	return (*pch->methods->xfer_finish)( pch );
 }
@@ -287,6 +299,7 @@ srmio_pc_xfer_state_t srmio_pc_xfer_status( srmio_pc_t pch )
 bool srmio_pc_xfer_block_progress( srmio_pc_t pch, size_t *block_done )
 {
 	assert( pch );
+	assert(pch->methods->xfer_block_progress);
 
 	return (*pch->methods->xfer_block_progress)( pch, block_done );
 }

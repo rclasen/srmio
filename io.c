@@ -140,6 +140,7 @@ srmio_io_t srmio_io_new( const srmio_io_methods_t *methods, void *child )
 void srmio_io_free( srmio_io_t h )
 {
 	assert( h );
+	assert(h->methods->free);
 
 	if( srmio_io_is_open( h ) )
 		srmio_io_close( h );
@@ -185,6 +186,7 @@ bool srmio_io_set_flow( srmio_io_t h, srmio_io_flow_t flow )
 bool srmio_io_update( srmio_io_t h )
 {
 	assert( h );
+	assert(h->methods->update);
 
 	return (*h->methods->update)( h );
 }
@@ -193,6 +195,7 @@ bool srmio_io_update( srmio_io_t h )
 bool srmio_io_open( srmio_io_t h )
 {
 	assert(h);
+	assert(h->methods->open);
 
 	if( h->is_open ){
 		errno = EBUSY;
@@ -209,6 +212,7 @@ bool srmio_io_close( srmio_io_t h )
 	bool ret;
 
 	assert(h);
+	assert(h->methods->close);
 
 	ret = (*h->methods->close)( h );
 	if( ret )
@@ -220,6 +224,7 @@ bool srmio_io_close( srmio_io_t h )
 int srmio_io_write( srmio_io_t h, const unsigned char *buf, size_t len )
 {
 	assert(h);
+	assert(h->methods->write);
 
 	return (*h->methods->write)( h, buf, len );
 }
@@ -227,6 +232,7 @@ int srmio_io_write( srmio_io_t h, const unsigned char *buf, size_t len )
 int srmio_io_read( srmio_io_t h, unsigned char *buf, size_t len )
 {
 	assert(h);
+	assert(h->methods->read);
 
 	return (*h->methods->read)( h, buf, len );
 }
@@ -234,6 +240,7 @@ int srmio_io_read( srmio_io_t h, unsigned char *buf, size_t len )
 bool srmio_io_flush( srmio_io_t h )
 {
 	assert(h);
+	assert(h->methods->flush);
 
 	return (*h->methods->flush)( h );
 }
@@ -241,6 +248,7 @@ bool srmio_io_flush( srmio_io_t h )
 bool srmio_io_send_break( srmio_io_t h )
 {
 	assert(h);
+	assert(h->methods->send_break);
 
 	return (*h->methods->send_break)( h );
 }
