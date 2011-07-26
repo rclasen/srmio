@@ -224,6 +224,7 @@ int main( int argc, char **argv )
 	srmio_io_baudrate_t opt_baud = srmio_io_baud_max;
 	int opt_clear = 0;
 	int opt_date = 0;
+	int opt_ftdi = 0;
 	int opt_fixup = 0;
 	int opt_get = 0;
 	int opt_help = 0;
@@ -243,6 +244,7 @@ int main( int argc, char **argv )
 		{ "baud", required_argument, NULL, 'b' },
 		{ "clear", no_argument, NULL, 'c' },
 		{ "date", no_argument, NULL, 'd' },
+		{ "ftdi", no_argument, NULL, 'f' },
 		{ "fixup", no_argument, NULL, 'x' },
 		{ "get", optional_argument, NULL, 'g' },
 		{ "help", no_argument, NULL, 'h' },
@@ -263,7 +265,7 @@ int main( int argc, char **argv )
 	srmio_pc_t srm;
 
 	/* TODO: option to filter data by timerange */
-	while( -1 != ( c = getopt_long( argc, argv, "b:cdg::hi:np:rR:s:tVvw:W:x", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "b:cdfg::hi:np:rR:s:tVvw:W:x", lopts, NULL ))){
 		switch(c){
 		  case 'b':
 			if( ! srmio_io_name2baud( atoi(optarg), &opt_baud)){
@@ -278,6 +280,10 @@ int main( int argc, char **argv )
 
 		  case 'd':
 			++opt_date;
+			break;
+
+		  case 'f':
+			++opt_ftdi;
 			break;
 
 		  case 'g':
@@ -431,11 +437,31 @@ int main( int argc, char **argv )
 		return 0;
 	}
 
-	if( NULL == (io = srmio_ios_new( fname ))){
-		fprintf( stderr, "srmio_io_new(%s) failed: %s\n",
-			fname,
-			strerror(errno) );
+	if( opt_ftdi ){
+#ifdef SRMIO_HAVE_D2XX
+		if( NULL == (io = srmio_d2xx_description_new( fname ))){
+			fprintf( stderr, "srmio_d2xx_new(%s) failed: %s\n",
+				fname,
+				strerror(errno) );
+			return 1;
+		}
+#else
+		fprintf( stderr "ftdi support is not enabled\n" )
 		return 1;
+#endif
+
+	} else {
+#ifdef SRMIO_HAVE_TERMIOS
+		if( NULL == (io = srmio_ios_new( fname ))){
+			fprintf( stderr, "srmio_ios_new(%s) failed: %s\n",
+				fname,
+				strerror(errno) );
+			return 1;
+		}
+#else
+		fprintf( stderr "termios support is not enabled\n" )
+		return 1;
+#endif
 	}
 
 	if( ! srmio_io_open( io )){

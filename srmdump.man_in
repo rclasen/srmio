@@ -28,6 +28,9 @@ is retrieved from the PCV (PCVI and PC7 don't seem to support getting
 "deleted" data). By default data is written to stdout as
 tab-seperated list.
 .TP
+\fB\-f\fR, \fB\-\-ftdi\fR
+use ftdi serial driver and open device by the given description.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 A brief message.
 .TP
@@ -48,6 +51,7 @@ show srmdump version number and exit.
  srmdump /dev/ttyS1		# cygwin, com1
  srmdump /dev/cu.usbserial*	# Mac OS X, prolific driver (good luck)
  srmdump /dev/cu.PL2303-*	# Mac OS X with http://osx-pl2303.sourceforge.net/
+ srmdump -p 7 -f "POWERCONTROL 7" # ftdi, PowerControl 7
 
 .SH "SEE ALSO"
 This is just a very simplistic frontend for the lib. Please check the

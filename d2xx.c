@@ -29,6 +29,8 @@ static FT_STATUS (*FP_SetFlowControl)( FT_HANDLE ftHandle, USHORT FlowControl, U
 static FT_STATUS (*FP_SetTimeouts)( FT_HANDLE ftHandle, ULONG ReadTimeout, ULONG WriteTimeout) = NULL;
 static FT_STATUS (*FP_Read)( FT_HANDLE ftHandle, LPVOID lpBuffer, DWORD nBufferSize, LPDWORD lpBytesReturned) = NULL;
 static FT_STATUS (*FP_Write)( FT_HANDLE ftHandle, LPVOID lpBuffer, DWORD nBufferSize, LPDWORD lpBytesWritten) = NULL;
+static FT_STATUS (*FP_SetBreakOn)( FT_HANDLE ftHandle) = NULL;
+static FT_STATUS (*FP_SetBreakOff)( FT_HANDLE ftHandle) = NULL;
 //static FT_STATUS (*FP_CreateDeviceInfoList)( LPDWORD lpdwNumDevs) = NULL;
 //static FT_STATUS (*FP_GetDeviceInfoList)( FT_DEVICE_LIST_INFO_NODE *pDest, LPDWORD lpdwNumDevs) = NULL;
 
@@ -55,6 +57,8 @@ static bool d2xx_dlopen( void )
 	SYM(d2xx_lib, FP_SetTimeouts, "FT_SetTimeouts" );
 	SYM(d2xx_lib, FP_Read, "FT_Read" );
 	SYM(d2xx_lib, FP_Write, "FT_Write" );
+	SYM(d2xx_lib, FP_SetBreakOn, "FT_SetBreakOn" );
+	SYM(d2xx_lib, FP_SetBreakOff, "FT_SetBreakOff" );
 //	SYM(d2xx_lib, FP_CreateDeviceInfoList, "FT_CreateDeviceInfoList" );
 //	SYM(d2xx_lib, FP_GetDeviceInfoList, "FT_GetDeviceInfoList" );
 
@@ -70,7 +74,41 @@ static int d2xx_errno( FT_STATUS status )
 {
 	fprintf(stderr,"status: %u\n", status );
 	switch( status ){
-		// TODO
+          case FT_OK:
+		return 0;
+
+          case FT_INVALID_HANDLE:
+          case FT_INVALID_PARAMETER:
+          case FT_INVALID_BAUD_RATE:
+          case FT_INVALID_ARGS:
+		return EINVAL;
+
+          case FT_IO_ERROR:
+		return EIO;
+
+          case FT_NOT_SUPPORTED:
+		return ENOTSUP;
+
+          case FT_DEVICE_NOT_FOUND:
+		return ENODEV;
+
+          case FT_DEVICE_NOT_OPENED:
+          case FT_DEVICE_NOT_OPENED_FOR_ERASE:
+          case FT_DEVICE_NOT_OPENED_FOR_WRITE:
+		return EBADF;
+
+          case FT_INSUFFICIENT_RESOURCES:
+		return ENOMEM;
+
+          case FT_FAILED_TO_WRITE_DEVICE:
+          case FT_EEPROM_READ_FAILED:
+          case FT_EEPROM_WRITE_FAILED:
+          case FT_EEPROM_ERASE_FAILED:
+          case FT_EEPROM_NOT_PRESENT:
+          case FT_EEPROM_NOT_PROGRAMMED:
+
+          case FT_OTHER_ERROR:
+		return EIO;
 	}
 
 	return EIO;
@@ -159,13 +197,29 @@ static bool _srmio_d2xx_flush( srmio_io_t h )
 
 static bool _srmio_d2xx_send_break( srmio_io_t h )
 {
+	struct timespec tspec = {
+		.tv_sec = 0,
+		.tv_nsec = 250000000,
+	}; // 0.25 sec
 	FT_STATUS ret;
 
 	assert( h );
 	assert( SELF(h)->is_open );
 
-	(void)ret; (void)h;
-	// TODO
+	ret = (*FP_SetBreakOn)( SELF(h)->ft );
+	if( ret != FT_OK ){
+		errno = d2xx_errno( ret );
+		return false;
+	}
+
+	nanosleep( &tspec, NULL );
+
+	ret = (*FP_SetBreakOff)( SELF(h)->ft );
+	if( ret != FT_OK ){
+		errno = d2xx_errno( ret );
+		return false;
+	}
+
 	return true;
 }
 
@@ -351,3 +405,4 @@ srmio_io_t srmio_d2xx_description_new( const char *desc )
 	return _srmio_d2xx_new( desc, FT_OPEN_BY_DESCRIPTION );
 }
 
+/* TODO: provide some way to list devices */

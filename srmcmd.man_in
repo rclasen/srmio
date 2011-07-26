@@ -39,6 +39,9 @@ of up to 2sec are filled with averaged data. That's what srmwin is doing,
 It seems wko doesn't ... The protcol for PCVI and PC7 doesn't have this
 problem. 
 .TP
+\fB\-f\fR, \fB\-\-ftdi\fR
+use ftdi serial driver and open device by the given description.
+.TP
 \fB\-g\fR, \fB\-\-get\fR[=all]
 Download newly recorded data from PC. With \fIall\fR specified, the
 "deletion" on the PCV is ignored and all data (that's not yet overwriten)
@@ -121,6 +124,7 @@ Show name configured in PC:
  srmcmd -n /dev/ttyS1		# cygwin, com1
  srmcmd -n /dev/cu.usbserial*	# Mac OS X, prolific driver (good luck)
  srmcmd -n /dev/cu.PL2303-*	# Mac OS X with http://osx-pl2303.sourceforge.net/
+ srmcmd -n -p 7 -f "POWERCONTROL 7" # ftdi, PowerControl 7
 
 Download data to out.srm, delete data on PC, adjust clock and set recint
 to 1sec:

@@ -47,6 +47,7 @@ int main( int argc, char **argv )
 	char *dev = NULL;
 	int opt_all = 0;
 	srmio_io_baudrate_t opt_baud = srmio_io_baud_max;
+	int opt_ftdi = 0;
 	int opt_help = 0;
 	int opt_pc = 5;
 	int opt_version = 0;
@@ -54,6 +55,7 @@ int main( int argc, char **argv )
 	struct option lopts[] = {
 		{ "all", no_argument, NULL, 'a' },
 		{ "baud", required_argument, NULL, 'b' },
+		{ "ftdi", no_argument, NULL, 'f' },
 		{ "help", no_argument, NULL, 'h' },
 		{ "pc", required_argument, NULL, 'p' },
 		{ "version", no_argument, NULL, 'V' },
@@ -65,7 +67,7 @@ int main( int argc, char **argv )
 	struct _srmio_pc_xfer_block_t block;
 	struct _srmio_chunk_t chunk;
 
-	while( -1 != ( c = getopt_long( argc, argv, "b:g::hp:V", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "b:fg::hp:V", lopts, NULL ))){
 		switch(c){
 		  case 'a':
 			++opt_all;
@@ -76,6 +78,10 @@ int main( int argc, char **argv )
 				fprintf( stderr, "invalid baud rate: : %s\n", optarg );
 				++needhelp;
 			}
+			break;
+
+		  case 'f':
+			++opt_ftdi;
 			break;
 
 		  case 'h':
@@ -116,11 +122,31 @@ int main( int argc, char **argv )
 		exit(1);
 	}
 
-	if( NULL == (io = srmio_ios_new( dev ))){
-		fprintf( stderr, "srmio_io_new(%s) failed: %s\n",
-			dev,
-			strerror(errno) );
+	if( opt_ftdi ){
+#ifdef SRMIO_HAVE_D2XX
+		if( NULL == (io = srmio_d2xx_description_new( dev ))){
+			fprintf( stderr, "srmio_d2xx_new(%s) failed: %s\n",
+				dev,
+				strerror(errno) );
+			return 1;
+		}
+#else
+		fprintf( stderr "ftdi support is not enabled\n" )
 		return 1;
+#endif
+
+	} else {
+#ifdef SRMIO_HAVE_TERMIOS
+		if( NULL == (io = srmio_ios_new( dev ))){
+			fprintf( stderr, "srmio_ios_new(%s) failed: %s\n",
+				dev,
+				strerror(errno) );
+			return 1;
+		}
+#else
+		fprintf( stderr "termios support is not enabled\n" )
+		return 1;
+#endif
 	}
 
 	if( ! srmio_io_open( io )){
