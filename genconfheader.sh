@@ -60,6 +60,14 @@ if [ -n "$HEADER_TERMIOS_H" ]; then
 	echo "#include <termios.h>"
 fi
 
+if [ -n "$HAVE_TERMIOS" ]; then
+	echo "#define SRMIO_HAVE_TERMIOS"
+fi
+
+if [ -n "$HAVE_D2XX" ]; then
+	echo "#define SRMIO_HAVE_D2XX"
+fi
+
 cat<<EOF
 
 # ifdef __cplusplus

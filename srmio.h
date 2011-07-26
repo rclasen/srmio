@@ -229,8 +229,24 @@ bool srmio_io_send_break( srmio_io_t h );
  *
  ************************************************************/
 
+#ifdef SRMIO_HAVE_TERMIOS
+
 srmio_io_t srmio_ios_new( const char *fname );
 
+#endif
+
+/************************************************************
+ *
+ * from d2xx.c
+ *
+ ************************************************************/
+
+#ifdef SRMIO_HAVE_D2XX
+
+srmio_io_t srmio_d2xx_serial_new( const char *serial );
+srmio_io_t srmio_d2xx_description_new( const char *desc );
+
+#endif
 
 /************************************************************
  *

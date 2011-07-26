@@ -24,25 +24,44 @@ EXTRA_DIST= $(man_INS) \
 	genconfheader.sh \
 	srmwinget.sh
 
+DISTCLEANFILES=srmio_config.h
 include_HEADERS= \
 	srmio.h \
 	srmio_config.h
-DISTCLEANFILES=srmio_config.h
+
+if HAVE_D2XX
+D2XX_SRC = d2xx.c
+D2XX_LD = -ldl -lpthread
+else
+D2XX_SRC =
+D2XX_LD =
+endif
+
+if HAVE_TERMIOS
+TERMIOS_SRC = ios.c
+else
+TERMIOS_SRC =
+endif
 
 lib_LTLIBRARIES=libsrmio.la
+
+libsrmio_la_LDFLAGS= $(D2XX_LD)
 libsrmio_la_SOURCES= \
 	common.h \
+	io.h \
+	pc.h \
 	\
 	buf.c \
 	chunk.c \
 	common.c \
+	$(D2XX_SRC) \
 	data.c \
 	ftypes.c \
 	file_srm.c \
 	file_wkt.c \
 	fixup.c \
 	io.c \
-	ios.c \
+	$(TERMIOS_SRC) \
 	marker.c \
 	pc.c \
 	pc5.c \
@@ -51,11 +70,11 @@ libsrmio_la_SOURCES= \
 
 bin_PROGRAMS=srmcmd srmdump
 
-srmcmd_LDFLAGS= -lsrmio
+srmcmd_LDFLAGS= -lsrmio $(D2XX_LD)
 srmcmd_SOURCES= \
 	srmcmd.c
 
-srmdump_LDFLAGS= -lsrmio
+srmdump_LDFLAGS= -lsrmio $(D2XX_LD)
 srmdump_SOURCES= \
 	srmdump.c
 

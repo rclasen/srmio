@@ -22,10 +22,18 @@ AC_PROG_MAKE_SET
 # Checks for header files.
 AC_HEADER_STDC
 AC_HEADER_STDBOOL
-AC_CHECK_HEADERS([fcntl.h getopt.h inttypes.h limits.h memory.h stddef.h stdint.h stdlib.h string.h sys/time.h termios.h unistd.h])
+AC_CHECK_HEADERS([dlfcn.h fcntl.h getopt.h inttypes.h limits.h memory.h stddef.h stdint.h stdlib.h string.h sys/time.h termios.h unistd.h])
 
 
 AC_SYS_POSIX_TERMIOS
+AM_CONDITIONAL([HAVE_TERMIOS],[ test "x$ac_cv_sys_posix_termios" = xyes ])
+AS_IF([test "x$ac_cv_sys_posix_termios" = xyes], [
+  AC_SUBST([HAVE_TERMIOS], true)
+  AC_DEFINE([HAVE_TERMIOS],[1],[Define if sytem has posix termios for serial device access.])
+  AC_CHECK_FUNC([cfmakeraw],
+    [AC_DEFINE([HAVE_CFMAKERAW],[1], [Define if cfmakeraw exists.])],)
+],[])
+
 
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -87,8 +95,63 @@ AC_CPP_FUNC
 # TODO: getopt_long alternatives (FreeBSD)
 # TODO: provide alternative implementations, use gnulib?
 
-AC_CHECK_FUNC([cfmakeraw],
-	[AC_DEFINE([HAVE_CFMAKERAW],[1], [Define if cfmakeraw exists.])],)
+AC_DEFUN([AC_DLOPEN_IFELSE],[
+  AC_COMPILE_IFELSE([
+    AC_LANG_PROGRAM([],[[
+#include <dlfcn.h>
+	  return 0 == dlopen($1, RTLD_NOW) ? 1 : 0;
+    ]])
+  ], [$2] , [$3] )
+])
+
+
+AC_ARG_WITH([ftd2xx],
+  [AS_HELP_STRING([--with-ftd2xx=<filename>],
+    [support libftd2xx for FTDI device serial access @<:@default=check@:>@])],
+  [],
+  [with_ftd2xx=check])
+
+HAVE_D2XX=
+AS_IF([test "x$with_ftd2xx" != xno], [
+  AC_CHECK_LIB([ftd2xx], [FT_OpenEx], [
+    AC_MSG_CHECKING([for ftd2xx filename])
+    #for lib in libftd2xx.so ftd2xx.dll libftd2xx.dylib "$with_ftd2xx"; do
+    AC_DLOPEN_IFELSE(["libftd2xx.so"],[
+      AC_SUBST([HAVE_D2XX],[true])
+      AC_DEFINE([HAVE_D2XX],[1],[Define if system has libftd2xx.])
+      AC_DEFINE([D2XX_LIBNAME],"libftd2xx.so",[Define to libftd2xx filname for dlopen.])
+    ], [
+      AC_DLOPEN_IFELSE(["libftd2xx.dylib"],[
+        AC_SUBST([HAVE_D2XX],[true])
+        AC_DEFINE([HAVE_D2XX],[1],[Define if system has libftd2xx.])
+        AC_DEFINE([D2XX_LIBNAME],"libftd2xx.dylib",[Define to libftd2xx filname for dlopen.])
+      ],[
+        AC_DLOPEN_IFELSE(["ftd2xx.dll"],[
+          AC_SUBST([HAVE_D2XX],[true])
+          AC_DEFINE([HAVE_D2XX],[1],[Define if system has libftd2xx.])
+          AC_DEFINE([D2XX_LIBNAME],"ftd2xx.dll",[Define to libftd2xx filname for dlopen.])
+        ],[
+        ])
+      ])
+    ])
+
+    if test -z "$HAVE_D2XX" ; then
+      if test "x$with_ftd2xx" != xcheck; then
+        AC_MSG_FAILURE([--with-ftd2x was given, but test for ftd2xx failed])
+      else
+        AC_MSG_RESULT([none])
+      fi
+    else
+      AC_MSG_RESULT(["found"])
+    fi
+  ],[
+    if test "x$with_ftd2xx" != xcheck; then
+      AC_MSG_FAILURE([--with-ftd2x was given, but test for ftd2xx failed])
+    fi
+  ])
+])
+
+AM_CONDITIONAL([HAVE_D2XX], [ test -n "$HAVE_D2XX" ])
 
 
 AC_CONFIG_FILES([Makefile])
@@ -103,6 +166,8 @@ HAVE__BOOL=$ac_cv_type__Bool
 HEADER_TIME_WITH_SYS_TIME=$ac_cv_header_time
 HEADER_SYS_TIME_H=$ac_cv_header_sys_time_h
 HEADER_TERMIOS_H=$ac_cv_header_termios_h
+HAVE_TERMIOS=$ac_cv_sys_posix_termios
+HAVE_D2XX=$HAVE_D2XX
 ])
 
 AC_OUTPUT
