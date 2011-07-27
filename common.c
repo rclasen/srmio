@@ -10,6 +10,8 @@
 #include "common.h"
 #include <stdarg.h>
 
+const char *srmio_version = PACKAGE_STRING;
+
 #ifdef DEBUG
 void dumphex( const char *func, const char *prefix, const unsigned char *buf, int blen, ... )
 {
