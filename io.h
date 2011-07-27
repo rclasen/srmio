@@ -14,9 +14,9 @@
 #include "srmio.h"
 
 typedef void (*srmio_io_method_void)( srmio_io_t h );
-typedef bool (*srmio_io_method_bool)( srmio_io_t h );
-typedef int (*srmio_io_method_buf)( srmio_io_t h, unsigned char *buf, size_t len );
-typedef int (*srmio_io_method_constbuf)( srmio_io_t h, const unsigned char *buf, size_t len );
+typedef bool (*srmio_io_method_bool)( srmio_io_t h, srmio_error_t *err );
+typedef int (*srmio_io_method_buf)( srmio_io_t h, unsigned char *buf, size_t len, srmio_error_t *err );
+typedef int (*srmio_io_method_constbuf)( srmio_io_t h, const unsigned char *buf, size_t len, srmio_error_t *err );
 
 typedef struct {
 	srmio_io_method_void		free;
@@ -38,7 +38,7 @@ struct _srmio_io_t {
 	void			*child;
 };
 
-srmio_io_t srmio_io_new( const srmio_io_methods_t *methods, void *child );
+srmio_io_t srmio_io_new( const srmio_io_methods_t *methods, void *child, srmio_error_t *err );
 
 #include "common.h"
 

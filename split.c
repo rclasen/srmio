@@ -18,7 +18,7 @@
  *
  */
 srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
-	srmio_time_t overlap )
+	srmio_time_t overlap, srmio_error_t *err )
 {
 	srmio_data_t *list = NULL;
 	unsigned alloc = 0;
@@ -26,6 +26,8 @@ srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
 	unsigned c, delta;
 
 	assert( src );
+
+	srmio_error_set( err, "no data" );
 
 	for( c = 0; c < src->cused; ++c ){
 		srmio_time_t start = src->chunks[c]->time
@@ -59,20 +61,22 @@ srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
 				srmio_data_t *new;
 
 				if( NULL == (new = realloc( list,
-					sizeof(srmio_data_t) * ( alloc +1 +10)  ) ))
+					sizeof(srmio_data_t) * ( alloc +1 +10)  ) )){
+					srmio_error_errno( err, "realloc");
 					goto clean;
+				}
 
 				alloc += 10;
 				list = new;
 			}
 
-			if( NULL == (list[used] = srmio_data_header( src )))
+			if( NULL == (list[used] = srmio_data_header( src, err)))
 				goto clean;
 
 			list[++used] = NULL;
 		}
 
-		srmio_data_add_chunk( list[used-1], src->chunks[c] );
+		srmio_data_add_chunk( list[used-1], src->chunks[c], err );
 	}
 
 	delta = 0;
@@ -92,7 +96,7 @@ srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
 			DPRINTF( "found marker: %d - %d", mk->first,
 				mk->last );
 
-			if( NULL == (nm = srmio_marker_clone( mk )))
+			if( NULL == (nm = srmio_marker_clone( mk, err )))
 				goto clean;
 
 			if( nm->first < delta )
@@ -105,7 +109,7 @@ srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
 			else
 				nm->last -= delta;
 
-			srmio_data_add_markerp( list[c], nm );
+			srmio_data_add_markerp( list[c], nm, err );
 		}
 
 		delta += list[c]->cused;

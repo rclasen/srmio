@@ -12,13 +12,12 @@
 /*
  * write contents of data structure into specified file
  */
-bool srmio_file_wkt_write( srmio_data_t data, FILE *fh )
+bool srmio_file_wkt_write( srmio_data_t data, FILE *fh, srmio_error_t *err )
 {
 	unsigned i;
 
 	if( ! data ){
-		ERRMSG( "no data to write" );
-		errno = EINVAL;
+		srmio_error_set( err, "no data to write" );
 		return false;
 	}
 
@@ -30,14 +29,14 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh )
 		data->athlete ? data->athlete : ""
 		) ){
 
-		ERRMSG("fprintf failed: %s", strerror(errno));
+		srmio_error_errno( err, "write" );
 		goto clean2;
 	}
 
 	if( data->notes && 0 > fprintf( fh, "Note=%s\n",
 		data->notes ) ){
 
-		ERRMSG("fprintf failed: %s", strerror(errno));
+		srmio_error_errno( err, "write" );
 		goto clean2;
 	}
 
@@ -46,7 +45,7 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh )
 
 		data->marker[0]->notes ) ){
 
-		ERRMSG("fprintf failed: %s", strerror(errno));
+		srmio_error_errno( err, "write" );
 		goto clean2;
 	}
 
@@ -60,7 +59,7 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh )
 		data->zeropos
 		) ){
 
-		ERRMSG("fprintf failed: %s", strerror(errno));
+		srmio_error_errno( err, "write" );
 		goto clean2;
 	}
 
@@ -86,13 +85,13 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh )
 			ck->temp
 			) ){
 
-			ERRMSG("fprintf failed: %s", strerror(errno));
+			srmio_error_errno( err, "write" );
 			goto clean2;
 		}
 	}
 
 	if( 0 > fprintf( fh,"\n[Markers]\n" ) ){
-		ERRMSG("fprintf failed: %s", strerror(errno));
+		srmio_error_errno( err, "write" );
 		goto clean2;
 	}
 
@@ -106,7 +105,7 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh )
 			(double)( last->time / 10 ),
 			mk->notes ? mk->notes : "" ) ){
 
-			ERRMSG("fprintf failed: %s", strerror(errno));
+			srmio_error_errno( err, "write" );
 			goto clean2;
 		}
 	}

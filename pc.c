@@ -10,15 +10,18 @@
 
 #include "pc.h"
 
-srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child )
+srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child,
+	srmio_error_t *err )
 {
 	srmio_pc_t pch;
 
 	assert( methods );
 	assert( child );
 
-	if( NULL == (pch = malloc( sizeof(struct _srmio_pc_t))))
+	if( NULL == (pch = malloc( sizeof(struct _srmio_pc_t)))){
+		srmio_error_errno( err, "pc new" );
 		return NULL;
+	}
 
 	memset( pch, 0, sizeof(struct _srmio_pc_t) );
 
@@ -35,13 +38,13 @@ void srmio_pc_free( srmio_pc_t pch )
 	assert(pch->methods->free);
 
 	if( pch->is_open )
-		srmio_pc_close( pch );
+		srmio_pc_close( pch, NULL );
 
 	(*pch->methods->free)( pch );
 	free(pch);
 }
 
-bool srmio_pc_open( srmio_pc_t pch )
+bool srmio_pc_open( srmio_pc_t pch, srmio_error_t *err )
 {
 	assert( pch );
 	assert( pch->io );
@@ -50,26 +53,26 @@ bool srmio_pc_open( srmio_pc_t pch )
 	DPRINTF("");
 
 	if( pch->is_open ){
-		errno = EBUSY;
+		srmio_error_set( err, "device is already open" );
 		return false;
 	}
 
 	if( ! srmio_io_is_open( pch->io ) ){
-		errno = EINVAL;
+		srmio_error_set( err, "io device is already open" );
 		return false;
 	}
 
-	srmio_io_set_baudrate( pch->io, pch->baudrate );
-	srmio_io_set_parity( pch->io, pch->parity );
+	srmio_io_set_baudrate( pch->io, pch->baudrate, err );
+	srmio_io_set_parity( pch->io, pch->parity, err );
 
-	if( ! (pch->methods->open( pch ) ) )
+	if( ! (*pch->methods->open)( pch, err ) )
 		return false;
 
 	pch->is_open = true;
 	return true;
 }
 
-bool srmio_pc_close( srmio_pc_t pch )
+bool srmio_pc_close( srmio_pc_t pch, srmio_error_t *err )
 {
 	assert( pch );
 	assert( pch->io );
@@ -78,9 +81,9 @@ bool srmio_pc_close( srmio_pc_t pch )
 	DPRINTF("");
 
 	if( pch->xfer_state != srmio_pc_xfer_state_new )
-		srmio_pc_xfer_finish( pch );
+		srmio_pc_xfer_finish( pch, err );
 
-	if( ! (pch->methods->close( pch ) ) )
+	if( ! (*pch->methods->close)( pch, err ) )
 		return false;
 
 	pch->is_open = false;
@@ -91,13 +94,13 @@ bool srmio_pc_close( srmio_pc_t pch )
  * sets the device filename, that's len for communicating.
  * does *not* take ownership of io handle!!! You need to free it yourself!
  */
-bool srmio_pc_set_device( srmio_pc_t pch, srmio_io_t h )
+bool srmio_pc_set_device( srmio_pc_t pch, srmio_io_t h, srmio_error_t *err )
 {
 	assert( pch );
 	assert( h );
 
 	if( pch->is_open ){
-		errno = EBUSY;
+		srmio_error_set( err, "device is open, can't change");
 		return false;
 	}
 
@@ -109,8 +112,9 @@ bool srmio_pc_set_device( srmio_pc_t pch, srmio_io_t h )
 /*
  * retrieve the IO handle
  */
-bool srmio_pc_get_device( srmio_pc_t pch, srmio_io_t *h )
+bool srmio_pc_get_device( srmio_pc_t pch, srmio_io_t *h, srmio_error_t *err )
 {
+	(void)err;
 	assert( pch );
 	assert( h );
 
@@ -122,13 +126,14 @@ bool srmio_pc_get_device( srmio_pc_t pch, srmio_io_t *h )
  * sets the baudrate to use for communication with the PowerControl.
  * with srmio_io_baud_max, all supported baud rates are probed.
  */
-bool srmio_pc_set_baudrate( srmio_pc_t pch, srmio_io_baudrate_t rate )
+bool srmio_pc_set_baudrate( srmio_pc_t pch, srmio_io_baudrate_t rate,
+	srmio_error_t *err )
 {
 	assert( pch );
 	assert( rate <= srmio_io_baud_max );
 
 	if( pch->is_open ){
-		errno = EBUSY;
+		srmio_error_set( err, "device is open, can't change");
 		return false;
 	}
 
@@ -141,13 +146,14 @@ bool srmio_pc_set_baudrate( srmio_pc_t pch, srmio_io_baudrate_t rate )
  * sets the parity to use for communication with the PowerControl.
  * with srmio_io_parity_max, all supported parity settings are probed.
  */
-bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity )
+bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity,
+	srmio_error_t *err )
 {
 	assert( pch );
 	assert( parity <= srmio_io_parity_max );
 
 	if( pch->is_open ){
-		errno = EBUSY;
+		srmio_error_set( err, "device is open, can't change");
 		return false;
 	}
 
@@ -155,25 +161,31 @@ bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity )
 	return true;
 }
 
-bool srmio_pc_get_baudrate( srmio_pc_t pch, srmio_io_baudrate_t *rate )
+bool srmio_pc_get_baudrate( srmio_pc_t pch, srmio_io_baudrate_t *rate,
+	srmio_error_t *err )
 {
 	assert(pch);
 	assert(rate);
 
-	if( pch->baudrate >= srmio_io_baud_max )
+	if( pch->baudrate >= srmio_io_baud_max ){
+		srmio_error_set( err, "baudrate is unset" );
 		return false;
+	}
 
 	*rate = pch->baudrate;
 	return true;
 }
 
-bool srmio_pc_get_parity( srmio_pc_t pch, srmio_io_parity_t *parity )
+bool srmio_pc_get_parity( srmio_pc_t pch, srmio_io_parity_t *parity,
+	srmio_error_t *err )
 {
 	assert(pch);
 	assert(parity);
 
-	if( pch->parity >= srmio_io_parity_max )
+	if( pch->parity >= srmio_io_parity_max ){
+		srmio_error_set( err, "parity is unset" );
 		return false;
+	}
 
 	*parity = pch->parity;
 	return true;
@@ -182,8 +194,10 @@ bool srmio_pc_get_parity( srmio_pc_t pch, srmio_io_parity_t *parity )
 /*
  * gets the firmware as discovered when opening the device
  */
-bool srmio_pc_get_version( srmio_pc_t pch, unsigned *version )
+bool srmio_pc_get_version( srmio_pc_t pch, unsigned *version,
+	srmio_error_t *err )
 {
+	(void)err;
 	assert( pch );
 	assert( version );
 
@@ -191,8 +205,10 @@ bool srmio_pc_get_version( srmio_pc_t pch, unsigned *version )
 	return true;
 }
 
-bool srmio_pc_set_xfer( srmio_pc_t pch, srmio_pc_xfer_type_t type )
+bool srmio_pc_set_xfer( srmio_pc_t pch, srmio_pc_xfer_type_t type,
+	srmio_error_t *err )
 {
+	(void)err;
 	assert( pch );
 	assert( type < srmio_pc_xfer_type_max );
 
@@ -210,8 +226,10 @@ bool srmio_pc_can_preview( srmio_pc_t conn )
 	return conn->can_preview;
 }
 
-bool srmio_pc_xfer_get_blocks( srmio_pc_t conn, size_t *blocks )
+bool srmio_pc_xfer_get_blocks( srmio_pc_t conn, size_t *blocks,
+	srmio_error_t *err )
 {
+	(void)err;
 	assert( conn );
 	assert( blocks );
 
@@ -221,44 +239,47 @@ bool srmio_pc_xfer_get_blocks( srmio_pc_t conn, size_t *blocks )
 }
 
 
-bool srmio_pc_cmd_get_athlete( srmio_pc_t pch, char **athlete )
+bool srmio_pc_cmd_get_athlete( srmio_pc_t pch, char **athlete,
+	srmio_error_t *err )
 {
 	assert(pch);
 	assert(pch->methods->cmd_get_athlete);
 
-	return (*pch->methods->cmd_get_athlete)( pch, athlete );
+	return (*pch->methods->cmd_get_athlete)( pch, athlete, err );
 }
 
-bool srmio_pc_cmd_set_time( srmio_pc_t pch, struct tm *t )
+bool srmio_pc_cmd_set_time( srmio_pc_t pch, struct tm *t,
+	srmio_error_t *err )
 {
 	assert(pch);
 	assert(pch->methods->cmd_set_time);
 
-	return (*pch->methods->cmd_set_time)( pch, t );
+	return (*pch->methods->cmd_set_time)( pch, t, err );
 }
 
-bool srmio_pc_cmd_set_recint( srmio_pc_t pch, srmio_time_t t )
+bool srmio_pc_cmd_set_recint( srmio_pc_t pch, srmio_time_t t,
+	srmio_error_t *err )
 {
 	assert(pch);
 	assert(pch->methods->cmd_set_recint);
 
-	return (*pch->methods->cmd_set_recint)( pch, t );
+	return (*pch->methods->cmd_set_recint)( pch, t, err );
 }
 
-bool srmio_pc_cmd_clear( srmio_pc_t pch )
+bool srmio_pc_cmd_clear( srmio_pc_t pch, srmio_error_t *err )
 {
 	assert(pch);
 	assert(pch->methods->cmd_clear);
 
-	return (*pch->methods->cmd_clear)( pch );
+	return (*pch->methods->cmd_clear)( pch, err );
 }
 
-bool srmio_pc_xfer_start( srmio_pc_t pch )
+bool srmio_pc_xfer_start( srmio_pc_t pch, srmio_error_t *err )
 {
 	assert(pch);
 	assert(pch->methods->xfer_start);
 
-	return (*pch->methods->xfer_start)( pch );
+	return (*pch->methods->xfer_start)( pch, err );
 }
 
 bool srmio_pc_xfer_block_next( srmio_pc_t pch, srmio_pc_xfer_block_t block )
@@ -281,17 +302,21 @@ bool srmio_pc_xfer_chunk_next( srmio_pc_t pch, srmio_chunk_t chunk,
 		is_intervall, start_intervall );
 }
 
-bool srmio_pc_xfer_finish( srmio_pc_t pch )
+bool srmio_pc_xfer_finish( srmio_pc_t pch, srmio_error_t *err )
 {
 	assert(pch);
 	assert(pch->methods->xfer_finish);
 
-	return (*pch->methods->xfer_finish)( pch );
+	return (*pch->methods->xfer_finish)( pch, err );
 }
 
-srmio_pc_xfer_state_t srmio_pc_xfer_status( srmio_pc_t pch )
+srmio_pc_xfer_state_t srmio_pc_xfer_status( srmio_pc_t pch,
+	srmio_error_t *err)
 {
 	assert( pch );
+
+	if( pch->xfer_state == srmio_pc_xfer_state_failed )
+		srmio_error_copy( err, &pch->err );
 
 	return pch->xfer_state;
 }
@@ -325,7 +350,8 @@ bool srmio_pc_xfer_block_progress( srmio_pc_t pch, size_t *block_done )
  */
 bool srmio_pc_xfer_all( srmio_pc_t pch,
 	srmio_data_t data,
-	srmio_progress_t pfunc, void *user_data  )
+	srmio_progress_t pfunc, void *user_data,
+	srmio_error_t *err  )
 {
 	int mfirst = -1;
 	struct _srmio_pc_xfer_block_t block;
@@ -333,7 +359,6 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 	size_t done_chunks = 0;
 	size_t block_cnt, block_num = 0;
 	size_t prog_prev = 0, prog_sum=0;
-	srmio_pc_xfer_state_t result;
 
 	assert( pch );
 	assert( data );
@@ -342,11 +367,11 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 
 	DPRINTF("");
 
-	if( ! srmio_pc_xfer_start( pch ) )
-		goto clean1;
+	if( ! srmio_pc_xfer_start( pch, err ) )
+		return false;
 
-	if( ! srmio_pc_xfer_get_blocks( pch, &block_cnt ) )
-		goto clean2;
+	if( ! srmio_pc_xfer_get_blocks( pch, &block_cnt, err ) )
+		goto clean;
 
 	if( block_cnt > 1 ){
 		if( srmio_pc_can_preview( pch ) ){
@@ -359,10 +384,15 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 			DPRINTF("prog_sum %u", prog_sum );
 
 			/* finalize / restart xfer */
-			srmio_pc_xfer_finish( pch );
+			if( srmio_pc_xfer_state_success !=
+				srmio_pc_xfer_status( pch, err ) )
 
-			if( ! srmio_pc_xfer_start( pch ) )
-				goto clean2;
+				goto clean;
+
+			srmio_pc_xfer_finish( pch, NULL );
+
+			if( ! srmio_pc_xfer_start( pch, err ) )
+				goto clean;
 		}
 	}
 
@@ -413,14 +443,17 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 			}
 
 
-			if( ! srmio_data_add_chunk( data, &chunk ) )
-				goto clean2;
+			if( ! srmio_data_add_chunk( data, &chunk, err ) )
+				goto clean;
 
 			++done_chunks;
 
 			/* finish previous marker */
 			if( mfirst >= 0 && ( ! is_int || is_first ) )
-				srmio_data_add_marker( data, mfirst, data->cused -1 );
+				if( ! srmio_data_add_marker( data, mfirst,
+					data->cused -1, err ) )
+
+					goto clean;
 
 			/* start marker */
 			if( is_first ){
@@ -435,7 +468,11 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 
 		/* finalize marker at block end */
 		if( mfirst >= 0 ){
-			srmio_data_add_marker( data, mfirst, data->cused -1 );
+			if( ! srmio_data_add_marker( data, mfirst,
+				data->cused -1, err ) )
+
+				goto clean;
+
 			mfirst = -1;
 		}
 
@@ -451,19 +488,18 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 	}
 
 	if( ! done_chunks ){
-		errno = ENODATA;
-		goto clean2;
+		srmio_error_set( err, "no data");
+		goto clean;
 	}
 
-	result = srmio_pc_xfer_status( pch );
-	srmio_pc_xfer_finish( pch );
+	if( srmio_pc_xfer_state_success != srmio_pc_xfer_status( pch, err) )
+		goto clean;
 
-	return result == srmio_pc_xfer_state_success;
+	srmio_pc_xfer_finish( pch, NULL  );
+	return true;
 
-clean2:
-	srmio_pc_xfer_finish( pch );
-
-clean1:
+clean:
+	srmio_pc_xfer_finish( pch, NULL );
 	return false;
 }
 

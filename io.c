@@ -120,15 +120,17 @@ bool srmio_io_name2flow( const char *name, srmio_io_flow_t *flow )
 	return false;
 }
 
-srmio_io_t srmio_io_new( const srmio_io_methods_t *methods, void *child )
+srmio_io_t srmio_io_new( const srmio_io_methods_t *methods, void *child, srmio_error_t *err )
 {
 	srmio_io_t h;
 
 	assert( methods );
 	assert( child );
 
-	if( NULL == ( h = malloc(sizeof(struct _srmio_io_t))))
+	if( NULL == ( h = malloc(sizeof(struct _srmio_io_t)))){
+		srmio_error_errno( err, "new io" );
 		return NULL;
+	}
 	memset(h, 0, sizeof(struct _srmio_io_t) );
 
 	h->methods = methods;
@@ -143,7 +145,7 @@ void srmio_io_free( srmio_io_t h )
 	assert(h->methods->free);
 
 	if( srmio_io_is_open( h ) )
-		srmio_io_close( h );
+		srmio_io_close( h, NULL );
 
 	(*h->methods->free)( h );
 	free( h );
@@ -156,8 +158,10 @@ bool srmio_io_is_open( srmio_io_t h )
 	return h->is_open;
 }
 
-bool srmio_io_set_baudrate( srmio_io_t h, srmio_io_baudrate_t rate )
+bool srmio_io_set_baudrate( srmio_io_t h, srmio_io_baudrate_t rate,
+	srmio_error_t *err )
 {
+	(void)err;
 	assert( h );
 
 	h->baudrate = rate;
@@ -165,8 +169,10 @@ bool srmio_io_set_baudrate( srmio_io_t h, srmio_io_baudrate_t rate )
 	return true;
 }
 
-bool srmio_io_set_parity( srmio_io_t h, srmio_io_parity_t parity )
+bool srmio_io_set_parity( srmio_io_t h, srmio_io_parity_t parity,
+	srmio_error_t *err )
 {
+	(void)err;
 	assert( h );
 
 	h->parity = parity;
@@ -174,8 +180,10 @@ bool srmio_io_set_parity( srmio_io_t h, srmio_io_parity_t parity )
 	return true;
 }
 
-bool srmio_io_set_flow( srmio_io_t h, srmio_io_flow_t flow )
+bool srmio_io_set_flow( srmio_io_t h, srmio_io_flow_t flow,
+	srmio_error_t *err )
 {
+	(void)err;
 	assert( h );
 
 	h->flow = flow;
@@ -183,74 +191,76 @@ bool srmio_io_set_flow( srmio_io_t h, srmio_io_flow_t flow )
 	return true;
 }
 
-bool srmio_io_update( srmio_io_t h )
+bool srmio_io_update( srmio_io_t h, srmio_error_t *err )
 {
 	assert( h );
 	assert(h->methods->update);
 
-	return (*h->methods->update)( h );
+	return (*h->methods->update)( h, err );
 }
 
 
-bool srmio_io_open( srmio_io_t h )
+bool srmio_io_open( srmio_io_t h, srmio_error_t *err )
 {
 	assert(h);
 	assert(h->methods->open);
 
 	if( h->is_open ){
-		errno = EBUSY;
+		srmio_error_set( err, "device already open");
 		return false;
 	}
 
-	h->is_open = (*h->methods->open)( h );
+	h->is_open = (*h->methods->open)( h, err );
 
 	return h->is_open;
 }
 
-bool srmio_io_close( srmio_io_t h )
+bool srmio_io_close( srmio_io_t h, srmio_error_t *err )
 {
 	bool ret;
 
 	assert(h);
 	assert(h->methods->close);
 
-	ret = (*h->methods->close)( h );
+	ret = (*h->methods->close)( h, err );
 	if( ret )
 		h->is_open = false;
 
 	return ret;
 }
 
-int srmio_io_write( srmio_io_t h, const unsigned char *buf, size_t len )
+int srmio_io_write( srmio_io_t h, const unsigned char *buf, size_t len,
+	srmio_error_t *err )
 {
 	assert(h);
 	assert(h->methods->write);
 
-	return (*h->methods->write)( h, buf, len );
+	return (*h->methods->write)( h, buf, len, err );
 }
 
-int srmio_io_read( srmio_io_t h, unsigned char *buf, size_t len )
+int srmio_io_read( srmio_io_t h, unsigned char *buf, size_t len,
+	srmio_error_t *err )
 {
 	assert(h);
 	assert(h->methods->read);
 
-	return (*h->methods->read)( h, buf, len );
+	return (*h->methods->read)( h, buf, len, err );
 }
 
-bool srmio_io_flush( srmio_io_t h )
+bool srmio_io_flush( srmio_io_t h, srmio_error_t *err )
 {
 	assert(h);
 	assert(h->methods->flush);
 
-	return (*h->methods->flush)( h );
+	return (*h->methods->flush)( h, err );
 }
 
-bool srmio_io_send_break( srmio_io_t h )
+bool srmio_io_send_break( srmio_io_t h, srmio_error_t *err )
 {
 	assert(h);
 	assert(h->methods->send_break);
 
-	return (*h->methods->send_break)( h );
+	return (*h->methods->send_break)( h, err );
 }
 
 

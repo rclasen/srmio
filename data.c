@@ -16,20 +16,26 @@
  * on success pointer is returned
  * returns NULL on error and sets errno.
  */
-srmio_data_t srmio_data_new( void )
+srmio_data_t srmio_data_new( srmio_error_t *err )
 {
 	srmio_data_t data;
 
-	if( NULL == (data = malloc( sizeof( struct _srmio_data_t) )) )
+	if( NULL == (data = malloc( sizeof( struct _srmio_data_t) )) ){
+		srmio_error_errno( err, "new data" );
 		return NULL;
+	}
 	memset( data, 0, sizeof(struct _srmio_data_t));
 
-	if( NULL == (data->chunks = malloc(sizeof(srmio_chunk_t *))))
+	if( NULL == (data->chunks = malloc(sizeof(srmio_chunk_t *)))){
+		srmio_error_errno( err, "new data chunks" );
 		goto clean1;
+	}
 	*data->chunks = NULL;
 
-	if( NULL == (data->marker = malloc(sizeof(srmio_marker_t *))))
+	if( NULL == (data->marker = malloc(sizeof(srmio_marker_t *)))){
+		srmio_error_errno( err, "new data marker" );
 		goto clean2;
+	}
 	*data->marker = NULL;
 
 	return data;
@@ -45,20 +51,24 @@ clean1:
 /*
  * copies "header" to a newly allocated data structure
  */
-srmio_data_t srmio_data_header( srmio_data_t src )
+srmio_data_t srmio_data_header( srmio_data_t src, srmio_error_t *err )
 {
 	srmio_data_t dst;
 
 	assert(src);
 
-	if( NULL == ( dst = srmio_data_new() ))
+	if( NULL == ( dst = srmio_data_new( err ) ))
 		return NULL;
 
-	if( src->notes && NULL == ( dst->notes = strdup( src->notes ) ) )
+	if( src->notes && NULL == ( dst->notes = strdup( src->notes ) ) ){
+		srmio_error_errno( err, "data notes" );
 		goto clean1;
+	}
 
-	if( src->athlete && NULL == ( dst->athlete = strdup( src->athlete ) ) )
+	if( src->athlete && NULL == ( dst->athlete = strdup( src->athlete ) ) ){
+		srmio_error_errno( err, "data athlete");
 		goto clean1;
+	}
 
 	dst->slope = src->slope;
 	dst->zeropos = src->zeropos;
@@ -78,20 +88,21 @@ clean1:
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-bool srmio_data_add_chunkp( srmio_data_t data, srmio_chunk_t chunk )
+bool srmio_data_add_chunkp( srmio_data_t data, srmio_chunk_t chunk, srmio_error_t *err )
 {
 	if( data->cused >= data->cavail ){
 		srmio_chunk_t *tmp;
 
 		if( data->cavail > UINT_MAX - 1001 ){
-			ERRMSG("too many chunks");
-			errno = EOVERFLOW;
+			srmio_error_set( err, "too many chunks" );
 			return false;
 		}
 
 		if( NULL == (tmp = realloc( data->chunks,
-			(data->cavail + 1001) * sizeof(srmio_chunk_t))))
+			(data->cavail + 1001) * sizeof(srmio_chunk_t)))){
+			srmio_error_errno( err, "enlarge data chunks" );
 			return false;
+		}
 
 		data->cavail += 1000;
 		data->chunks = tmp;
@@ -109,13 +120,13 @@ bool srmio_data_add_chunkp( srmio_data_t data, srmio_chunk_t chunk )
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-bool srmio_data_add_chunk( srmio_data_t data, srmio_chunk_t chunk )
+bool srmio_data_add_chunk( srmio_data_t data, srmio_chunk_t chunk, srmio_error_t *err )
 {
 	srmio_chunk_t nc;
 
-	if( NULL == (nc = srmio_chunk_clone(chunk)))
+	if( NULL == (nc = srmio_chunk_clone(chunk, err)))
 		return false;
-	return srmio_data_add_chunkp( data, nc );
+	return srmio_data_add_chunkp( data, nc, err );
 }
 
 /*
@@ -125,20 +136,21 @@ bool srmio_data_add_chunk( srmio_data_t data, srmio_chunk_t chunk )
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-bool srmio_data_add_markerp( srmio_data_t data, srmio_marker_t mk )
+bool srmio_data_add_markerp( srmio_data_t data, srmio_marker_t mk, srmio_error_t *err )
 {
 	if( data->mused >= data->mavail ){
 		srmio_marker_t *tmp;
 
 		if( data->mavail > UINT_MAX - 11 ){
-			ERRMSG("too many marker");
-			errno = EOVERFLOW;
+			srmio_error_set( err, "too many marker");
 			return false;
 		}
 
 		if( NULL == (tmp = realloc( data->marker,
-			(data->mavail + 11) * sizeof(srmio_marker_t))))
+			(data->mavail + 11) * sizeof(srmio_marker_t)))){
+			srmio_error_errno( err, "enlarge data marker" );
 			return false;
+		}
 
 		data->mavail += 10;
 		data->marker = tmp;
@@ -161,7 +173,7 @@ bool srmio_data_add_markerp( srmio_data_t data, srmio_marker_t mk )
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-bool srmio_data_add_marker( srmio_data_t data, unsigned first, unsigned last )
+bool srmio_data_add_marker( srmio_data_t data, unsigned first, unsigned last, srmio_error_t *err )
 {
 	srmio_marker_t mk;
 
@@ -170,17 +182,16 @@ bool srmio_data_add_marker( srmio_data_t data, unsigned first, unsigned last )
 		last );
 
 	if( first >= data->cused || first > last ){
-		ERRMSG("marker out of range");
-		errno = EINVAL;
+		srmio_error_set(err, "marker out of range");
 		return false;
 	}
 
-	if( NULL == (mk = srmio_marker_new() ))
+	if( NULL == (mk = srmio_marker_new( err ) ))
 		return false;
 	mk->first = first;
 	mk->last = last;
 
-	if( ! srmio_data_add_markerp( data, mk ) )
+	if( ! srmio_data_add_markerp( data, mk, err ) )
 		goto clean1;
 
 	return true;
@@ -194,13 +205,15 @@ clean1:
 /*
  * return start time of first chunk
  */
-bool srmio_data_time_start( srmio_data_t data, srmio_time_t *start )
+bool srmio_data_time_start( srmio_data_t data, srmio_time_t *start, srmio_error_t *err )
 {
 	assert( data );
 	assert( start );
 
-	if( ! data->cused )
+	if( ! data->cused ){
+		srmio_error_set( err, "no data available" );
 		return false;
+	}
 
 	*start = data->chunks[0]->time;
 	return true;
@@ -210,13 +223,15 @@ bool srmio_data_time_start( srmio_data_t data, srmio_time_t *start )
 /*
  * return common recording interval
  */
-bool srmio_data_recint( srmio_data_t data, srmio_time_t *recint )
+bool srmio_data_recint( srmio_data_t data, srmio_time_t *recint, srmio_error_t *err )
 {
 	assert( data );
 	assert( recint );
 
-	if( ! data->cused )
+	if( ! data->cused ){
+		srmio_error_set( err, "no data available" );
 		return false;
+	}
 
 	*recint = data->chunks[data->cused-1]->dur;
 	return true;
@@ -233,7 +248,7 @@ bool srmio_data_recint( srmio_data_t data, srmio_time_t *recint )
  * on success pointer to list is returned
  * returns NULL on error and sets errno.
  */
-srmio_marker_t *srmio_data_blocks( srmio_data_t data )
+srmio_marker_t *srmio_data_blocks( srmio_data_t data, srmio_error_t *err )
 {
 	srmio_marker_t *blocks;
 	unsigned avail = 10;
@@ -241,15 +256,16 @@ srmio_marker_t *srmio_data_blocks( srmio_data_t data )
 	unsigned i;
 
 	if( data->cused < 1 ){
-		ERRMSG("no blocks in empty data");
-		errno = EINVAL;
+		srmio_error_set( err, "no data available");
 		return NULL;
 	}
 
-	if( NULL == (blocks = malloc( (1+ avail) * (sizeof(srmio_marker_t)))))
+	if( NULL == (blocks = malloc( (1+ avail) * (sizeof(srmio_marker_t))))){
+		srmio_error_errno( err, "data blocks" );
 		return NULL;
+	}
 
-	if( NULL == (*blocks = srmio_marker_new()))
+	if( NULL == (*blocks = srmio_marker_new( err )))
 		goto clean1;
 	blocks[0]->first = 0;
 	blocks[0]->last = data->cused -1;
@@ -266,15 +282,16 @@ srmio_marker_t *srmio_data_blocks( srmio_data_t data )
 				unsigned ns = avail + 10;
 
 				if( ns < avail ){
-					ERRMSG("too many blocks");
-					errno = EOVERFLOW;
+					srmio_error_set( err, "too many blocks");
 					goto clean2;
 				}
 
 				if( NULL == (tmp = realloc(blocks, (1+ ns)
-					* (sizeof(srmio_marker_t)) )))
+					* (sizeof(srmio_marker_t)) ))){
 
+					srmio_error_errno( err, "enlage data blocks" );
 					goto clean2;
+				}
 
 				blocks = tmp;
 				avail = ns;
@@ -287,7 +304,7 @@ srmio_marker_t *srmio_data_blocks( srmio_data_t data )
 				(double)this->time/10,
 				(double)(this->time - prev->time)/10);
 
-			if( NULL == (blocks[used] = srmio_marker_new() ) )
+			if( NULL == (blocks[used] = srmio_marker_new(err) ) )
 				goto clean2;
 
 			blocks[used-1]->last = i -1;

@@ -61,6 +61,7 @@ int main( int argc, char **argv )
 		{ "version", no_argument, NULL, 'V' },
 	};
 	char c;
+	srmio_error_t err;
 	srmio_io_t io;
 	srmio_pc_t srm;
 	unsigned fw_version;
@@ -124,10 +125,9 @@ int main( int argc, char **argv )
 
 	if( opt_ftdi ){
 #ifdef SRMIO_HAVE_D2XX
-		if( NULL == (io = srmio_d2xx_description_new( dev ))){
+		if( NULL == (io = srmio_d2xx_description_new( dev, &err ))){
 			fprintf( stderr, "srmio_d2xx_new(%s) failed: %s\n",
-				dev,
-				strerror(errno) );
+				dev, err.message );
 			return 1;
 		}
 #else
@@ -137,10 +137,9 @@ int main( int argc, char **argv )
 
 	} else {
 #ifdef SRMIO_HAVE_TERMIOS
-		if( NULL == (io = srmio_ios_new( dev ))){
+		if( NULL == (io = srmio_ios_new( dev, &err ))){
 			fprintf( stderr, "srmio_ios_new(%s) failed: %s\n",
-				dev,
-				strerror(errno) );
+				dev, err.message );
 			return 1;
 		}
 #else
@@ -149,68 +148,67 @@ int main( int argc, char **argv )
 #endif
 	}
 
-	if( ! srmio_io_open( io )){
+	if( ! srmio_io_open( io, &err )){
 		fprintf( stderr, "srmio_io_open(%s) failed: %s\n",
-			dev,
-			strerror(errno) );
+			dev, err.message );
 		return 1;
 	}
 
 	switch( opt_pc ){
 	  case 5:
-		if( NULL == (srm = srmio_pc5_new() )){
+		if( NULL == (srm = srmio_pc5_new( &err ) )){
 			fprintf( stderr, "srmio_pc5_new failed: %s\n",
-				strerror(errno) );
+				err.message );
 			return 1;
 		}
 		break;
 
 	  case 6:
 	  case 7:
-		if( NULL == (srm = srmio_pc7_new() )){
+		if( NULL == (srm = srmio_pc7_new( &err ) )){
 			fprintf( stderr, "srmio_pc7_new failed: %s\n",
-				strerror(errno) );
+				err.message );
 			return 1;
 		}
 		break;
 
 	  default:
-		fprintf( stderr, "invalid power control type: %d", opt_pc);
+		fprintf( stderr, "invalid power control type: %d\n", opt_pc);
 		return 1;
 	}
 	printf( "powercontrol %d protocol is used\n", opt_pc );
 
-	if( ! srmio_pc_set_device( srm, io )){
+	if( ! srmio_pc_set_device( srm, io, &err )){
 		fprintf( stderr, "srmio_pc_set_device failed: %s\n",
-			strerror(errno) );
-		return -1;
-	}
-
-	if( ! srmio_pc_set_baudrate( srm, opt_baud )){
-		fprintf( stderr, "srmio_pc_set_baudrate failed: %s\n",
-			strerror(errno) );
-		return -1;
-	}
-
-	if( ! srmio_pc_open( srm ) ){
-		fprintf( stderr, "srmio_pc_new failed: %s\n",
-			strerror(errno) );
+			err.message );
 		return 1;
 	}
 
-	if( ! srmio_pc_get_version( srm, &fw_version ) ){
+	if( ! srmio_pc_set_baudrate( srm, opt_baud, &err )){
+		fprintf( stderr, "srmio_pc_set_baudrate failed: %s\n",
+			err.message );
+		return 1;
+	}
+
+	if( ! srmio_pc_open( srm, &err ) ){
+		fprintf( stderr, "srmio_pc_new failed: %s\n",
+			err.message );
+		return 1;
+	}
+
+	if( ! srmio_pc_get_version( srm, &fw_version, &err ) ){
 		fprintf( stderr, "srmio_pc_get_version failed: %s\n",
-			strerror(errno) );
+			err.message );
 		return 1;
 	}
 	printf( "powercontrol firmware: 0x%04x\n", fw_version );
 
 	if( opt_all )
-		srmio_pc_set_xfer( srm, srmio_pc_xfer_type_all );
+		srmio_pc_set_xfer( srm, srmio_pc_xfer_type_all, NULL );
 
-	if( ! srmio_pc_xfer_start( srm ) ){
+	if( ! srmio_pc_xfer_start( srm, &err ) ){
 		fprintf( stderr, "srmio_pc_xfer_start failed: %s\n",
-			strerror(errno) );
+			err.message );
 		return 1;
 	}
 
@@ -243,7 +241,7 @@ int main( int argc, char **argv )
 			"hr\t"
 			"ele\n");
 
-		while( srmio_pc_xfer_chunk_next( srm, &chunk, NULL, NULL  ) ){
+		while( srmio_pc_xfer_chunk_next( srm, &chunk, NULL, NULL ) ){
 			printf(
 				"%.1f\t"	/* "time\t" */
 				"%.1f\t"	/* "dur\t" */
@@ -269,12 +267,13 @@ int main( int argc, char **argv )
 		block.athlete = NULL;
 	}
 
-	if( srmio_pc_xfer_state_success != srmio_pc_xfer_status( srm ) ){
-		fprintf( stderr, "srmio_pc_xfer failed\n" );
+	if( srmio_pc_xfer_state_success != srmio_pc_xfer_status( srm, &err ) ){
+		fprintf( stderr, "srmio_pc_xfer failed: %s\n",
+			err.message );
 		return 1;
 	}
 
-	srmio_pc_xfer_finish( srm );
+	srmio_pc_xfer_finish( srm, NULL );
 
 	srmio_pc_free( srm );
 	srmio_io_free( io );

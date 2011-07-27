@@ -17,7 +17,8 @@
  * on success 0 is returned
  * returns -1 and sets errno on error
  */
-static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk )
+static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk,
+	srmio_error_t *err )
 {
 	srmio_chunk_t last = data->chunks[data->cused-1];
 	srmio_time_t recint = chunk->dur;
@@ -26,8 +27,7 @@ static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk )
 	unsigned i;
 
 	if( chunk->time < lnext ){
-		ERRMSG( "data is overlapping, can't add" );
-		errno = EINVAL;
+		srmio_error_set( err, "data is overlapping, can't add" );
 		return false;
 	}
 
@@ -65,7 +65,7 @@ static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk )
 		srmio_chunk_t fill;
 		double part = (double)i / (miss +1 );
 
-		if( NULL == (fill = srmio_chunk_new() ))
+		if( NULL == (fill = srmio_chunk_new(err) ))
 			return false;
 
 		fill->time = last->time + (i * recint);
@@ -83,13 +83,13 @@ static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk )
 		fill->ele = part * (chunk->ele - last->ele)
 			+ last->ele + 0.5;
 
-		if( ! srmio_data_add_chunkp( data, fill ) ){
+		if( ! srmio_data_add_chunkp( data, fill, err ) ){
 			srmio_chunk_free(fill);
 			return false;
 		}
 	}
 
-	if( ! srmio_data_add_chunkp( data, chunk ) )
+	if( ! srmio_data_add_chunkp( data, chunk, err ) )
 		return false;
 
 	return true;
@@ -106,7 +106,7 @@ static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk )
  * returns pointer to newly allocated srmio_data
  * returns NULL on failure
  */
-srmio_data_t srmio_data_fixup( srmio_data_t data )
+srmio_data_t srmio_data_fixup( srmio_data_t data, srmio_error_t *err )
 {
 	srmio_data_t fixed;
 	srmio_time_t delta = 0;
@@ -117,28 +117,28 @@ srmio_data_t srmio_data_fixup( srmio_data_t data )
 	DPRINTF("start %d", data->cused );
 
 	if( data->cused < 1 ){
-		errno = EINVAL;
+		srmio_error_set( err, "no data" );
 		return NULL;
 	}
 
 	/* copy global data */
-	if( NULL == (fixed = srmio_data_header( data ) ))
+	if( NULL == (fixed = srmio_data_header( data, err ) ))
 		return NULL;
 
 	/* copy marker */
 	for( m=0; m < data->mused; ++m ){
 		srmio_marker_t mark;
 
-		if( NULL == ( mark = srmio_marker_clone( data->marker[m]) ) )
+		if( NULL == ( mark = srmio_marker_clone( data->marker[m], err ) ) )
 			goto clean1;
 
-		if( ! srmio_data_add_markerp( fixed, mark ) )
+		if( ! srmio_data_add_markerp( fixed, mark, err ) )
 			goto clean1;
 	}
 
 	/* copy chunks + fix smaller gaps/overlaps */
 
-	if( ! srmio_data_add_chunk( fixed, data->chunks[0] ) )
+	if( ! srmio_data_add_chunk( fixed, data->chunks[0], err ) )
 		goto clean1;
 
 	for( c=1; c < data->cused; ++c ){
@@ -147,7 +147,7 @@ srmio_data_t srmio_data_fixup( srmio_data_t data )
 		srmio_time_t recint;
 		srmio_time_t lnext;
 
-		if( NULL == ( this = srmio_chunk_clone( data->chunks[c] )))
+		if( NULL == ( this = srmio_chunk_clone( data->chunks[c], err )))
 			goto clean1;
 
 		recint = this->dur;
@@ -162,19 +162,19 @@ srmio_data_t srmio_data_fixup( srmio_data_t data )
 				(double)lnext / 10);
 			this->time = lnext;
 
-			if( ! srmio_data_add_chunkp( fixed, this ) )
+			if( ! srmio_data_add_chunkp( fixed, this, err ) )
 				goto clean1;
 
 		/* small gap > recint ... fill/shift  */
 		} else if( lnext < this->time
 			&& this->time - lnext <= 2*recint ){
 
-			if( ! srmio_data_add_fillp( fixed, this ))
+			if( ! srmio_data_add_fillp( fixed, this, err ))
 				goto clean1;
 
 		/* nothing to fix (yet) */
 		} else {
-			if( ! srmio_data_add_chunkp( fixed, this ) )
+			if( ! srmio_data_add_chunkp( fixed, this, err ) )
 				goto clean1;
 
 		}

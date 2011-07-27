@@ -59,7 +59,7 @@ static void csvdump( srmio_data_t data )
 	srmio_chunk_t *ck;
 	srmio_time_t recint;
 
-	if( ! srmio_data_recint( data, &recint ) )
+	if( ! srmio_data_recint( data, &recint, NULL ) )
 		return;
 
 	printf(
@@ -104,14 +104,15 @@ static void progress( size_t total, size_t done, void *data )
 
 bool do_fixup( srmio_data_t *srmdata, bool fixup )
 {
+	srmio_error_t err;
 	srmio_data_t fixed;
 
 	if( ! fixup )
 		return true;
 
-	if( NULL == ( fixed = srmio_data_fixup( *srmdata ) )){
+	if( NULL == ( fixed = srmio_data_fixup( *srmdata, &err ) )){
 		fprintf( stderr, "srmio_data_fixup failed: %s\n",
-			strerror(errno));
+			err.message );
 		return false;
 	}
 
@@ -123,6 +124,7 @@ bool do_fixup( srmio_data_t *srmdata, bool fixup )
 bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 	srmio_ftype_t type, srmio_time_t split )
 {
+	srmio_error_t err;
 
 	if( ! (*srmdata)->cused ){
 		fprintf( stderr, "no data available\n" );
@@ -141,9 +143,9 @@ bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 			return false;
 		}
 
-		if( ! srmio_file_ftype_write( *srmdata, type, fh ) ){
+		if( ! srmio_file_ftype_write( *srmdata, type, fh, &err ) ){
 			fprintf( stderr, "srmio_file_write(%s) failed: %s\n",
-				fname, strerror(errno) );
+				fname, err.message );
 			return false;
 		}
 
@@ -156,18 +158,23 @@ bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 		int suffixlen;
 		char *nfname;
 
-		if( NULL == (nfname = strdup(fname )))
+		if( NULL == (nfname = strdup(fname ))){
+			fprintf( stderr, "allocating new filenam failed: %s\n",
+				strerror(errno) );
 			return false;
+		}
 
 		if( NULL == (match = strrchr( fname, 'X' ) )){
-			errno = EINVAL;
+			fprintf( stderr, "missing 'XXXXX' in filename template\n" );
 			return false;
 		}
 		suffixlen = strlen(fname);
 		suffixlen -= (match - fname) +1;
 
-		if( NULL == ( list = srmio_data_split( *srmdata, split, 500)))
+		if( NULL == ( list = srmio_data_split( *srmdata, split, 500, &err))){
+			fprintf( stderr, "split failed: %s\n", err.message);
 			return false;
+		}
 
 		for( dat = list; *dat; ++dat ){
 			int fd;
@@ -195,9 +202,9 @@ bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 				return false;
 			}
 
-			if( ! srmio_file_ftype_write( *dat, type, fh ) ){
+			if( ! srmio_file_ftype_write( *dat, type, fh, &err ) ){
 				fprintf( stderr, "srmio_file_write(%s) failed: %s\n",
-					nfname, strerror(errno) );
+					nfname, err.message );
 				return false;
 			}
 
@@ -261,6 +268,7 @@ int main( int argc, char **argv )
 		{ "write-type", required_argument, NULL, 'W' },
 	};
 	char c;
+	srmio_error_t err;
 	srmio_io_t io;
 	srmio_pc_t srm;
 
@@ -391,9 +399,9 @@ int main( int argc, char **argv )
 			return 1;
 		}
 
-		if( NULL == (srmdata = srmio_file_ftype_read( opt_rtype, fh ))){
+		if( NULL == (srmdata = srmio_file_ftype_read( opt_rtype, fh, &err ))){
 			fprintf( stderr, "srmio_file_read(%s) failed: %s\n",
-				fname, strerror(errno) );
+				fname, err.message );
 			return 1;
 		}
 
@@ -416,8 +424,11 @@ int main( int argc, char **argv )
 				return 1;
 			}
 
-			if( ! srmio_data_time_start( srmdata, &start ) )
+			if( ! srmio_data_time_start( srmdata, &start, &err) ){
+				fprintf( stderr, "srmio_data_time_start failed: %s\n",
+					err.message );
 				return 1;
+			}
 
 			printf( "%.0f\n", (double)start / 10 );
 
@@ -439,10 +450,9 @@ int main( int argc, char **argv )
 
 	if( opt_ftdi ){
 #ifdef SRMIO_HAVE_D2XX
-		if( NULL == (io = srmio_d2xx_description_new( fname ))){
+		if( NULL == (io = srmio_d2xx_description_new( fname, &err ))){
 			fprintf( stderr, "srmio_d2xx_new(%s) failed: %s\n",
-				fname,
-				strerror(errno) );
+				fname, err.message );
 			return 1;
 		}
 #else
@@ -452,10 +462,9 @@ int main( int argc, char **argv )
 
 	} else {
 #ifdef SRMIO_HAVE_TERMIOS
-		if( NULL == (io = srmio_ios_new( fname ))){
+		if( NULL == (io = srmio_ios_new( fname, &err ))){
 			fprintf( stderr, "srmio_ios_new(%s) failed: %s\n",
-				fname,
-				strerror(errno) );
+				fname, err.message );
 			return 1;
 		}
 #else
@@ -464,51 +473,50 @@ int main( int argc, char **argv )
 #endif
 	}
 
-	if( ! srmio_io_open( io )){
+	if( ! srmio_io_open( io, &err )){
 		fprintf( stderr, "srmio_io_open(%s) failed: %s\n",
-			fname,
-			strerror(errno) );
+			fname, err.message );
 		return 1;
 	}
 
 	switch( opt_pc ){
 	  case 5:
-		if( NULL == (srm = srmio_pc5_new() )){
+		if( NULL == (srm = srmio_pc5_new( &err ) )){
 			fprintf( stderr, "srmio_pc5_new failed: %s\n",
-				strerror(errno) );
+				err.message );
 			return 1;
 		}
 		break;
 
 	  case 6:
 	  case 7:
-		if( NULL == (srm = srmio_pc7_new() )){
+		if( NULL == (srm = srmio_pc7_new( &err ) )){
 			fprintf( stderr, "srmio_pc7_new failed: %s\n",
-				strerror(errno) );
+				err.message );
 			return 1;
 		}
 		break;
 
 	  default:
-		fprintf( stderr, "invalid power control type: %d", opt_pc);
+		fprintf( stderr, "invalid power control type: %d\n", opt_pc);
 		return 1;
 	}
 
-	if( ! srmio_pc_set_device( srm, io )){
+	if( ! srmio_pc_set_device( srm, io, &err )){
 		fprintf( stderr, "srmio_pc_set_device failed: %s\n",
-			strerror(errno) );
+			err.message );
 		return -1;
 	}
 
-	if( ! srmio_pc_set_baudrate( srm, opt_baud )){
+	if( ! srmio_pc_set_baudrate( srm, opt_baud, &err )){
 		fprintf( stderr, "srmio_pc_set_baudrate failed: %s\n",
-			strerror(errno) );
+			err.message );
 		return -1;
 	}
 
-	if( ! srmio_pc_open( srm ) ){
+	if( ! srmio_pc_open( srm, &err ) ){
 		fprintf( stderr, "srmio_pc_new failed: %s\n",
-			strerror(errno) );
+			err.message );
 		return 1;
 	}
 
@@ -517,8 +525,9 @@ int main( int argc, char **argv )
 	if( opt_name ){
 		char *name;
 
-		if( ! srmio_pc_cmd_get_athlete( srm, &name ) ){
-			perror("srmio_pc_cmd_get_athlete failed");
+		if( ! srmio_pc_cmd_get_athlete( srm, &name, &err ) ){
+			fprintf( stderr, "srmio_pc_cmd_get_athlete failed: %s\n",
+				err.message );
 			return 1;
 		}
 		printf( "%s\n", name );
@@ -527,17 +536,19 @@ int main( int argc, char **argv )
 	} else if( opt_get || opt_date ){
 		srmio_data_t srmdata;
 
-		if( NULL == (srmdata = srmio_data_new() ) ){
-			perror( "srmio_data_new failed" );
+		if( NULL == (srmdata = srmio_data_new( &err ) ) ){
+			fprintf( stderr, "srmio_data_new failed: %s\n",
+				err.message );
 			return 1;
 		}
 
 		if( opt_all )
-			srmio_pc_set_xfer( srm, srmio_pc_xfer_type_all );
+			srmio_pc_set_xfer( srm, srmio_pc_xfer_type_all, NULL );
 
 		/* get new/all chunks */
-		if( ! srmio_pc_xfer_all( srm, srmdata, progress, NULL )){
-			perror( "srmio_pc_xfer_all failed" );
+		if( ! srmio_pc_xfer_all( srm, srmdata, progress, NULL, &err )){
+			fprintf( stderr, "srmio_pc_xfer_all failed: %s\n",
+				err.message );
 			return 1;
 		}
 
@@ -549,8 +560,11 @@ int main( int argc, char **argv )
 				return 1;
 			}
 
-			if( ! srmio_data_time_start( srmdata, &start ) )
+			if( ! srmio_data_time_start( srmdata, &start, &err) ){
+				fprintf( stderr, "srmio_data_time_start failed: %s\n",
+					err.message );
 				return 1;
+			}
 
 			printf( "%.0f\n", (double)start / 10 );
 
@@ -568,15 +582,17 @@ int main( int argc, char **argv )
 	}
 
 	if( opt_clear ){
-		if( ! srmio_pc_cmd_clear( srm ) ){
-			perror( "srmio_pc_cmd_clear failed" );
+		if( ! srmio_pc_cmd_clear( srm, &err ) ){
+			fprintf( stderr, "srmio_pc_cmd_clear failed: %s\n",
+				err.message);
 			return 1;
 		}
 	}
 
 	if( opt_int ){
-		if( ! srmio_pc_cmd_set_recint( srm, opt_int ) ){
-			perror( "srmio_pc_cmd_set_recint failed" );
+		if( ! srmio_pc_cmd_set_recint( srm, opt_int, &err ) ){
+			fprintf( stderr, "srmio_pc_cmd_set_recint failed: %s\n",
+				err.message );
 			return 1;
 		}
 	}
@@ -587,8 +603,9 @@ int main( int argc, char **argv )
 
 		time( &now );
 		nows = localtime( &now );
-		if( ! srmio_pc_cmd_set_time( srm, nows ) ){
-			perror( "srmio_pc_cmd_set_time failed" );
+		if( ! srmio_pc_cmd_set_time( srm, nows, &err ) ){
+			fprintf( stderr, "srmio_pc_cmd_set_time failed: %s\n",
+				err.message );
 			return 1;
 		}
 	}

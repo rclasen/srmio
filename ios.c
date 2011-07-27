@@ -52,7 +52,8 @@ typedef struct _srmio_ios_t *srmio_ios_t;
 #define SELF(x)	((srmio_ios_t)x->child)
 
 
-static int _srmio_ios_write( srmio_io_t h, const unsigned char *buf, size_t len )
+static int _srmio_ios_write( srmio_io_t h, const unsigned char *buf,
+	size_t len, srmio_error_t *err )
 {
 	int ret;
 
@@ -61,13 +62,17 @@ static int _srmio_ios_write( srmio_io_t h, const unsigned char *buf, size_t len 
 
 	ret = write( SELF(h)->fd, buf, len );
 
-	if( ret > 0 )
+	if( ret < 0 ){
+		srmio_error_errno( err, "ios write" );
+	} else {
 		tcdrain( SELF(h)->fd );
+	}
 
 	return ret;
 }
 
-static int _srmio_ios_read( srmio_io_t h, unsigned char *buf, size_t len )
+static int _srmio_ios_read( srmio_io_t h, unsigned char *buf, size_t len,
+	srmio_error_t *err )
 {
 	size_t got = 0;
 	int ret;
@@ -81,8 +86,10 @@ static int _srmio_ios_read( srmio_io_t h, unsigned char *buf, size_t len )
 
 	while( got < len ){
 		ret = read( SELF(h)->fd, &buf[got], 1 );
-		if( ret < 0 ) /* error, abort */
+		if( ret < 0 ){ /* error, abort */
+			srmio_error_errno( err, "ios read" );
 			return -1;
+		}
 
 		if( ret < 1 ) /* no further data */
 			return got;
@@ -94,23 +101,33 @@ static int _srmio_ios_read( srmio_io_t h, unsigned char *buf, size_t len )
 }
 
 
-static bool _srmio_ios_flush( srmio_io_t h )
+static bool _srmio_ios_flush( srmio_io_t h, srmio_error_t *err )
 {
 	assert( h );
 	assert( SELF(h)->fd >= 0 );
 
-	return 0 == tcflush( SELF(h)->fd, TCIOFLUSH );
+	if( 0 != tcflush( SELF(h)->fd, TCIOFLUSH ) ){
+		srmio_error_errno( err, "ios flush" );
+		return false;
+	}
+
+	return true;
 }
 
-static bool _srmio_ios_send_break( srmio_io_t h )
+static bool _srmio_ios_send_break( srmio_io_t h, srmio_error_t *err )
 {
 	assert( h );
 	assert( SELF(h)->fd >= 0 );
 
-	return 0 == tcsendbreak( SELF(h)->fd, 0 );
+	if( 0 != tcsendbreak( SELF(h)->fd, 0 ) ){
+		srmio_error_errno( err, "ios break" );
+		return false;
+	}
+
+	return true;
 }
 
-static bool _srmio_ios_update( srmio_io_t h )
+static bool _srmio_ios_update( srmio_io_t h, srmio_error_t *err )
 {
 	struct termios ios;
 
@@ -138,7 +155,7 @@ static bool _srmio_ios_update( srmio_io_t h )
 		break;
 
 	  default:
-		errno = EINVAL;
+		srmio_error_set( err, "ios invalid flow control: %u", h->flow);
 		return false;
 	}
 
@@ -156,29 +173,36 @@ static bool _srmio_ios_update( srmio_io_t h )
 		break;
 
 	  default:
-		errno = EINVAL;
+		srmio_error_set( err, "ios invalid parity: %u", h->parity );
 		return false;
 	}
 
-	if( 0 > cfsetispeed( &ios, _srmio_ios_baud[h->baudrate] ) )
+	if( 0 > cfsetispeed( &ios, _srmio_ios_baud[h->baudrate] ) ){
+		srmio_error_errno( err, "ios setispieed" );
 		return false;
+	}
 
-	if( 0 > cfsetospeed( &ios, _srmio_ios_baud[h->baudrate] ) )
+	if( 0 > cfsetospeed( &ios, _srmio_ios_baud[h->baudrate] ) ){
+		srmio_error_errno( err, "ios setospieed" );
 		return false;
+	}
 
 	/* wait max 1 sec for whole read() */
 	ios.c_cc[VMIN] = 0;
 	ios.c_cc[VTIME] = 10;
 
-	if( tcsetattr( SELF(h)->fd, TCSANOW, &ios ) )
+	if( tcsetattr( SELF(h)->fd, TCSANOW, &ios ) ){
+		srmio_error_errno( err, "ios settattr" );
 		return false;
+	}
 
 	return true;
 }
 
 
-static bool _srmio_ios_close( srmio_io_t h )
+static bool _srmio_ios_close( srmio_io_t h, srmio_error_t *err )
 {
+	(void)err;
 	assert( h );
 
 	if( SELF(h)->fd < 0 )
@@ -194,28 +218,31 @@ static bool _srmio_ios_close( srmio_io_t h )
 	return true;
 }
 
-static bool _srmio_ios_open( srmio_io_t h )
+static bool _srmio_ios_open( srmio_io_t h, srmio_error_t *err )
 {
 	(void)h;
 
 	/* TODO: lock */
 
-	if( 0 > (SELF(h)->fd = open( SELF(h)->fname, O_RDWR | O_NOCTTY )))
-		goto clean1;
+	if( 0 > (SELF(h)->fd = open( SELF(h)->fname, O_RDWR | O_NOCTTY))){
+		srmio_error_errno( err, "ios open" );
+		return false;
+	}
 
 	/* get serial comm parameter for restore on close*/
-	if( tcgetattr( SELF(h)->fd, &SELF(h)->oldios ) )
-		goto clean2;
+	if( tcgetattr( SELF(h)->fd, &SELF(h)->oldios ) ){
+		srmio_error_errno( err, "ios getattr" );
+		goto clean;
+	}
 
-	if( ! srmio_io_update( h ) )
-		goto clean2;
+	if( ! srmio_io_update( h, err ) )
+		goto clean;
 
 	return true;
 
-clean2:
+clean:
 	close(SELF(h)->fd);
 	SELF(h)->fd = -1;
-clean1:
 	return false;
 }
 
@@ -236,21 +263,25 @@ static const srmio_io_methods_t _ios_methods = {
 	.send_break	= _srmio_ios_send_break,
 };
 
-srmio_io_t srmio_ios_new( const char *fname )
+srmio_io_t srmio_ios_new( const char *fname, srmio_error_t *err )
 {
 	srmio_ios_t self;
 	srmio_io_t h;
 
 	assert( fname );
-	if( NULL == ( self = malloc( sizeof(struct _srmio_ios_t))))
+	if( NULL == ( self = malloc( sizeof(struct _srmio_ios_t)))){
+		srmio_error_errno( err, "ios new" );
 		return NULL;
+	}
 
 	self->fd = -1;
 
-	if( NULL == ( self->fname = strdup( fname ) ))
+	if( NULL == ( self->fname = strdup( fname ) )){
+		srmio_error_errno( err, "ios new fname" );
 		goto clean1;
+	}
 
-	if( NULL == ( h = srmio_io_new( &_ios_methods, (void*)self ) ))
+	if( NULL == ( h = srmio_io_new( &_ios_methods, (void*)self, err ) ))
 		goto clean2;
 
 	return h;

@@ -15,12 +15,14 @@
  * on success pointer is returned
  * returns NULL on error and sets errno.
  */
-srmio_chunk_t srmio_chunk_new( void )
+srmio_chunk_t srmio_chunk_new( srmio_error_t *err )
 {
 	srmio_chunk_t tmp;
 
-	if( NULL == (tmp = malloc( sizeof(struct _srmio_chunk_t)) ))
+	if( NULL == (tmp = malloc( sizeof(struct _srmio_chunk_t)) )){
+		srmio_error_errno( err, "new chunk" );
 		return NULL;
+	}
 
 	memset( tmp, 0, sizeof(struct _srmio_chunk_t));
 	return tmp;
@@ -32,12 +34,14 @@ srmio_chunk_t srmio_chunk_new( void )
  * on success pointer is returned
  * returns NULL on error and sets errno.
  */
-srmio_chunk_t srmio_chunk_clone( srmio_chunk_t chunk )
+srmio_chunk_t srmio_chunk_clone( srmio_chunk_t chunk, srmio_error_t *err )
 {
 	srmio_chunk_t tmp;
 
-	if( NULL == (tmp = malloc( sizeof(struct _srmio_chunk_t)) ))
+	if( NULL == (tmp = malloc( sizeof(struct _srmio_chunk_t)) )){
+		srmio_error_errno( err, "clone chunk" );
 		return NULL;
+	}
 
 	memcpy( tmp, chunk, sizeof(struct _srmio_chunk_t));
 	return tmp;

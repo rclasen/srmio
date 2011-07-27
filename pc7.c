@@ -83,7 +83,8 @@ static uint8_t _srmio_pc7_checksum( const unsigned char *buf, size_t len )
 
 
 static bool _srmio_pc7_msg_send( srmio_pc_t conn,
-	struct _srmio_pc7_packet_t *pkt )
+	struct _srmio_pc7_packet_t *pkt,
+	srmio_error_t *err )
 {
 	unsigned char buf[PC7_CMD_BUFSIZE];
 	int ret;
@@ -95,25 +96,39 @@ static bool _srmio_pc7_msg_send( srmio_pc_t conn,
 	DPRINTF("cmd 0x%04x", pkt->cmd);
 	buflen = PC7_PKTHEAD_SIZE + pkt->datalen +1;
 
-	if( ! buf_set_buint16( buf, 0, PC7_MAGIC ) )
+	if( ! buf_set_buint16( buf, 0, PC7_MAGIC ) ){
+		srmio_error_errno( err, "set packet magic" );
 		return false;
-	if( ! buf_set_buint16( buf, 2, pkt->datalen+3 ) )
+	}
+
+	if( ! buf_set_buint16( buf, 2, pkt->datalen+3 ) ){
+		srmio_error_errno( err, "set packet length" );
 		return false;
-	if( ! buf_set_buint16( buf, 4, pkt->cmd ) )
+	}
+
+	if( ! buf_set_buint16( buf, 4, pkt->cmd ) ){
+		srmio_error_errno( err, "set cmd" );
 		return false;
+	}
+
 
 	memcpy( &buf[PC7_PKTHEAD_SIZE], pkt->data, pkt->datalen );
 
-	if( ! buf_set_uint8( buf, buflen -1, _srmio_pc7_checksum( buf, buflen -1 ) ) )
+	if( ! buf_set_uint8( buf, buflen -1, _srmio_pc7_checksum( buf,
+		buflen -1 ) ) ){
+
+		srmio_error_errno( err, "set checksum" );
 		return false;
+	}
+
 
 	DUMPHEX("sending", buf, buflen );
-	ret = srmio_io_write( conn->io, buf, buflen );
+	ret = srmio_io_write( conn->io, buf, buflen, err );
 	if( ret < 0 )
 		return false;
 
 	if( (size_t)ret != buflen ){
-		errno = EIO;
+		srmio_error_set( err, "failed to send complete command" );
 		return false;
 	}
 
@@ -121,7 +136,8 @@ static bool _srmio_pc7_msg_send( srmio_pc_t conn,
 }
 
 static bool _srmio_pc7_msg_recv( srmio_pc_t conn,
-	struct _srmio_pc7_packet_t *pkt )
+	struct _srmio_pc7_packet_t *pkt,
+	srmio_error_t *err )
 {
 	unsigned char buf[PC7_CMD_BUFSIZE];
 	uint8_t sum;
@@ -131,7 +147,7 @@ static bool _srmio_pc7_msg_recv( srmio_pc_t conn,
 	assert( conn );
 	assert( pkt );
 
-	ret = srmio_io_read( conn->io, buf, buflen );
+	ret = srmio_io_read( conn->io, buf, buflen, err );
 	if( ret < 0 )
 		return false;
 
@@ -140,7 +156,8 @@ static bool _srmio_pc7_msg_recv( srmio_pc_t conn,
 #endif
 
 	if( (size_t)ret < buflen ){
-		errno = EIO;
+		srmio_error_set( err, "got incomplete packet header: %u/%u",
+			ret, buflen );
 		return false;
 	}
 
@@ -153,18 +170,20 @@ static bool _srmio_pc7_msg_recv( srmio_pc_t conn,
 	DPRINTF( "get pkt body: %d bytes", pkt->datalen +1 );
 #endif
 	if( pkt->datalen +1 > PC7_CMD_BUFSIZE ){
-		errno = EOVERFLOW;
+		srmio_error_set( err, "response too large, pleas fix buffer size" );
 		return false;
 	}
 
-	ret = srmio_io_read( conn->io, &buf[PC7_PKTHEAD_SIZE], pkt->datalen +1 );
+	ret = srmio_io_read( conn->io, &buf[PC7_PKTHEAD_SIZE],
+		pkt->datalen +1, err );
 	if( ret < 0 )
 		return false;
 
 	DUMPHEX( "got pkt body", &buf[PC7_PKTHEAD_SIZE], ret );
 
 	if( (size_t)ret < pkt->datalen +1 ){
-		errno = EIO;
+		srmio_error_set( err, "got incomplete packet body : %u/%u",
+			ret, pkt->datalen +1 );
 		return false;
 	}
 
@@ -175,7 +194,7 @@ static bool _srmio_pc7_msg_recv( srmio_pc_t conn,
 		pkt->magic, pkt->datalen, pkt->cmd, pkt->sum, sum );
 
 	if( sum != pkt-> sum ){
-		errno = EIO;
+		srmio_error_set( err, "packet checksum is invalid" );
 		return false;
 	}
 
@@ -187,7 +206,8 @@ static bool _srmio_pc7_msg_recv( srmio_pc_t conn,
 static bool _srmio_pc7_msg( srmio_pc_t conn,
 	struct _srmio_pc7_packet_t *first,
 	struct _srmio_pc7_packet_t *retry,
-	struct _srmio_pc7_packet_t *recv )
+	struct _srmio_pc7_packet_t *recv,
+	srmio_error_t *err )
 {
 	int retries;
 	struct _srmio_pc7_packet_t *send = first;
@@ -200,27 +220,29 @@ static bool _srmio_pc7_msg( srmio_pc_t conn,
 	for( retries = 0; retries < 3; ++retries ){
 		if( retries ){
 			if( retry ) send = retry;
-			DPRINTF("cmd 0x%04x/0x%04x retry %d",
+			STATMSG("cmd 0x%04x/0x%04x retry %d",
 				first->cmd, send->cmd, retries );
-			srmio_io_send_break( conn->io );
+			srmio_io_send_break( conn->io, NULL );
 			sleep(1);
-			srmio_io_flush( conn->io );
+			srmio_io_flush( conn->io, NULL );
 		}
 
-		if( ! _srmio_pc7_msg_send( conn, send ) )
+		if( ! _srmio_pc7_msg_send( conn, send, err ) )
 			return false;
 
-		if( ! _srmio_pc7_msg_recv( conn, recv ) )
+		if( ! _srmio_pc7_msg_recv( conn, recv, err ) ){
+			STATMSG("failed to get response, considering retry");
 			continue;
+		}
 
 #if REALLY_PARANOID
 		if( recv->magic != PC7_MAGIC ){
-			errno = EPROTO;
+			srmio_error_set( err, "packet lacks magic bytes");
 			continue;
 		}
 
 		if( first->cmd != recv->cmd ){
-			errno = EPROTO;
+			srmio_error_set( err, "response packet for wrong command");
 			continue;
 		}
 #endif
@@ -231,7 +253,7 @@ static bool _srmio_pc7_msg( srmio_pc_t conn,
 	return false;
 }
 
-static bool _srmio_pc7_open( srmio_pc_t conn )
+static bool _srmio_pc7_open( srmio_pc_t conn, srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x0101, // helo
@@ -244,20 +266,26 @@ static bool _srmio_pc7_open( srmio_pc_t conn )
 
 	DPRINTF( "" );
 
-	srmio_io_set_baudrate( conn->io, srmio_io_baud_38400 );
-	srmio_io_set_parity( conn->io, srmio_io_parity_none );
-	srmio_io_set_flow( conn->io, srmio_io_flow_none );
-
-	if( ! srmio_io_update( conn->io ) )
+	if( ! srmio_io_set_baudrate( conn->io, srmio_io_baud_38400, err ) )
 		return false;
 
-	srmio_io_send_break( conn->io );
+	if( ! srmio_io_set_parity( conn->io, srmio_io_parity_none, err ) )
+		return false;
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! srmio_io_set_flow( conn->io, srmio_io_flow_none, err ) )
+		return false;
+
+	if( ! srmio_io_update( conn->io, err ) )
+		return false;
+
+	if( ! srmio_io_send_break( conn->io, err ) )
+		return false;
+
+	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		return false;
 
 	if( recv.datalen != 2 ){
-		errno = EPROTO;
+		srmio_error_set( err, "unexpected response size" );
 		return false;
 	}
 
@@ -267,11 +295,13 @@ static bool _srmio_pc7_open( srmio_pc_t conn )
 	return true;
 }
 
-static bool _srmio_pc7_close( srmio_pc_t conn )
+static bool _srmio_pc7_close( srmio_pc_t conn, srmio_error_t *err )
 {
 	assert( conn );
 
 	(void) conn;
+	(void) err;
+
 	return true;
 }
 
@@ -280,7 +310,8 @@ static bool _srmio_pc7_close( srmio_pc_t conn )
  * set/get individual parameter
  */
 
-static bool _srmio_pc7_cmd_get_athlete( srmio_pc_t conn, char **name )
+static bool _srmio_pc7_cmd_get_athlete( srmio_pc_t conn, char **name,
+	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x0205, // athlete
@@ -292,18 +323,20 @@ static bool _srmio_pc7_cmd_get_athlete( srmio_pc_t conn, char **name )
 	assert( conn->is_open );
 	assert( name );
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		return false;
 
 	if( recv.datalen != 20 ){
-		errno = EPROTO;
+		srmio_error_set( err, "unexpected response size" );
 		return false;
 	}
 
 
 	// TODO: athlete encoding
-	if( NULL == ( *name = buf_get_string( recv.data, 0, recv.datalen ) ))
+	if( NULL == ( *name = buf_get_string( recv.data, 0, recv.datalen ))){
+		SRMIO_PC_ERRNO( conn, err, "get athlete" );
 		return false;
+	}
 
 	DPRINTF("athlete: %s", *name );
 
@@ -346,7 +379,8 @@ static bool set_time( unsigned char *buf, size_t pos, struct tm *src )
 	return true;
 }
 
-bool srmio_pc7_cmd_get_time( srmio_pc_t conn, struct tm *timep )
+bool srmio_pc7_cmd_get_time( srmio_pc_t conn, struct tm *timep,
+	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x020e, // time
@@ -359,11 +393,11 @@ bool srmio_pc7_cmd_get_time( srmio_pc_t conn, struct tm *timep )
 	assert( conn->is_open );
 	assert( timep );
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		return false;
 
 	if( recv.datalen != 7 ){
-		errno = EPROTO;
+		srmio_error_set( err, "unexpected response size" );
 		return false;
 	}
 
@@ -373,7 +407,8 @@ bool srmio_pc7_cmd_get_time( srmio_pc_t conn, struct tm *timep )
 	return result;
 }
 
-static bool _srmio_pc7_cmd_set_time( srmio_pc_t conn, struct tm *timep )
+static bool _srmio_pc7_cmd_set_time( srmio_pc_t conn, struct tm *timep,
+	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x020e, // time
@@ -389,10 +424,11 @@ static bool _srmio_pc7_cmd_set_time( srmio_pc_t conn, struct tm *timep )
 	if( ! set_time( send.data, 0, timep ) )
 		return false;
 
-	return _srmio_pc7_msg( conn, &send, NULL, &recv );
+	return _srmio_pc7_msg( conn, &send, NULL, &recv, err );
 }
 
-bool srmio_pc7_cmd_get_circum( srmio_pc_t conn, unsigned *circum )
+bool srmio_pc7_cmd_get_circum( srmio_pc_t conn, unsigned *circum,
+	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x0203, // circum
@@ -404,11 +440,11 @@ bool srmio_pc7_cmd_get_circum( srmio_pc_t conn, unsigned *circum )
 	assert( conn->is_open );
 	assert( circum );
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		return false;
 
 	if( recv.datalen != 2 ){
-		errno = EPROTO;
+		srmio_error_set( err, "unexpected response size" );
 		return false;
 	}
 
@@ -419,7 +455,8 @@ bool srmio_pc7_cmd_get_circum( srmio_pc_t conn, unsigned *circum )
 }
 
 
-bool srmio_pc7_cmd_get_slope( srmio_pc_t conn, double *slope )
+bool srmio_pc7_cmd_get_slope( srmio_pc_t conn, double *slope,
+	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x0201, // slope
@@ -431,11 +468,11 @@ bool srmio_pc7_cmd_get_slope( srmio_pc_t conn, double *slope )
 	assert( conn->is_open );
 	assert( slope );
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		return false;
 
 	if( recv.datalen != 2 ){
-		errno = EPROTO;
+		srmio_error_set( err, "unexpected response size" );
 		return false;
 	}
 
@@ -445,7 +482,8 @@ bool srmio_pc7_cmd_get_slope( srmio_pc_t conn, double *slope )
 	return true;
 }
 
-bool srmio_pc7_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos )
+bool srmio_pc7_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos,
+	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x0202, // zeropos
@@ -457,11 +495,11 @@ bool srmio_pc7_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos )
 	assert( conn->is_open );
 	assert( zeropos );
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		return false;
 
 	if( recv.datalen != 4 ){
-		errno = EPROTO;
+		srmio_error_set( err, "unexpected response size" );
 		return false;
 	}
 
@@ -472,7 +510,8 @@ bool srmio_pc7_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos )
 	return true;
 }
 
-bool srmio_pc7_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint )
+bool srmio_pc7_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint,
+	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x0206, // recint
@@ -484,11 +523,11 @@ bool srmio_pc7_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint )
 	assert( conn->is_open );
 	assert( recint );
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		return false;
 
 	if( recv.datalen != 2 ){
-		errno = EPROTO;
+		srmio_error_set( err, "unexpected response size" );
 		return false;
 	}
 
@@ -499,7 +538,8 @@ bool srmio_pc7_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint )
 }
 
 
-static bool _srmio_pc7_cmd_set_recint( srmio_pc_t conn, srmio_time_t recint )
+static bool _srmio_pc7_cmd_set_recint( srmio_pc_t conn, srmio_time_t recint,
+	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x0206, // recint
@@ -519,14 +559,17 @@ static bool _srmio_pc7_cmd_set_recint( srmio_pc_t conn, srmio_time_t recint )
 		break;
 
 	  default:
-		errno = EINVAL;
+		srmio_error_set( err, "unsuported recording interval: %.1lf",
+			.1 * recint );
 		return false;
 	}
 
-	if( ! buf_set_buint16( recv.data, 0, recint * 100 ) )
+	if( ! buf_set_buint16( recv.data, 0, recint * 100 ) ){
+		srmio_error_errno( err, "set recint" );
 		return false;
+	}
 
-	return _srmio_pc7_msg( conn, &send, NULL, &recv );
+	return _srmio_pc7_msg( conn, &send, NULL, &recv, err );
 }
 
 /*
@@ -540,7 +583,7 @@ static bool _srmio_pc7_cmd_set_recint( srmio_pc_t conn, srmio_time_t recint )
  * only responds, if there is data to delete!!
  */
 
-static bool _srmio_pc7_cmd_clear( srmio_pc_t conn )
+static bool _srmio_pc7_cmd_clear( srmio_pc_t conn, srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x0407, // clear
@@ -551,16 +594,16 @@ static bool _srmio_pc7_cmd_clear( srmio_pc_t conn )
 	assert( conn );
 	assert( conn->is_open );
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		return false;
 
 	if( recv.datalen != 0 ){
-		errno = EPROTO;
+		srmio_error_set( err, "unexpected response size" );
 		return false;
 	}
 
 	while( *recv.data < 2 ){
-		if( ! _srmio_pc7_msg_recv( conn, &recv ) )
+		if( ! _srmio_pc7_msg_recv( conn, &recv, err ) )
 			// not really true, but who cares...
 			return true;
 	}
@@ -612,7 +655,7 @@ static bool _srmio_pc7_xfer_block_progress(
 /*
  * get block count and re-/start download
  */
-static bool _srmio_pc7_xfer_start( srmio_pc_t conn )
+static bool _srmio_pc7_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
 		.cmd = 0x0401, // xfer_count
@@ -627,11 +670,11 @@ static bool _srmio_pc7_xfer_start( srmio_pc_t conn )
 	assert( conn );
 	assert( conn->xfer_state == srmio_pc_xfer_state_new );
 
-	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		goto fail;
 
 	if( recv.datalen != 2 ){
-		errno = EPROTO;
+		srmio_error_set( err, "unexpected response size" );
 		goto fail;
 	}
 
@@ -706,7 +749,7 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 		return false;
 	}
 
-	if( ! _srmio_pc7_msg( conn, &send, &retry, &recv ) )
+	if( ! _srmio_pc7_msg( conn, &send, &retry, &recv, &conn->err ) )
 		goto fail;
 
 	if( recv.datalen == 0 ){
@@ -715,7 +758,7 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 	}
 
 	if( recv.datalen != 47 ){
-		errno = EPROTO;
+		srmio_error_set( &conn->err, "unexpected response size" );
 		goto fail;
 	}
 
@@ -723,7 +766,9 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 
 	block_num = buf_get_buint16( recv.data, 0 );
 	if( SELF(conn)->block_num +1 != block_num ){
-		errno = EPROTO;
+		srmio_error_set( &conn->err,
+			"got unexpeced block number %u, expected %u",
+			block_num, SELF(conn)->block_num +1 );
 		goto fail;
 	}
 
@@ -736,7 +781,7 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 		goto fail;
 	bstart = mktime( &bstarts );
 	if( (time_t)-1 == bstart ){
-		DPRINTF("bad timestamp, skipping block" );
+		STATMSG("bad timestamp, skipping block %u", block_num );
 		SELF(conn)->chunk_cnt = 0;
 		bstart = 0;
 		SELF(conn)->block_time = 0;
@@ -807,7 +852,7 @@ static bool _srmio_pc7_xfer_pkt_next( srmio_pc_t conn )
 	if( conn->xfer_state != srmio_pc_xfer_state_running )
 		return false;
 
-	if( ! _srmio_pc7_msg( conn, &send, &retry, &SELF(conn)->pkt ) )
+	if( ! _srmio_pc7_msg( conn, &send, &retry, &SELF(conn)->pkt, &conn->err ) )
 		goto fail;
 
 	if( SELF(conn)->pkt.datalen == 0 ){
@@ -817,7 +862,7 @@ static bool _srmio_pc7_xfer_pkt_next( srmio_pc_t conn )
 	}
 
 	if( SELF(conn)->pkt.datalen != 257 ){
-		errno = EPROTO;
+		srmio_error_set( &conn->err, "unexpected response size" );
 		goto fail;
 	}
 
@@ -825,7 +870,9 @@ static bool _srmio_pc7_xfer_pkt_next( srmio_pc_t conn )
 	DPRINTF("got pkt #%d", pkt_num );
 
 	if( SELF(conn)->pkt_num +1 != pkt_num ){
-		errno = EPROTO;
+		srmio_error_set( &conn->err,
+			"got unexpeced packet number %u, expected %u",
+			pkt_num, SELF(conn)->pkt_num +1 );
 		goto fail;
 	}
 	SELF(conn)->pkt_num = pkt_num;
@@ -954,7 +1001,7 @@ static bool _srmio_pc7_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 	return true;
 }
 
-static bool _srmio_pc7_xfer_finish( srmio_pc_t conn )
+static bool _srmio_pc7_xfer_finish( srmio_pc_t conn, srmio_error_t *err )
 {
 	assert( conn );
 
@@ -964,7 +1011,7 @@ static bool _srmio_pc7_xfer_finish( srmio_pc_t conn )
 		conn->xfer_state = srmio_pc_xfer_state_abort;
 	}
 
-	srmio_io_flush( conn->io );
+	srmio_io_flush( conn->io, err );
 	conn->xfer_state = srmio_pc_xfer_state_new;
 
 	return true;
@@ -998,7 +1045,7 @@ static const srmio_pc_methods_t _pc7_methods = {
 	.xfer_finish		= _srmio_pc7_xfer_finish,
 };
 
-srmio_pc_t srmio_pc7_new( void )
+srmio_pc_t srmio_pc7_new( srmio_error_t *err )
 {
 	srmio_pc7_t self;
 	srmio_pc_t conn;
@@ -1008,7 +1055,7 @@ srmio_pc_t srmio_pc7_new( void )
 
 	memset(self, 0, sizeof( struct _srmio_pc7_t ));
 
-	if( NULL == ( conn = srmio_pc_new( &_pc7_methods, (void*)self ) ))
+	if( NULL == ( conn = srmio_pc_new( &_pc7_methods, (void*)self, err ) ))
 		goto clean1;
 
 	conn->can_preview = true;

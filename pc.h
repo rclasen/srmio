@@ -14,11 +14,11 @@
 #include "common.h"
 
 typedef void (*srmio_pc_method_void)( srmio_pc_t h );
-typedef bool (*srmio_pc_method_bool)( srmio_pc_t h );
-typedef bool (*srmio_pc_method_athlete)( srmio_pc_t h, char **athlete );
-typedef bool (*srmio_pc_method_tm)( srmio_pc_t h, struct tm *tp );
-typedef bool (*srmio_pc_method_time)( srmio_pc_t h, srmio_time_t t );
-typedef bool (*srmio_pc_method_block)( srmio_pc_t h, srmio_pc_xfer_block_t block);
+typedef bool (*srmio_pc_method_bool)( srmio_pc_t h, srmio_error_t *err );
+typedef bool (*srmio_pc_method_athlete)( srmio_pc_t h, char **athlete, srmio_error_t *err );
+typedef bool (*srmio_pc_method_tm)( srmio_pc_t h, struct tm *tp, srmio_error_t *err );
+typedef bool (*srmio_pc_method_time)( srmio_pc_t h, srmio_time_t t, srmio_error_t *err );
+typedef bool (*srmio_pc_method_block)( srmio_pc_t h, srmio_pc_xfer_block_t block );
 typedef bool (*srmio_pc_method_chunk)( srmio_pc_t h, srmio_chunk_t chunk,
 	bool *is_intervall, bool *start_intervall );
 typedef bool (*srmio_pc_method_progress)( srmio_pc_t h, size_t *block_done );
@@ -51,6 +51,7 @@ struct _srmio_pc_t {
 	bool				is_open;
 
 	/* xfer */
+	srmio_error_t			err;
 	srmio_pc_xfer_type_t		xfer_type;
 	srmio_pc_xfer_state_t		xfer_state;
 	size_t				block_cnt;
@@ -60,6 +61,6 @@ struct _srmio_pc_t {
 	void				*child;
 };
 
-srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child );
+srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child, srmio_error_t *err );
 
 #endif // _SRMIO_PC_H

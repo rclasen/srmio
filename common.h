@@ -10,11 +10,6 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
-#ifndef DEBUG
-/* suppress assert() code generation: */
-#define NDEBUG
-#endif
-
 #include <assert.h>
 
 #include "srmio.h"
@@ -77,6 +72,8 @@
 #include <limits.h>
 #endif
 
+#include <stdarg.h>
+
 #ifdef VERBOSE
 /* TODO: workaround for bad error reporting */
 #define ERRMSG(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
@@ -85,6 +82,18 @@
 #define ERRMSG(x, ...)	while(0);
 #define STATMSG(x, ...)	while(0);
 #endif
+
+/************************************************************
+ *
+ * from error.c
+ *
+ ************************************************************/
+
+void srmio_error_set( srmio_error_t *err, const char *fmt, ... );
+void srmio_error_setv( srmio_error_t *err, const char *fmt, va_list ap );
+#define srmio_error_errno( err, fmt, ... ) \
+	srmio_error_set( err, fmt ": %s", ##__VA_ARGS__ , strerror(errno) )
+void srmio_error_copy( srmio_error_t *dst, srmio_error_t *src );
 
 /************************************************************
  *

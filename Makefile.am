@@ -56,6 +56,7 @@ libsrmio_la_SOURCES= \
 	common.c \
 	$(D2XX_SRC) \
 	data.c \
+	error.c \
 	ftypes.c \
 	file_srm.c \
 	file_wkt.c \
