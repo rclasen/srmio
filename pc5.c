@@ -1093,19 +1093,19 @@ static bool _srmio_pc5_cmd_set_recint( srmio_pc_t conn, srmio_time_t recint )
 		return false;
 	}
 
-	/* 0.1 .. 0.9 sec? */
-	if( recint < 10 ){
+	/* 0.5 .. 0.9 sec */
+	if( recint >= 5 & recint < 10 ){
 		raw = 0x80 | recint;
 
-	/* 1 .. 15 sec? */
-	} else {
-		if( recint > 150 || recint % 10 ){
-			_srm_log( conn, "fractional recint > 1sec isn't supported" );
-			errno = ENOTSUP;
-			return false;
-		}
-
+	/* 1 .. 30 sec */
+	} else if( recint <= 300 && recint % 10 == 0 ){
 		raw = recint / 10;
+
+	} else {
+		_srm_log( conn, "fractional recint > 1sec isn't supported" );
+		errno = ENOTSUP;
+		return false;
+
 	}
 
 	if( 0 > _srmio_pc5_msg( conn, 'R', &raw, 1, NULL, 0, 1 ) )
