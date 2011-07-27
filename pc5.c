@@ -1285,7 +1285,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 			 * to the PCV, again. As a result, all further
 			 * data is off.
 			 */
-			while( flush > 0 ){
+			if( flush > 0 ){
 				if( ! srmio_io_flush( conn->io ) ){
 					conn->xfer_state = srmio_pc_xfer_state_failed;
 					return false;
@@ -1306,15 +1306,16 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 					return false;
 				}
 
+				/* retransmit was incomplete, as well: */
+				if( ret <= PC5_PKT_SIZE ){
+					flush = PC5_PKT_SIZE - ret;
+					continue;
+				}
+
 				/* we got more than one pkt ... hopefully
 				 * that's everything... */
-				if( ret > PC5_PKT_SIZE )
-					break;
-
-				/* retransmit was incomplete, as well: */
-				flush = PC5_PKT_SIZE - ret;
+				flush = 0;
 			}
-			flush = 0;
 
 			if( 0 > _srmio_pc5_write( conn, BLOCK_NAK, 1 ) ){
 				conn->xfer_state = srmio_pc_xfer_state_failed;
