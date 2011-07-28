@@ -1094,7 +1094,7 @@ static bool _srmio_pc5_cmd_set_recint( srmio_pc_t conn, srmio_time_t recint )
 	}
 
 	/* 0.5 .. 0.9 sec */
-	if( recint >= 5 & recint < 10 ){
+	if( recint >= 5 && recint < 10 ){
 		raw = 0x80 | recint;
 
 	/* 1 .. 30 sec */
