@@ -759,6 +759,7 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 		block->zeropos = buf_get_buint16( recv.data, 33 );
 		block->circum = buf_get_buint16( recv.data, 39 );
 		block->total = SELF(conn)->chunk_cnt;
+		block->end = block->start + block->total * block->recint;
 	}
 
 

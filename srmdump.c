@@ -217,6 +217,7 @@ int main( int argc, char **argv )
 	while( srmio_pc_xfer_block_next( srm, &block ) ){
 		printf( "block\n"
 			" start=%.1lf\n"
+			" end=%.1lf\n"
 			" recint=%.1lf\n"
 			" max_progress=%u\n"
 			" slope=%.1lf\n"
@@ -224,6 +225,7 @@ int main( int argc, char **argv )
 			" circum=%u\n"
 			" athlete=%s\n",
 			0.1 * block.start,
+			0.1 * block.end,
 			0.1 * block.recint,
 			block.total,
 			block.slope,

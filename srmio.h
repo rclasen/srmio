@@ -277,9 +277,13 @@ struct _srmio_pc_xfer_block_t {
 	unsigned	zeropos;
 	unsigned	circum;
 	char		*athlete;
-	srmio_time_t	recint;		/* informational only, chunks may disagree!!! */
-	srmio_time_t	start;		/* informational only, chunks may disagree!!! */
-	size_t		total; /* $items in this block - for progress indication */
+	size_t		total;	/* $items in this block - for progress indication */
+	/* informational only, chunks may disagree!!!:
+	 * 0 = unset/unknown
+	 */
+	srmio_time_t	recint;
+	srmio_time_t	start;
+	srmio_time_t	end;
 };
 typedef struct _srmio_pc_xfer_block_t *srmio_pc_xfer_block_t;
 
