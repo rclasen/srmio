@@ -1377,7 +1377,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 			-- btm.tm_year;
 
 		bstart = mktime( &btm );
-		if( (time_t) -1 > bstart ){
+		if( (time_t) -1 == bstart ){
 			conn->xfer_state = srmio_pc_xfer_state_failed;
 			_srm_log( conn, "mktime %s failed: %s",
 				asctime( &btm ),
