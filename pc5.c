@@ -97,16 +97,20 @@ static bool _srmio_pc5_msg_send( srmio_pc_t conn,
 static bool _srmio_pc5_write( srmio_pc_t conn, const unsigned char *buf,
 	size_t blen, srmio_error_t *err )
 {
+	srmio_error_t lerr;
 	int ret;
 
-	DUMPHEX( "", buf, blen );
+	SRMIO_PC_DUMP( conn, buf, blen, "" );
 
-	ret = srmio_io_write( conn->io, buf, blen, err );
-	if( ret < 0 )
+	ret = srmio_io_write( conn->io, buf, blen, &lerr );
+	if( ret < 0 ){
+		SRMIO_PC_ERROR( conn, err, "write failed: %s",
+			lerr.message );
 		return false;
+	}
 
 	if( (size_t)ret < blen ){
-		srmio_error_set(err, "incomplete write: %d/%d",
+		SRMIO_PC_ERROR( conn, err, "incomplete write: %d/%d",
 			ret, blen);
 		return false;
 	}
@@ -123,7 +127,16 @@ static bool _srmio_pc5_write( srmio_pc_t conn, const unsigned char *buf,
 static int _srmio_pc5_read( srmio_pc_t conn, unsigned char *buf,
 	size_t want, srmio_error_t *err )
 {
-	return srmio_io_read( conn->io, buf, want, err );
+	srmio_error_t lerr;
+	int ret;
+
+	ret = srmio_io_read( conn->io, buf, want, &lerr );
+	if( 0 > ret ){
+		SRMIO_PC_ERROR( conn, err, "read failed: %s",
+			lerr.message );
+	}
+
+	return ret;
 }
 
 
@@ -142,6 +155,7 @@ static bool _srmio_pc5_init(
 	const srmio_io_parity_t parity,
 	srmio_error_t *err )
 {
+	srmio_error_t	lerr;
 	int		ret;
 	unsigned char	buf[20];
 	unsigned char	verbuf[2];
@@ -157,24 +171,39 @@ static bool _srmio_pc5_init(
 	srmio_io_baud2name( baudrate, &baudname );
 	srmio_io_parity2name( parity, &parityname );
 
-	STATMSG( "trying comm %d/8%c1",
+	SRMIO_PC_STATUS( conn, "trying comm %d/8%c1",
 		baudname,
 		parityname );
 
-	if( ! srmio_io_set_baudrate( conn->io, baudrate, err ) )
+	if( ! srmio_io_set_baudrate( conn->io, baudrate, &lerr ) ){
+		SRMIO_PC_ERROR( conn, err, "set baudrate failed: %s",
+			lerr.message );
 		return false;
+	}
 
-	if( ! srmio_io_set_parity( conn->io, parity, err ) )
+	if( ! srmio_io_set_parity( conn->io, parity, &lerr ) ){
+		SRMIO_PC_ERROR( conn, err, "set parity failed: %s",
+			lerr.message );
 		return false;
+	}
 
-	if( ! srmio_io_update( conn->io, err ))
+	if( ! srmio_io_update( conn->io, &lerr )){
+		SRMIO_PC_ERROR( conn, err, "io update failed: %s",
+			lerr.message );
 		return false;
+	}
 
-	if( ! srmio_io_send_break( conn->io, err ) )
+	if( ! srmio_io_send_break( conn->io, &lerr ) ){
+		SRMIO_PC_ERROR( conn, err, "send break failed: %s",
+			lerr.message );
 		return false;
+	}
 
-	if( ! srmio_io_flush( conn->io, err ) )
+	if( ! srmio_io_flush( conn->io, &lerr ) ){
+		SRMIO_PC_ERROR( conn, err, "flush failed: %s",
+			lerr.message );
 		return false;
+	}
 
 	/* send opening 'P' to verify communication works */
 	if( ! _srmio_pc5_msg_send( conn, 'P', NULL, 0, err ) )
@@ -185,31 +214,32 @@ static bool _srmio_pc5_init(
 		return false;
 	}
 	if( ret == 0 ){
-		srmio_error_set( err, "got no opening response" );
+		SRMIO_PC_ERROR( conn, err, "got no opening response" );
 		return false;
 	}
 
-	DUMPHEX( "got", buf, ret );
+	SRMIO_PC_DUMP( conn, buf, ret, "got opening" );
 
 	/* autodetect communcitation type */
 	if( *buf == STX ){
 		if( ret != 7 || buf[1] != 'P' ){
-			srmio_error_set( err, "opening response is garbled" );
+			SRMIO_PC_ERROR( conn, err, "opening response is garbled" );
 			return false;
 		}
 
-		if( 0 >  _srmio_pc5_msg_decode( verbuf, 2, &buf[2], 4, err ) ){
+		if( 0 >  _srmio_pc5_msg_decode( verbuf, 2, &buf[2], 4, &lerr ) ){
+			SRMIO_PC_ERROR( conn, err, "%s", lerr.message );
 			return false;
 		}
 
 	} else {
 		if( ret != 3 ||  buf[0] != 'P' ){
-			srmio_error_set( err, "opening response is garbled" );
+			SRMIO_PC_ERROR( conn, err, "opening response is garbled" );
 			return false;
 		}
 
 		SELF(conn)->stxetx = 0;
-		DPRINTF( "disabling stx/etx" );
+		SRMIO_PC_DEBUG( conn, "disabling stx/etx" );
 
 		memcpy( verbuf, &buf[1], 2 );
 	}
@@ -218,7 +248,7 @@ static bool _srmio_pc5_init(
 	conn->parity = parity;
 	conn->firmware = buf_get_buint16( verbuf, 0 );
 
-	DPRINTF("found PCV version 0x%x at %d/8%c1",
+	SRMIO_PC_DEBUG( conn, "found PCV version 0x%x at %d/8%c1",
 		conn->firmware,
 		baudname,
 		parityname );
@@ -234,7 +264,7 @@ static bool _srmio_pc5_probe_parity( srmio_pc_t conn,
 	unsigned baud;
 
 	if( ! srmio_io_baud2name( rate, &baud ) ){
-		srmio_error_set( err, "invalid baudrate" );
+		SRMIO_PC_ERROR( conn, err, "invalid baudrate" );
 		return false;
 	}
 
@@ -244,11 +274,11 @@ static bool _srmio_pc5_probe_parity( srmio_pc_t conn,
 		if( _srmio_pc5_init( conn, rate, *parity, &lerr ) )
 			return true;
 
-		STATMSG( "probe %u baud, parityID %u failed: %s",
+		SRMIO_PC_STATUS( conn, "probe %u baud, parityID %u failed: %s",
 			baud, *parity, lerr.message );
 	}
 
-	srmio_error_set( err, "no PCV found at %u baud", baud );
+	SRMIO_PC_ERROR( conn, err, "no PCV found at %u baud", baud );
 	return false;
 }
 
@@ -263,7 +293,7 @@ static bool _srmio_pc5_probe_baud( srmio_pc_t conn,
 			if( _srmio_pc5_probe_parity( conn, *rate, &lerr ) )
 				return true;
 
-			STATMSG( "probe baudID %u failed: %s",
+			SRMIO_PC_STATUS( conn, "probe baudID %u failed: %s",
 				*rate, lerr.message );
 
 		} else {
@@ -275,7 +305,7 @@ static bool _srmio_pc5_probe_baud( srmio_pc_t conn,
 		}
 	}
 
-	srmio_error_set( err, "no PCV found at any baudrate" );
+	SRMIO_PC_ERROR( conn, err, "no PCV found at any baudrate" );
 	return false;
 }
 
@@ -287,13 +317,18 @@ static bool _srmio_pc5_probe_baud( srmio_pc_t conn,
  */
 static bool _srmio_pc5_open( srmio_pc_t conn, srmio_error_t *err )
 {
+	srmio_error_t lerr;
+
 	assert( conn );
 	assert( conn->io );
 
-	DPRINTF( "" );
+	SRMIO_PC_DEBUG( conn, "" );
 
-	if( !  srmio_io_set_flow( conn->io, srmio_io_flow_none, err ) )
+	if( !  srmio_io_set_flow( conn->io, srmio_io_flow_none, &lerr ) ){
+		SRMIO_PC_ERROR( conn, err, "set flow failed: %s",
+			lerr.message );
 		return false;
+	}
 
 	/* set serial parameter and get PCV version */
 	if( conn->baudrate == srmio_io_baud_max ){
@@ -461,10 +496,11 @@ static bool _srmio_pc5_msg_send( srmio_pc_t conn, char cmd,
 	const unsigned char *arg, size_t alen,
 	srmio_error_t *err )
 {
+	srmio_error_t	lerr;
 	unsigned char buf[PC5_BUFSIZE];
 	unsigned len = 0;
 
-	DUMPHEX( "cmd=%c", arg, alen, cmd );
+	SRMIO_PC_DUMP( conn, arg, alen, "cmd=%c", cmd );
 
 	assert( conn );
 	assert( ! alen || arg );
@@ -489,9 +525,13 @@ static bool _srmio_pc5_msg_send( srmio_pc_t conn, char cmd,
 
 
 	/* send */
-	if( ! srmio_io_flush( conn->io, err ) )
+	if( ! srmio_io_flush( conn->io, &lerr ) ){
+		SRMIO_PC_ERROR( conn, err, "flush failed: %s",
+			lerr.message );
 		return false;
+	}
 
+	SRMIO_PC_DUMP( conn, buf, len, "sending");
 	if( ! _srmio_pc5_write( conn, buf, len, err ) )
 		return false;
 
@@ -512,6 +552,7 @@ static int _srmio_pc5_msg_recv( srmio_pc_t conn,
 	unsigned char *rbuf, size_t rsize, size_t want,
 	srmio_error_t *err )
 {
+	srmio_error_t lerr;
 	unsigned char	buf[PC5_BUFSIZE];
 	size_t	rlen = 0;
 	int	ret;
@@ -529,7 +570,7 @@ static int _srmio_pc5_msg_recv( srmio_pc_t conn,
 	/* cmd char */
 	++want;
 
-	DPRINTF( "will read %lu ", (unsigned long)want );
+	SRMIO_PC_DEBUG( conn, "will read %lu ", (unsigned long)want );
 
 
 	/* read till
@@ -540,14 +581,14 @@ static int _srmio_pc5_msg_recv( srmio_pc_t conn,
 	while( rlen < want ){
 		ret = _srmio_pc5_read( conn, &buf[rlen], 1, err );
 		if( ret < 0 ){
-			DUMPHEX( "", buf, rlen );
+			SRMIO_PC_DUMP( conn, buf, rlen, "" );
 			return -1;
 		}
 
 		/* timeout */
 		if( ret < 1 ){
-			srmio_error_set( err, "read timed out" );
-			DUMPHEX( "", buf, rlen );
+			SRMIO_PC_ERROR( conn, err, "read timed out" );
+			SRMIO_PC_DUMP( conn, buf, rlen, "" );
 			return -1;
 		}
 
@@ -555,48 +596,52 @@ static int _srmio_pc5_msg_recv( srmio_pc_t conn,
 
 		/* avoid running into timeout */
 		if( SELF(conn)->stxetx && buf[rlen-1] == ETX ){
-			DPRINTF( "msg complete - got ETX" );
+			SRMIO_PC_DEBUG( conn, "msg complete - got ETX" );
 			break;
 		}
 
 	}
-	DUMPHEX( "", buf, rlen );
+	SRMIO_PC_DUMP( conn, buf, rlen, "" );
 
 	if( rlen < want ){
-		srmio_error_set( err, "got incomplete response: %u/%u",
+		SRMIO_PC_ERROR( conn, err, "got incomplete response: %u/%u",
 			rlen, want );
 		return -1;
 	}
 
 	if( SELF(conn)->stxetx ){
 		if( rlen < 3 ){
-			srmio_error_set( err, "response is too short for stxetx: %u",
+			SRMIO_PC_ERROR( conn, err, "response is too short for stxetx: %u",
 				rlen );
 			return -1;
 		}
 
 		if( buf[0] != STX ){
-			srmio_error_set( err, "response is missing STX" );
+			SRMIO_PC_ERROR( conn, err, "response is missing STX" );
 			return -1;
 		}
 
 		if( buf[rlen-1] != ETX ){
-			srmio_error_set( err, "response is missing ETX" );
+			SRMIO_PC_ERROR( conn, err, "response is missing ETX" );
 			return -1;
 		}
 		rlen -= 3; /* stx, cmd, etx */
 
 		if( rbuf ){
-			ret = _srmio_pc5_msg_decode(rbuf, rsize, &buf[2], rlen, err );
-			if( ret < 0 )
+			ret = _srmio_pc5_msg_decode(rbuf, rsize,
+				&buf[2], rlen, &lerr );
+			if( ret < 0 ){
+				SRMIO_PC_ERROR( conn, err, "decode failed: %s",
+					lerr.message );
 				return -1;
+			}
 			rlen = ret;
 		} else
 			rlen /= 2;
 
 	} else {
 		if( rlen < 1 ){
-			srmio_error_set( err, "response is too short: %u",
+			SRMIO_PC_ERROR( conn, err, "response is too short: %u",
 				rlen );
 			return -1;
 		}
@@ -644,7 +689,7 @@ static void _srmio_pc5_msg_ready( srmio_pc_t conn )
 
 	delta = SELF(conn)->nready - now;
 
-	STATMSG( "PCV still busy for %usec, waiting...", delta );
+	SRMIO_PC_STATUS( conn, "PCV still busy for %usec, waiting...", delta );
 	sleep( delta );
 
 	return;
@@ -671,7 +716,7 @@ static int _srmio_pc5_msg( srmio_pc_t conn, char cmd,
 	assert( conn );
 
 	if( conn->xfer_state != srmio_pc_xfer_type_new ){
-		srmio_error_set( err, "another command is still running" );
+		SRMIO_PC_ERROR( conn, err, "another command is still running" );
 		return -1;
 	}
 
@@ -680,7 +725,8 @@ static int _srmio_pc5_msg( srmio_pc_t conn, char cmd,
 	for( retries = 0; retries < 3; ++retries ){
 
 		if( retries ){
-			STATMSG( "SRM isn't responding, send break and retry" );
+			SRMIO_PC_STATUS( conn,
+				"SRM isn't responding, send break and retry" );
 			srmio_io_send_break( conn->io, err );
 			sleep(1);
 			srmio_io_flush( conn->io, err );
@@ -737,7 +783,7 @@ bool srmio_pc5_cmd_get_version( srmio_pc_t conn, unsigned *version,
 	if( ret < 0 )
 		return false;
 	if( ret < 2 ){
-		srmio_error_set( err, "got truncated version response" );
+		SRMIO_PC_ERROR( conn, err, "got truncated version response" );
 		return false;
 	}
 
@@ -773,12 +819,12 @@ static bool _srmio_pc5_cmd_get_athlete( srmio_pc_t conn, char **name,
 	if( ret < 0 )
 		return false;
 	if( ret < 6 ){
-		srmio_error_set( err, "got truncated athlete response" );
+		SRMIO_PC_ERROR( conn, err, "got truncated athlete response" );
 		return false;
 	}
 
 	*name = buf_get_string( buf, 0, 6 );
-	DPRINTF( "athlete=%s", (char*)*name );
+	SRMIO_PC_DEBUG( conn, "athlete=%s", (char*)*name );
 	/* TODO: iconv cp850 -> internal ?? */
 
 	return true;
@@ -814,7 +860,7 @@ bool srmio_pc5_cmd_get_time( srmio_pc_t conn, struct tm *timep,
 	if( ret < 0 )
 		return false;
 	if( ret < 6 ){
-		srmio_error_set( err, "got truncated time response" );
+		SRMIO_PC_ERROR( conn, err, "got truncated time response" );
 		return false;
 	}
 
@@ -826,7 +872,7 @@ bool srmio_pc5_cmd_get_time( srmio_pc_t conn, struct tm *timep,
 	timep->tm_sec = TIMEDEC( buf[5] );
 	timep->tm_isdst = -1;
 
-	DPRINTF( "time=%s", asctime( timep ) );
+	SRMIO_PC_DEBUG( conn, "time=%s", asctime( timep ) );
 
 	return true;
 }
@@ -860,7 +906,7 @@ static bool _srmio_pc5_cmd_set_time( srmio_pc_t conn, struct tm *timep,
 	if( 0 > _srmio_pc5_msg( conn, 'M', buf, 6, NULL, 0, 0, err ))
 		return false;
 
-	DPRINTF( "time=%s", asctime(timep) );
+	SRMIO_PC_DEBUG( conn, "time=%s", asctime(timep) );
 	_srmio_pc5_msg_busy( conn, 2 );
 	return true;
 }
@@ -895,12 +941,12 @@ bool srmio_pc5_cmd_get_circum( srmio_pc_t conn, unsigned *circum,
 	if( ret < 0 )
 		return false;
 	if( ret < 2 ){
-		srmio_error_set( err, "got truncated circumference response" );
+		SRMIO_PC_ERROR( conn, err, "got truncated circumference response" );
 		return false;
 	}
 
 	*circum = buf_get_buint16( buf, 0 );
-	DPRINTF( "circum=%d", *circum );
+	SRMIO_PC_DEBUG( conn, "circum=%d", *circum );
 	return true;
 }
 
@@ -934,12 +980,12 @@ bool srmio_pc5_cmd_get_slope( srmio_pc_t conn, double *slope,
 	if( ret < 0 )
 		return false;
 	if( ret < 2 ){
-		srmio_error_set( err, "got truncated slope response" );
+		SRMIO_PC_ERROR( conn, err, "got truncated slope response" );
 		return false;
 	}
 
 	*slope = (double)( buf_get_buint16( buf, 0 ) ) / 10;
-	DPRINTF( "slope=%.1f", *slope );
+	SRMIO_PC_DEBUG( conn, "slope=%.1f", *slope );
 	return true;
 }
 
@@ -973,12 +1019,12 @@ bool srmio_pc5_cmd_get_zeropos( srmio_pc_t conn,
 	if( ret < 0 )
 		return false;
 	if( ret < 2 ){
-		srmio_error_set( err, "got truncated offset response" );
+		SRMIO_PC_ERROR( conn, err, "got truncated offset response" );
 		return false;
 	}
 
 	*zeropos = buf_get_buint16( buf, 0 );
-	DPRINTF( "zeropos=%d", *zeropos );
+	SRMIO_PC_DEBUG( conn, "zeropos=%d", *zeropos );
 	return true;
 }
 
@@ -1018,7 +1064,7 @@ bool srmio_pc5_cmd_get_recint( srmio_pc_t conn,
 	if( ret < 0 )
 		return false;
 	if( ret < 1 ){
-		srmio_error_set( err, "got truncated recint response" );
+		SRMIO_PC_ERROR( conn, err, "got truncated recint response" );
 		return false;
 	}
 
@@ -1026,7 +1072,7 @@ bool srmio_pc5_cmd_get_recint( srmio_pc_t conn,
 		? *buf & 0x0f
 		: *buf * 10;
 
-	DPRINTF( "raw=0x%02x recint=%.1f", *buf,
+	SRMIO_PC_DEBUG( conn, "raw=0x%02x recint=%.1f", *buf,
 		(double)*recint/10 );
 	return true;
 }
@@ -1046,7 +1092,7 @@ static bool _srmio_pc5_cmd_set_recint( srmio_pc_t conn,
 	unsigned char raw;
 
 	if( recint <= 0 ){
-		srmio_error_set( err, "recint < 0sec isn't supported" );
+		SRMIO_PC_ERROR( conn, err, "recint < 0sec isn't supported" );
 		return false;
 	}
 
@@ -1059,7 +1105,7 @@ static bool _srmio_pc5_cmd_set_recint( srmio_pc_t conn,
 		raw = recint / 10;
 
 	} else {
-		srmio_error_set( err, "unsupported recint: %.1lf",
+		SRMIO_PC_ERROR( conn, err, "unsupported recint: %.1lf",
 			.1 * recint );
 		return false;
 
@@ -1068,7 +1114,7 @@ static bool _srmio_pc5_cmd_set_recint( srmio_pc_t conn,
 	if( 0 > _srmio_pc5_msg( conn, 'R', &raw, 1, NULL, 0, 1, err ) )
 		return false;
 
-	DPRINTF( "success" );
+	SRMIO_PC_DEBUG( conn, "success" );
 	return true;
 }
 
@@ -1100,7 +1146,7 @@ static bool _srmio_pc5_cmd_clear( srmio_pc_t conn, srmio_error_t *err )
 	if( 0 >  _srmio_pc5_msg( conn, 'T', NULL, 0, NULL, 0, 0, err ) )
 		return false;
 
-	DPRINTF( "success" );
+	SRMIO_PC_DEBUG( conn, "success" );
 	return true;
 }
 
@@ -1217,7 +1263,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 	assert( conn );
 
-	DPRINTF( "getting pkt %u/%u",
+	SRMIO_PC_DEBUG( conn, "getting pkt %u/%u",
 		SELF(conn)->pkt_num +1,
 		SELF(conn)->pkt_cnt);
 
@@ -1226,7 +1272,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 		if( retries ){
 			/* request retransmit */
-			STATMSG( "received bad pkt %u, "
+			SRMIO_PC_STATUS( conn, "received bad pkt %u, "
 				"requesting retransmit",
 				SELF(conn)->pkt_num );
 
@@ -1243,6 +1289,8 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 			 */
 			if( flush > 0 ){
 				if( ! srmio_io_flush( conn->io, &conn->err ) ){
+					SRMIO_PC_DEBUG( conn, "flush failed: %s",
+						conn->err.message );
 					conn->xfer_state = srmio_pc_xfer_state_failed;
 					return false;
 				}
@@ -1250,6 +1298,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 				if( ! _srmio_pc5_write( conn, BLOCK_NAK,
 					1, &conn->err ) ){
 
+					SRMIO_PC_DEBUG( conn, "flush/NAK failed");
 					conn->xfer_state = srmio_pc_xfer_state_failed;
 					return false;
 				}
@@ -1257,11 +1306,10 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 				flush += PC5_PKT_SIZE;
 				ret = _srmio_pc5_read( conn,
 					SELF(conn)->pkt_data, flush, &conn->err);
-
-				DPRINTF("flushed %d bytes", ret );
 				if( ret < 0 ){
 					return false;
 				}
+				SRMIO_PC_DEBUG( conn,"flushed %d bytes", ret );
 
 				/* retransmit was incomplete, as well: */
 				if( ret <= PC5_PKT_SIZE ){
@@ -1276,6 +1324,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 			if( ! _srmio_pc5_write( conn, BLOCK_NAK, 1, &conn->err ) ){
 
+				SRMIO_PC_DEBUG( conn, "retansmit/NAK failed");
 				conn->xfer_state = srmio_pc_xfer_state_failed;
 				return false;
 			}
@@ -1284,7 +1333,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 		ret = _srmio_pc5_read( conn, SELF(conn)->pkt_data,
 			PC5_PKT_SIZE, &conn->err  );
-		DUMPHEX( "", SELF(conn)->pkt_data, ret );
+		SRMIO_PC_DUMP( conn, SELF(conn)->pkt_data, ret, "got pkt" );
 
 		if( ret < 0 ){
 			conn->xfer_state = srmio_pc_xfer_state_failed;
@@ -1296,7 +1345,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 			&& SELF(conn)->pkt_num == 0 ){
 
 			/* workaround stxetx + 3 pkts problem */
-			DPRINTF( "stxetx, fixing pkts=0" );
+			SRMIO_PC_DEBUG( conn, "stxetx, fixing pkts=0" );
 			SELF(conn)->pkt_cnt = 0;
 			conn->xfer_state = srmio_pc_xfer_state_success;
 			return false;
@@ -1304,14 +1353,14 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 		} else if( ret == 1 && SELF(conn)->stxetx
 			&& SELF(conn)->pkt_data[0] == ETX ){
 
-			srmio_error_set( &conn->err, "got unexpected end of "
+			SRMIO_PC_ERROR( conn, &conn->err, "got unexpected end of "
 				"transfer for pkt %u", SELF(conn)->pkt_num );
 			conn->xfer_state = srmio_pc_xfer_state_failed;
 			return false;
 
 		} else if( ret < PC5_PKT_SIZE ){
 			/* incomplete pkt, retry */
-			STATMSG( "pkt %d is too short: %d",
+			SRMIO_PC_STATUS( conn, "pkt %d is too short: %d",
 				SELF(conn)->pkt_num,
 				ret );
 
@@ -1335,10 +1384,10 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 		bstart = mktime( &btm );
 		if( (time_t) -1 == bstart ){
-			conn->xfer_state = srmio_pc_xfer_state_failed;
-			srmio_error_set( &conn->err, "mktime %s failed: %s",
+			SRMIO_PC_ERROR( conn, &conn->err, "mktime %s failed: %s",
 				asctime( &btm ),
 				strerror(errno) );
+			conn->xfer_state = srmio_pc_xfer_state_failed;
 			return false;
 		}
 
@@ -1354,7 +1403,8 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 
 		if( ! SELF(conn)->pkt_recint ){
-			STATMSG( "pkt #%u has no recint", SELF(conn)->pkt_num );
+			SRMIO_PC_STATUS( conn, "pkt #%u has no recint",
+				SELF(conn)->pkt_num );
 			continue;
 		}
 
@@ -1364,7 +1414,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 	if( ! valid ){
 		conn->xfer_state = srmio_pc_xfer_state_failed;
-		srmio_error_set( &conn->err, "got invalid pkt #%u, retries failed",
+		SRMIO_PC_ERROR( conn, &conn->err, "got invalid pkt #%u, retries failed",
 			SELF(conn)->pkt_num );
 		return false;
 	}
@@ -1380,7 +1430,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 	SELF(conn)->chunk_num = 0;
 	SELF(conn)->pkt_num++;
 
-	DPRINTF( "mon=%u day=%u hour=%u min=%u sec=%u "
+	SRMIO_PC_DEBUG( conn, "mon=%u day=%u hour=%u min=%u sec=%u "
 		"dist=%lu temp=%d recint=%.1f na0=%x na2=%x",
 		(unsigned)btm.tm_mon,
 		(unsigned)btm.tm_mday,
@@ -1412,9 +1462,9 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 
 	assert( conn );
 
-	DPRINTF("getting meta info");
+	SRMIO_PC_DEBUG( conn,"getting meta info");
 	if( conn->xfer_state != srmio_pc_xfer_state_new ){
-		srmio_error_set( err, "device is busy" );
+		SRMIO_PC_ERROR( conn, err, "device is busy" );
 		return false;
 	}
 
@@ -1428,7 +1478,7 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 		break;
 
 	  default:
-		srmio_error_set( err, "invalid xfer mode" );
+		SRMIO_PC_ERROR( conn, err, "invalid xfer mode" );
 		return false;
 	}
 
@@ -1455,7 +1505,7 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 
 	_srmio_pc5_msg_ready( conn );
 
-	DPRINTF("starting %c", cmd );
+	SRMIO_PC_DEBUG( conn,"starting %c", cmd );
 	if( ! _srmio_pc5_msg_send( conn, cmd, NULL, 0, err ) )
 		goto clean1;
 
@@ -1470,7 +1520,7 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 	/* get header + number of pkts to read */
 	ret = _srmio_pc5_read( conn, SELF(conn)->pkt_data,
 		SELF(conn)->stxetx ? 4 : 3, err );
-	DUMPHEX( "xfer response", SELF(conn)->pkt_data, ret );
+	SRMIO_PC_DUMP( conn, SELF(conn)->pkt_data, ret, "xfer response" );
 	if( ret < 0 ){
 		goto clean2;
 	}
@@ -1480,13 +1530,13 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 		 * both: 0x02/  0x41/A 0x00/  0x03/
 		 * this is worked around in get_pkt() */
 		if( ret < 4 ){
-			srmio_error_set( err, "got incomplete download response" );
+			SRMIO_PC_ERROR( conn, err, "got incomplete download response" );
 			goto clean2;
 
 		} else if( SELF(conn)->pkt_data[0] != STX
 			|| SELF(conn)->pkt_data[1] != cmd ){
 
-			srmio_error_set( err, "download response is garbled" );
+			SRMIO_PC_ERROR( conn, err, "download response is garbled" );
 			goto clean2;
 		}
 
@@ -1495,7 +1545,7 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 
 	} else {
 		if( ret < 2 ){
-			srmio_error_set( err, "got incomplete download response" );
+			SRMIO_PC_ERROR( conn, err, "got incomplete download response" );
 			goto clean2;
 
 		} else if( ret > 2 ){
@@ -1508,9 +1558,9 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 		}
 
 	}
-	DPRINTF( "expecting %u pkts", SELF(conn)->pkt_cnt );
+	SRMIO_PC_DEBUG( conn, "expecting %u pkts", SELF(conn)->pkt_cnt );
 	if( (unsigned long)SELF(conn)->pkt_cnt * PC5_PKT_CHUNKS > UINT16_MAX ){
-		srmio_error_set( err, "PCV reports too many packets: %u",
+		SRMIO_PC_ERROR( conn, err, "PCV reports too many packets: %u",
 			SELF(conn)->pkt_cnt );
 		goto clean2;
 	}
@@ -1536,7 +1586,7 @@ static bool _srmio_pc5_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 	assert(conn);
 	assert(block);
 
-	DPRINTF("");
+	SRMIO_PC_DEBUG( conn,"");
 	if( SELF(conn)->block_num  )
 		return false;
 
@@ -1579,9 +1629,7 @@ static bool _srmio_pc5_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 				return false;
 
 		cbuf = &SELF(conn)->pkt_data[9 + 5*SELF(conn)->chunk_num];
-#ifdef DEBUG_CHUNK
-		DUMPHEX( "", cbuf, 5 );
-#endif
+		SRMIO_PC_DUMP( conn, cbuf, 5, "" );
 
 		is_first = cbuf[0] & 0x40;
 		is_int = cbuf[0] & 0x80;
@@ -1592,7 +1640,7 @@ static bool _srmio_pc5_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 			*is_intervall = is_int;
 
 		if( 0 == memcmp( cbuf, "\0\0\0\0\0", 5 )){
-			DPRINTF( "skipping empty chunk#%u",
+			SRMIO_PC_DEBUG( conn, "skipping empty chunk#%u",
 				SELF(conn)->chunk_num );
 			SELF(conn)->chunk_num++;
 			continue;
@@ -1601,7 +1649,8 @@ static bool _srmio_pc5_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 		chunk->time = SELF(conn)->pkt_time
 			+ SELF(conn)->chunk_num * SELF(conn)->pkt_recint;
 		if( chunk->time < SELF(conn)->pkt_time ){
-			srmio_error_set( &conn->err, "chunk time had INT overflow" );
+			SRMIO_PC_ERROR( conn, &conn->err,
+				"chunk time had INT overflow" );
 			conn->xfer_state = srmio_pc_xfer_state_failed;
 			return false;
 		}
@@ -1616,7 +1665,7 @@ static bool _srmio_pc5_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 		chunk->hr = cbuf[4];
 		chunk->ele = 0;
 
-		DPRINTF( "%u: "
+		SRMIO_PC_DEBUG( conn, "%u: "
 			"time=%.1f, "
 			"temp=%.1f, "
 			"pwr=%u, "
@@ -1655,11 +1704,11 @@ static bool _srmio_pc5_xfer_finish( srmio_pc_t conn, srmio_error_t *err )
 {
 	assert( conn );
 
-	DPRINTF("");
+	SRMIO_PC_DEBUG( conn,"");
 
 	/* abort */
 	if( SELF(conn)->pkt_num < SELF(conn)->pkt_cnt ){
-		STATMSG( "aborting download" );
+		SRMIO_PC_STATUS( conn, "aborting download" );
 		srmio_io_flush( conn->io, err );
 		_srmio_pc5_write( conn, BLOCK_ABRT, 1, err );
 		sleep(1);
@@ -1669,7 +1718,7 @@ static bool _srmio_pc5_xfer_finish( srmio_pc_t conn, srmio_error_t *err )
 		if( SELF(conn)->stxetx )
 			if( 1 == _srmio_pc5_read( conn,
 				SELF(conn)->pkt_data, 1, err ) )
-				DPRINTF( "final ETX: %02x",
+				SRMIO_PC_DEBUG( conn, "final ETX: %02x",
 				*SELF(conn)->pkt_data );
 
 	}

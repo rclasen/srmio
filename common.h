@@ -101,13 +101,18 @@ void srmio_error_copy( srmio_error_t *dst, srmio_error_t *src );
  *
  ************************************************************/
 
+void srmio_dumphexv(FILE *fh, const unsigned char *buf, size_t blen,
+	const char *fmt, va_list ap );
+void srmio_dumphex(FILE *fh, const unsigned char *buf, size_t blen,
+	const char *fmt, ... );
+
 #ifdef DEBUG
 
 #include <ctype.h>
 
 #define DPRINTF(x, ...)	fprintf( stderr, "%s: " x "\n", __func__, ##__VA_ARGS__ );
-#define DUMPHEX(prefix, buf, blen, ... ) dumphex(__func__, prefix, buf, blen, ##__VA_ARGS__ );
-void dumphex(const char *func, const char *prefix, const unsigned char *buf, int blen, ... );
+#define DUMPHEX(fmt, buf, blen, ... ) \
+	srmio_dumphex(stderr, buf, blen, "%s: " fmt, __func__, ##__VA_ARGS__ );
 
 #else
 

@@ -8,6 +8,8 @@
  */
 
 
+#include <stdarg.h>
+
 #include "pc.h"
 
 srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child,
@@ -30,6 +32,10 @@ srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child,
 	pch->xfer_state = srmio_pc_xfer_state_new;
 	pch->xfer_type = srmio_pc_xfer_type_new;
 
+#ifdef DEBUG
+	pch->debugfh = stderr;
+#endif
+
 	return pch;
 }
 
@@ -50,15 +56,15 @@ bool srmio_pc_open( srmio_pc_t pch, srmio_error_t *err )
 	assert( pch->io );
 	assert(pch->methods->open);
 
-	DPRINTF("");
+	SRMIO_PC_DEBUG(pch, "");
 
 	if( pch->is_open ){
-		srmio_error_set( err, "device is already open" );
+		SRMIO_PC_ERROR( pch, err, "device is already open" );
 		return false;
 	}
 
 	if( ! srmio_io_is_open( pch->io ) ){
-		srmio_error_set( err, "io device is already open" );
+		SRMIO_PC_ERROR( pch, err, "io device is already open" );
 		return false;
 	}
 
@@ -78,7 +84,7 @@ bool srmio_pc_close( srmio_pc_t pch, srmio_error_t *err )
 	assert( pch->io );
 	assert(pch->methods->close);
 
-	DPRINTF("");
+	SRMIO_PC_DEBUG(pch, "");
 
 	if( pch->xfer_state != srmio_pc_xfer_state_new )
 		srmio_pc_xfer_finish( pch, err );
@@ -88,6 +94,53 @@ bool srmio_pc_close( srmio_pc_t pch, srmio_error_t *err )
 
 	pch->is_open = false;
 	return true;
+}
+
+bool srmio_pc_set_debug( srmio_pc_t pch, FILE *fh )
+{
+	assert( pch );
+
+	pch->debugfh = fh;
+	return true;
+}
+
+bool srmio_pc_get_debug( srmio_pc_t pch, FILE **fh )
+{
+	assert( pch );
+	assert( fh );
+
+	*fh = pch->debugfh;
+	return true;
+}
+
+void srmio_pc_debug( srmio_pc_t pch, const char *fmt, ... )
+{
+	va_list ap;
+
+	assert( pch );
+
+	if( ! pch->debugfh )
+		return;
+
+	va_start( ap, fmt );
+	vfprintf( pch->debugfh, fmt, ap );
+	va_end( ap );
+	fprintf( pch->debugfh, "\n" );
+}
+
+void srmio_pc_dump( srmio_pc_t pch, const unsigned char *buf, size_t blen,
+	const char *fmt, ... )
+{
+	va_list ap;
+
+	assert( pch );
+
+	if( ! pch->debugfh )
+		return;
+
+	va_start( ap, fmt );
+	srmio_dumphexv( pch->debugfh, buf, blen, fmt, ap );
+	va_end( ap );
 }
 
 /*
@@ -100,7 +153,7 @@ bool srmio_pc_set_device( srmio_pc_t pch, srmio_io_t h, srmio_error_t *err )
 	assert( h );
 
 	if( pch->is_open ){
-		srmio_error_set( err, "device is open, can't change");
+		SRMIO_PC_ERROR( pch, err, "device is open, can't change");
 		return false;
 	}
 
@@ -133,7 +186,7 @@ bool srmio_pc_set_baudrate( srmio_pc_t pch, srmio_io_baudrate_t rate,
 	assert( rate <= srmio_io_baud_max );
 
 	if( pch->is_open ){
-		srmio_error_set( err, "device is open, can't change");
+		SRMIO_PC_ERROR( pch, err, "device is open, can't change");
 		return false;
 	}
 
@@ -153,7 +206,7 @@ bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity,
 	assert( parity <= srmio_io_parity_max );
 
 	if( pch->is_open ){
-		srmio_error_set( err, "device is open, can't change");
+		SRMIO_PC_ERROR( pch, err, "device is open, can't change");
 		return false;
 	}
 
@@ -168,7 +221,7 @@ bool srmio_pc_get_baudrate( srmio_pc_t pch, srmio_io_baudrate_t *rate,
 	assert(rate);
 
 	if( pch->baudrate >= srmio_io_baud_max ){
-		srmio_error_set( err, "baudrate is unset" );
+		SRMIO_PC_ERROR( pch, err, "baudrate is unset" );
 		return false;
 	}
 
@@ -183,7 +236,7 @@ bool srmio_pc_get_parity( srmio_pc_t pch, srmio_io_parity_t *parity,
 	assert(parity);
 
 	if( pch->parity >= srmio_io_parity_max ){
-		srmio_error_set( err, "parity is unset" );
+		SRMIO_PC_ERROR( pch, err, "parity is unset" );
 		return false;
 	}
 
@@ -212,7 +265,7 @@ bool srmio_pc_set_xfer( srmio_pc_t pch, srmio_pc_xfer_type_t type,
 	assert( pch );
 	assert( type < srmio_pc_xfer_type_max );
 
-	DPRINTF( "%d", type );
+	SRMIO_PC_DEBUG(pch,  "%d", type );
 
 	pch->xfer_type = type;
 
@@ -365,7 +418,7 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 
 	block.athlete = NULL;
 
-	DPRINTF("");
+	SRMIO_PC_DEBUG(pch, "");
 
 	if( ! srmio_pc_xfer_start( pch, err ) )
 		return false;
@@ -381,7 +434,7 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 					free( block.athlete );
 				block.athlete = NULL;
 			}
-			DPRINTF("prog_sum %u", prog_sum );
+			SRMIO_PC_DEBUG(pch, "prog_sum %u", prog_sum );
 
 			/* finalize / restart xfer */
 			if( srmio_pc_xfer_state_success !=
@@ -437,7 +490,8 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 						block.total / block_done;
 				}
 
-				DPRINTF( "prog_total %d, prog_prev %d, block_done %d",
+				SRMIO_PC_DEBUG( pch,
+					"prog_total %d, prog_prev %d, block_done %d",
 					prog_total, prog_prev, block_done );
 				(*pfunc)( prog_total, block_done, user_data );
 			}
@@ -458,7 +512,7 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 			/* start marker */
 			if( is_first ){
 				mfirst = (int)data->cused;
-				DPRINTF( "new marker at %d", mfirst );
+				SRMIO_PC_DEBUG(pch,  "new marker at %d", mfirst );
 
 			} else if( ! is_int ){
 				mfirst = -1;
@@ -488,7 +542,7 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 	}
 
 	if( ! done_chunks ){
-		srmio_error_set( err, "no data");
+		SRMIO_PC_ERROR( pch, err, "no data");
 		goto clean;
 	}
 

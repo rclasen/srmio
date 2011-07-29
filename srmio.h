@@ -307,6 +307,9 @@ bool srmio_pc_get_device( srmio_pc_t conn, srmio_io_t *h, srmio_error_t *err );
 bool srmio_pc_set_baudrate( srmio_pc_t pch, srmio_io_baudrate_t rate, srmio_error_t *err );
 bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity, srmio_error_t *err );
 
+bool srmio_pc_set_debug( srmio_pc_t pch, FILE *fh );
+bool srmio_pc_get_debug( srmio_pc_t pch, FILE **fh );
+
 bool srmio_pc_open( srmio_pc_t conn, srmio_error_t *err );
 bool srmio_pc_close( srmio_pc_t conn, srmio_error_t *err );
 bool srmio_pc_get_baudrate( srmio_pc_t pch, srmio_io_baudrate_t *rate, srmio_error_t *err );

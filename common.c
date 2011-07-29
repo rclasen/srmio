@@ -12,23 +12,17 @@
 
 const char *srmio_version = PACKAGE_STRING;
 
-#ifdef DEBUG
-void dumphex( const char *func, const char *prefix, const unsigned char *buf, int blen, ... )
+void srmio_dumphexv(FILE *fh, const unsigned char *buf, size_t blen,
+	const char *fmt, va_list ap )
 {
-	va_list ap;
-	int i;
+	size_t i;
 
-	if( blen < 1 )
-		return;
+	assert( fh );
+	assert( ! blen || buf );
+	assert( fmt );
 
-
-	fprintf( stderr, "%s ", func );
-
-	va_start( ap, blen );
-	vfprintf( stderr, prefix, ap );
-	va_end( ap );
-
-	fprintf( stderr, " %d: ", blen );
+	vfprintf( fh, fmt, ap );
+	fprintf( fh, " %d: ", blen );
 
 	for( i=0; i < blen; ++i ){
 		unsigned char c = buf[i];
@@ -38,10 +32,18 @@ void dumphex( const char *func, const char *prefix, const unsigned char *buf, in
 			p=' ';
 
 		if( i )
-			fprintf( stderr, " " );
-		fprintf( stderr, "0x%02x/%c", c, p );
+			fprintf( fh, " " );
+		fprintf( fh, "0x%02x/%c", c, p );
 	}
-	fprintf( stderr, "\n" );
+	fprintf( fh, "\n" );
 }
-#endif
 
+void srmio_dumphex(FILE *fh, const unsigned char *buf, size_t blen,
+	const char *fmt, ... )
+{
+	va_list ap;
+
+	va_start( ap, fmt );
+	srmio_dumphexv( fh, buf, blen, fmt, ap );
+	va_end( ap );
+}
