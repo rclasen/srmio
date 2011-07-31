@@ -106,6 +106,9 @@ void srmio_dumphexv(FILE *fh, const unsigned char *buf, size_t blen,
 void srmio_dumphex(FILE *fh, const unsigned char *buf, size_t blen,
 	const char *fmt, ... );
 
+void srmio_debugv( FILE *fh, const char *fmt, va_list ap );
+void srmio_debug( FILE *fh, const char *fmt, ... );
+
 #ifdef DEBUG
 
 #include <ctype.h>

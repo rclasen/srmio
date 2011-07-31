@@ -9,18 +9,26 @@
 
 #include "common.h"
 #include <stdarg.h>
+#include <sys/time.h>
 
 const char *srmio_version = PACKAGE_STRING;
 
 void srmio_dumphexv(FILE *fh, const unsigned char *buf, size_t blen,
 	const char *fmt, va_list ap )
 {
+	struct timeval tv;
 	size_t i;
 
-	assert( fh );
 	assert( ! blen || buf );
 	assert( fmt );
 
+	if( ! fh )
+		return;
+
+	if( 0 != gettimeofday( &tv, NULL ))
+		return;
+
+	fprintf( fh, "%lu.%03lu ", tv.tv_sec, (unsigned long)tv.tv_usec / 1000 );
 	vfprintf( fh, fmt, ap );
 	fprintf( fh, " %d: ", blen );
 
@@ -45,5 +53,31 @@ void srmio_dumphex(FILE *fh, const unsigned char *buf, size_t blen,
 
 	va_start( ap, fmt );
 	srmio_dumphexv( fh, buf, blen, fmt, ap );
+	va_end( ap );
+}
+
+void srmio_debugv(FILE *fh, const char *fmt, va_list ap )
+{
+	struct timeval tv;
+
+	assert(fmt);
+
+	if( ! fh )
+		return;
+
+	if( 0 != gettimeofday( &tv, NULL ))
+		return;
+
+	fprintf( fh, "%lu.%03lu ", tv.tv_sec, (unsigned long)tv.tv_usec / 1000 );
+	vfprintf( fh, fmt, ap );
+	fprintf( fh, "\n" );
+}
+
+void srmio_debug(FILE *fh, const char *fmt, ... )
+{
+	va_list ap;
+
+	va_start( ap, fmt );
+	srmio_debugv( fh, fmt, ap );
 	va_end( ap );
 }

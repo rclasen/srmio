@@ -113,36 +113,6 @@ bool srmio_pc_get_debug( srmio_pc_t pch, FILE **fh )
 	return true;
 }
 
-void srmio_pc_debug( srmio_pc_t pch, const char *fmt, ... )
-{
-	va_list ap;
-
-	assert( pch );
-
-	if( ! pch->debugfh )
-		return;
-
-	va_start( ap, fmt );
-	vfprintf( pch->debugfh, fmt, ap );
-	va_end( ap );
-	fprintf( pch->debugfh, "\n" );
-}
-
-void srmio_pc_dump( srmio_pc_t pch, const unsigned char *buf, size_t blen,
-	const char *fmt, ... )
-{
-	va_list ap;
-
-	assert( pch );
-
-	if( ! pch->debugfh )
-		return;
-
-	va_start( ap, fmt );
-	srmio_dumphexv( pch->debugfh, buf, blen, fmt, ap );
-	va_end( ap );
-}
-
 /*
  * sets the device filename, that's len for communicating.
  * does *not* take ownership of io handle!!! You need to free it yourself!
