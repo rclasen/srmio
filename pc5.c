@@ -1379,7 +1379,11 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 		btm.tm_min = TIMEDEC( SELF(conn)->pkt_data[3] );
 		btm.tm_sec = TIMEDEC( SELF(conn)->pkt_data[4] );
 
-		if( btm.tm_mon < SELF(conn)->pctime.tm_mon )
+		/*
+		 * pkts have no year - we use the current year and try to
+		 * guess, if pkt was recorded last year:
+		 */
+		if( btm.tm_mon > SELF(conn)->pctime.tm_mon )
 			-- btm.tm_year;
 
 		bstart = mktime( &btm );
