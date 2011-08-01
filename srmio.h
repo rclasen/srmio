@@ -180,6 +180,26 @@ bool srmio_file_ftype_write( srmio_data_t data, srmio_ftype_t ftype, FILE *fh, s
 
 /************************************************************
  *
+ * from store.c
+ *
+ ************************************************************/
+
+typedef struct _srmio_store_t *srmio_store_t;
+
+srmio_store_t srmio_store_new( const char *path, srmio_error_t *err );
+void srmio_store_free( srmio_store_t );
+
+bool srmio_store_have( srmio_store_t store,
+	const char *athlete, srmio_time_t start,
+	srmio_time_t fuzz, bool *have, srmio_error_t *err );
+bool srmio_store_have_data( srmio_store_t store, srmio_data_t data,
+	srmio_time_t fuzz, bool *have, srmio_error_t *err );
+
+bool srmio_store_add( srmio_store_t store, srmio_data_t data,
+	char **fname, srmio_error_t *err );
+
+/************************************************************
+ *
  * from io.c
  *
  ************************************************************/

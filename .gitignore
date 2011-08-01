@@ -28,6 +28,7 @@ missing
 stamp-h1
 srmcmd
 srmdump
+srmsync
 autoscan.log
 configure.scan
 srmio_config.h

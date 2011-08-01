@@ -1,0 +1,75 @@
+.TH SRMCMD 1 "9 Mar 2011" "SRM access tool" "Version %PACKAGE_VERSION%"
+.SH NAME
+srmsync \- download for SRM PowerControl
+
+.SH SYNOPSIS
+.B srmsync
+[options] \fIpath\fR
+
+.SH DESCRIPTION
+.B srmsync
+implemets the serial protocols for SRM's PowerControl V, VI and 7. It allows you to
+download data from the PC attached to the serial device at \fIpath\fR.
+
+Data is stored in a srmwin compatible file store. If possible only data not
+known to the srmwin file store is downloaded.
+
+.SH OPTIONS
+Options available for the
+.B srmsync
+command:
+.TP
+\fB\-a\fR, \fB\-\-all\fR
+Try to download data "deleted" on the PCV.
+(PCVI and PC7 don't seem to support getting
+"deleted" data).
+.TP
+\fB\-b\fR, \fB\-\-baud\fR=\fIrate\fR
+Use specified baudrate, only. By default all supported baudrates are
+probed. PCV factory setting is 9600 baud. PCVI and PV7 always use 38400.
+.TP
+\fB\-d\fR, \fB\-\-dup\fR
+download/save data known to srmwin store, as well.
+.TP
+\fB\-f\fR, \fB\-\-ftdi\fR
+use ftdi serial driver and open device by the given description.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+A brief message.
+.TP
+\fB\-p\fR, \fB\-\-pc\fR=\fItype\fR
+Type of PowerControl protocol to use. Supported are PowerControl 5, 6, and 7.
+Default is "5".
+.TP
+\fB\-s\fR, \fB\-\-split\fR=\fIseconds\fR
+Split data on gaps of specified minimum length. Time is given as
+10*seconds (see --recint for srmcmd).
+.TP
+\fB\-S\fR, \fB\-\-store\fR=\fIdir\fR
+Path for your srmwin file store. That's where the _\fIname\fR.SRM folders are
+in.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Enable verbose status messages.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+show srmsync version number and exit.
+.TP
+\fB\-w\fR, \fB\-\-write\fR=\fIdestination\fR
+Write data retrieved from to specified wkt file before splitting.
+
+.SH EXAMPLES
+
+ srmsync -S ~/srmwin /dev/ttyUSB0		# linux
+ srmsync -S ~/srmwin -p 7 /dev/ttyUSB0		# linux, PowerControl 7
+
+.SH "SEE ALSO"
+This is just a very simplistic frontend for the lib. Please check the
+source distribution for details.
+
+.SH BUGS
+Yes. For sure. Just keep in mind, that protocoll and file formats are
+reverse engineered...
+
+.SH AUTHORS
+Rainer Clasen

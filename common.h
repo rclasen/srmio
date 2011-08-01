@@ -168,4 +168,24 @@ uint32_t buf_get_buint32( const unsigned char *buf, size_t pos );
 bool buf_set_buint16( unsigned char *buf, size_t pos, uint32_t x );
 bool buf_set_buint32( unsigned char *buf, size_t pos, uint64_t x );
 
+/************************************************************
+ *
+ * from list.c
+ *
+ ************************************************************/
+
+typedef void (*srmio_list_closure)( void * );
+typedef struct _srmio_list_t *srmio_list_t;
+
+void *srmio_list_new( srmio_list_closure cfunc );
+void srmio_list_free( srmio_list_t list );
+
+void srmio_list_init( srmio_list_t list, srmio_list_closure cfunc );
+void srmio_list_clear( srmio_list_t list );
+
+bool srmio_list_add( srmio_list_t list, void *data );
+size_t srmio_list_used( srmio_list_t list );
+void **srmio_list( srmio_list_t list );
+
+
 #endif /* _COMMON_H */
