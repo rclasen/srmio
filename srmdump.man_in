@@ -1,6 +1,6 @@
 .TH SRMCMD 1 "9 Mar 2011" "SRM access tool" "Version %PACKAGE_VERSION%"
 .SH NAME
-srmdump \- download your SRM PowerControl
+srmdump \- download your SRM PowerControl data
 
 .SH SYNOPSIS
 .B srmdump
@@ -17,16 +17,14 @@ Options available for the
 .B srmdump
 command:
 .TP
+\fB\-a\fR, \fB\-\-all\fR
+Try to download data "deleted" on the PCV.
+(PCVI and PC7 don't seem to support getting
+"deleted" data).
+.TP
 \fB\-b\fR, \fB\-\-baud\fR=\fIrate\fR
 Use specified baudrate, only. By default all supported baudrates are
 probed. PCV factory setting is 9600 baud. PCVI and PV7 always use 38400.
-.TP
-\fB\-a\fR, \fB\-\-all\fR
-Download newly recorded data from PC. With \fIall\fR specified, the
-"deletion" on the PCV is ignored and all data (that's not yet overwriten)
-is retrieved from the PCV (PCVI and PC7 don't seem to support getting
-"deleted" data). By default data is written to stdout as
-tab-seperated list.
 .TP
 \fB\-f\fR, \fB\-\-ftdi\fR
 use ftdi serial driver and open device by the given description.
@@ -37,9 +35,6 @@ A brief message.
 \fB\-p\fR, \fB\-\-pc\fR=\fItype\fR
 Type of PowerControl protocol to use. Supported are PowerControl 5, 6, and 7.
 Default is "5".
-.TP
-\fB\-v\fR, \fB\-\-verbose\fR
-Enable verbose status messages.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 show srmdump version number and exit.

@@ -1,6 +1,6 @@
 .TH SRMCMD 1 "9 Mar 2011" "SRM access tool" "Version %PACKAGE_VERSION%"
 .SH NAME
-srmcmd \- download/access your SRM PowerControl
+srmcmd \- download/access for SRM PowerControl
 
 .SH SYNOPSIS
 .B srmcmd
@@ -72,15 +72,15 @@ is written to stdout as with --get. See below for supported file formats.
 specify format of file to read. See below for supported file formats.
 Defaults to srm7.
 .TP
-\fB\-t\fR, \fB\-\-time\fR
-Set the PCs time to the current system time.
-.TP
 \fB\-s\fR, \fB\-\-split\fR=\fItime\fR
 Split data on gaps of specified minimum length. Time is given as
 10*seconds - same as --recint. With a non-zero time, the argument given
 to --write will be used as template for mkstemps. So it has to have
 'XXXXXX' in it - that's exactly 6 uppercase X. The generated filenames are
 printed to stdout.
+.TP
+\fB\-t\fR, \fB\-\-time\fR
+Set the PCs time to the current system time.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 Enable verbose status messages.
@@ -130,6 +130,10 @@ Download data to out.srm, delete data on PC, adjust clock and set recint
 to 1sec:
 
  srmcmd -g -t -i 10 -w out.srm /dev/ttyUSB0
+
+Auto-split on 2h gaps and save to files named foo*.srm
+
+ srmcmd -g -s 72000 -w fooXXXXXX.srm /dev/ttyUSB0
 
 Dump file contents as tab-seperated list:
 

@@ -68,7 +68,7 @@ int main( int argc, char **argv )
 	struct _srmio_pc_xfer_block_t block;
 	struct _srmio_chunk_t chunk;
 
-	while( -1 != ( c = getopt_long( argc, argv, "b:fg::hp:V", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "ab:fhp:V", lopts, NULL ))){
 		switch(c){
 		  case 'a':
 			++opt_all;
@@ -284,12 +284,13 @@ int main( int argc, char **argv )
 static void usage( char *name )
 {
 	printf(
-"usage: %s [options] <device_or_fname>\n"
+"usage: %s [options] <device>\n"
 "downloads from PowerControl or reads SRM files\n"
 "\n"
 "options:\n"
+" --all|-a            download 'deleted' data from SRM, as well\n"
 " --baud=<rate>|-b    use fixed baud rate instead of auto-probing\n"
-" --all               download data from SRM and dump it to stdout\n"
+" --ftdi|-f           use ftdi driver\n"
 " --help|-h           this cruft\n"
 " --pc=<type>|-p      power control version: 5, 6 or 7\n"
 " --version|-V        show version number and exit\n"
