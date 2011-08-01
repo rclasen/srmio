@@ -93,7 +93,9 @@ static srmio_time_t _srm_mktime( unsigned days, srmio_error_t *err )
 		return (srmio_time_t)-1;
 	}
 
+#ifdef DEBUG_FILE
 	DPRINTF( "%u days -> %lu", days, (unsigned long)ret );
+#endif
 	return (srmio_time_t)ret * 10;
 }
 
@@ -164,9 +166,11 @@ static unsigned _srm_mkdays( srmio_time_t input, srmio_error_t *err )
 	}
 	days -= DAYS_SRM;
 
+#ifdef DEBUG_FILE
 	DPRINTF( "%.1f -> %u",
 		(double)input/10,
 		days );
+#endif
 	return days;
 }
 
@@ -245,7 +249,9 @@ srmio_data_t srmio_file_srm_read( FILE *fh, srmio_error_t *err )
 
 	if( ! _xread( fh, buf, 86, err ) )
 		goto clean2;
+#ifdef DEBUG_FILE
 	DUMPHEX( "head", buf, 86 );
+#endif
 
 	if( 0 != strncmp( (char*)buf, "SRM", 3 )){
 		srmio_error_set( err, "unrecognized file format");
@@ -279,7 +285,7 @@ srmio_data_t srmio_file_srm_read( FILE *fh, srmio_error_t *err )
 
 	if( (srmio_time_t)-1 == (timerefday = _srm_mktime( buf_get_luint16( buf, 4), err )))
 		goto clean2;
-#ifdef DEBUG
+#ifdef DEBUG_FILE
 	{
 	time_t t = timerefday / 10;
 	DPRINTF( "timerefday %u %.1f %s",
@@ -293,7 +299,9 @@ srmio_data_t srmio_file_srm_read( FILE *fh, srmio_error_t *err )
 		/ buf_get_uint8( buf, 9 );
 	bcnt = buf_get_luint16( buf, 10);
 	mcnt = buf_get_luint16( buf, 12);
+#ifdef DEBUG_FILE
 	DPRINTF( "bcnt=%u mcnt=%u(+1)", bcnt, mcnt );
+#endif
 
 	/* "notes" is preceeded by length + zero padded */
 	/* TODO: iconv notes cp850 -> internal */
@@ -342,10 +350,12 @@ srmio_data_t srmio_file_srm_read( FILE *fh, srmio_error_t *err )
 		}
 		/* TODO: iconv notes cp850 -> internal */
 
+#ifdef DEBUG_FILE
 		DPRINTF( "marker %u %u %s",
 			tm->first,
 			tm->last,
 			tm->notes );
+#endif
 	}
 
 	/* blocks */
@@ -372,7 +382,7 @@ srmio_data_t srmio_file_srm_read( FILE *fh, srmio_error_t *err )
 		tb->daydelta = buf_get_luint32( buf, 0) / 10;
 		tb->chunks = buf_get_luint16( buf, 4);
 
-#ifdef DEBUG
+#ifdef DEBUG_FILE
 		{
 		time_t t = (timerefday + tb->daydelta) / 10;
 		DPRINTF( "block %.1f %u %s",
@@ -387,13 +397,17 @@ srmio_data_t srmio_file_srm_read( FILE *fh, srmio_error_t *err )
 	/* calibration */
 	if( ! _xread( fh, buf, 7, err ))
 		goto clean3;
+#ifdef DEBUG_FILE
 	DUMPHEX( "calibration", buf, 7 );
+#endif
 
 	tmp->zeropos = buf_get_luint16( buf, 0);
 	tmp->slope = (double)(buf_get_luint16( buf, 2) * 140) / 42781;
 	ckcnt = buf_get_luint16( buf, 4);
+#ifdef DEBUG_FILE
 	DPRINTF( "cal zpos=%d slope=%.1f, chunks=%u",
 		tmp->zeropos, tmp->slope, ckcnt );
+#endif
 
 	/* synthesize block for SRM5 files */
 	if( bcnt == 0 ){
@@ -433,6 +447,7 @@ srmio_data_t srmio_file_srm_read( FILE *fh, srmio_error_t *err )
 				goto clean3;
 			}
 
+#ifdef DEBUG_FILE
 			DPRINTF( "chunk "
 				"time=%.1f, "
 				"temp=%.1f, "
@@ -446,6 +461,7 @@ srmio_data_t srmio_file_srm_read( FILE *fh, srmio_error_t *err )
 				ck->speed,
 				ck->cad,
 				ck->hr );
+#endif
 
 			if( ! srmio_data_add_chunkp( tmp, ck, err ) )
 				goto clean3;
