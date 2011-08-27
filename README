@@ -72,6 +72,18 @@ Linux:
 
 - PCVI/7: kernel 2.6.32 provided driver for /dev/ttyUSB works.
 
+You can make your life finding the proper device name a lot easier by
+letting udev creating meanigful symlinks for you by adding something like
+this to a file like "/etc/udev/rules.d/51-local.rules":
+
+ # /dev/prolific for PCV - unfortunatly no serial for unique identification
+ SUBSYSTEMS=="usb", KERNEL=="ttyUSB*", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", SYMLINK+="prolific"
+ # /dev/pc7
+ SUBSYSTEMS=="usb", KERNEL=="ttyUSB*", ATTRS{idProduct}=="POWERCONTROL 7", SYMLINK+="pc7"
+ # /dev/pc7, alternative using serial-number
+ #SUBSYSTEMS=="usb", KERNEL=="ttyUSB*", ATTRS{serial}=="A2QXXXXX", SYMLINK+="pc7"
+ # you can retrieve the serial with "lsusb -v"
+
 Cygwin:
 =======
 
