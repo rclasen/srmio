@@ -165,6 +165,10 @@ capture the communication:
  - send me the resulting files and please describe the problems you
    experience.
 
+For PC VI and 7, there's a free USB sniffer at
+http://sourceforge.net/projects/usbsnoop/ and a decoder at
+http://www.stillhq.com/usblogdump/
+
 Known Problems:
  - Dates before 1970-1-1 are not supported (SRM usese 1880-1-1 as
    reference). This might lead to problems with bad timestamps or when the

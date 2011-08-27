@@ -96,6 +96,9 @@ static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk,
 }
 
 
+/* TODO: skip n equal chunks or set pwr+cad = 0 before first chunk with
+ * cad=0. These n chunks were recorded while PC was waiting for next
+ * signal ... timeout is for cad=20 -> thats 3 chunks @ 1sec recint */
 
 /*
  * fix small time leaps at block boundaries

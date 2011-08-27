@@ -664,6 +664,8 @@ static bool _srmio_pc7_cmd_clear( srmio_pc_t conn, srmio_error_t *err )
  * timing seems to be quite uncritical.
  */
 
+/* TODO: used/max 118 hours recording time ? */
+
 static bool _srmio_pc7_xfer_block_progress(
 	srmio_pc_t conn, size_t *block_done )
 {
