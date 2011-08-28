@@ -80,10 +80,10 @@ done
 
 
 # Checks for library functions.
-AC_FUNC_MALLOC
+dnl AC_FUNC_MALLOC - unneeded, never called with size=0
+dnl AC_FUNC_REALLOC - unneeded, never called with size=0
 AC_FUNC_MEMCMP
 AC_FUNC_MKTIME
-AC_FUNC_REALLOC
 AC_CHECK_FUNCS([cfmakeraw localtime_r mkstemps nanosleep ])
 AC_CHECK_FUNCS([gettimeofday memset mkdir strcasecmp strdup strrchr strerror getopt_long ])
 
