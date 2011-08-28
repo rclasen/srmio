@@ -29,8 +29,9 @@ or "solid" from kdelibs
 */
 
 #include "serio.h"
+
 #ifdef HAVE_TERMIOS_H
-#include <termios.h>
+# include <termios.h>
 #endif
 
 

@@ -7,11 +7,16 @@
  *
  */
 
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <dirent.h>
-
 #include "common.h"
+
+#ifdef HAVE_SYS_STAT_H
+# include <sys/stat.h>
+#endif
+#ifdef HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+
+#include <dirent.h>
 
 /************************************************************
  *

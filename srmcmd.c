@@ -29,7 +29,7 @@
 #include <stdio.h>
 
 #ifdef HAVE_GETOPT_H
-#include <getopt.h>
+# include <getopt.h>
 #endif
 
 #ifdef STDC_HEADERS

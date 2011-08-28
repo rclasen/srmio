@@ -10,19 +10,19 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
-#include <assert.h>
-
 #include "srmio.h"
+
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
+
+#include <assert.h>
 
 #include <errno.h>
 #include <stdio.h>
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #ifdef HAVE_FCNTL_H
-#include <fcntl.h>
+# include <fcntl.h>
 #endif
 
 #ifdef HAVE_SYS_TYPES_H
@@ -42,7 +42,9 @@
 # endif
 #endif
 
-#include <malloc.h>
+#ifdef HAVE_MALLOC_H
+# include <malloc.h>
+#endif
 
 #ifdef HAVE_STRING_H
 # if !defined STDC_HEADERS && defined HAVE_MEMORY_H
@@ -71,31 +73,31 @@
 #endif
 
 #ifdef HAVE_LIMITS_H
-#include <limits.h>
+# include <limits.h>
 #endif
 
 #include <stdarg.h>
 
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
+# include <windows.h>
 #endif
 
 #ifdef HAVE_MSEC_SLEEP
-#define sleep(sec) Sleep(sec * 1000)
+# define sleep(sec) Sleep(sec * 1000)
 #endif
 
 #ifdef HAVE_ONE_ARG_MKDIR
-#define mkdir(a,b) _mkdir(a)
+# define mkdir(a,b) mkdir(a)
 #endif
 
 
 #ifdef VERBOSE
 /* TODO: workaround for bad error reporting */
-#define ERRMSG(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
-#define STATMSG(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
+# define ERRMSG(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
+# define STATMSG(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
 #else
-#define ERRMSG(x, ...)	while(0);
-#define STATMSG(x, ...)	while(0);
+# define ERRMSG(x, ...)	while(0);
+# define STATMSG(x, ...)	while(0);
 #endif
 
 /************************************************************

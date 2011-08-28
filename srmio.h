@@ -13,10 +13,10 @@
 #include <stdio.h>
 #include "srmio_config.h"
 
-# ifdef __cplusplus
+#ifdef __cplusplus
 extern "C"
 {
-# endif
+#endif
 
 /* please check the actual source for descriptions of the individual
  * functions */

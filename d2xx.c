@@ -7,10 +7,20 @@
  *
  */
 
-#include <ftd2xx.h>
-#include <dlfcn.h>
-
 #include "serio.h"
+
+#ifdef HAVE_DLFCN_H
+# include <dlfcn.h>
+#endif
+
+#ifdef HAVE_WINDOWS_H
+# include <windows.h>
+#endif
+
+#ifdef HAVE_FTD2XX_H
+# include <ftd2xx.h>
+#endif
+
 
 
 /************************************************************
@@ -232,10 +242,12 @@ static bool _srmio_d2xx_flush( srmio_io_t h, srmio_error_t *err )
 
 static bool _srmio_d2xx_send_break( srmio_io_t h, srmio_error_t *err )
 {
+#ifdef HAVE_NANOSLEEP
 	struct timespec tspec = {
 		.tv_sec = 0,
 		.tv_nsec = 250000000,
 	}; // 0.25 sec
+#endif
 	FT_STATUS ret;
 
 	assert( h );
@@ -247,7 +259,13 @@ static bool _srmio_d2xx_send_break( srmio_io_t h, srmio_error_t *err )
 		return false;
 	}
 
+#ifdef HAVE_NANOSLEEP
 	nanosleep( &tspec, NULL );
+#elif HAVE_MSEC_SLEEP
+	Sleep(250);
+#else
+#error no sufficient sleep() function available to send break
+#endif
 
 	ret = (*FP_SetBreakOff)( SELF(h)->ft );
 	if( ret != FT_OK ){

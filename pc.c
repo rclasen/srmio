@@ -8,9 +8,9 @@
  */
 
 
-#include <stdarg.h>
-
 #include "pc.h"
+
+#include <stdarg.h>
 
 srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child,
 	srmio_error_t *err )

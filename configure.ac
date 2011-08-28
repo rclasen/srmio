@@ -17,23 +17,47 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 
 # Checks for libraries.
-# FIXME: Replace `main' with a function in `-lsrmio':
+AC_CHECK_LIB([pthread],[pthread_create],[
+  ac_cv_pthread=yes
+], [
+  ac_cv_pthread=no
+])
+AM_CONDITIONAL([HAVE_PTHREAD], [ test "x$ac_cv_pthread" = xyes ])
+AS_IF([ test "x$ac_cv_pthread" = xyes ],[
+  AC_SUBST([HAVE_PTHREAD],[true])
+])
+
+AC_CHECK_LIB([dl],[dlopen],[
+  ac_cv_dl=yes
+  LIBS="$LIBS -ldl"
+], [
+  ac_cv_dl=no
+])
+AM_CONDITIONAL([HAVE_DL], [ test "x$ac_cv_dl" = xyes ])
+AS_IF([ test "x$ac_cv_dl" = xyes ],[
+  AC_SUBST([HAVE_DL],[true])
+])
+
+
 
 # Checks for header files.
 AC_HEADER_STDC
 AC_HEADER_STDBOOL
-AC_CHECK_HEADERS([dlfcn.h fcntl.h getopt.h inttypes.h limits.h memory.h stddef.h stdint.h stdlib.h string.h sys/time.h unistd.h windows.h])
+AC_CHECK_HEADERS([dlfcn.h  fcntl.h getopt.h inttypes.h limits.h malloc.h memory.h stddef.h stdint.h stdlib.h string.h sys/stat.h sys/time.h termios.h unistd.h windows.h])
 
+AC_CHECK_HEADER([ftd2xx.h],[
+  AC_DEFINE([HAVE_FTD2XX_H],[1],[Define to 1 if you have the <ftd2xx.h> header file.])
+], [], AC_INCLUDES_DEFAULT([
+#ifdef HAVE_WINDOWS_H
+# include <windows.h>
+#endif
+]))
 
 AC_SYS_POSIX_TERMIOS
 AM_CONDITIONAL([HAVE_TERMIOS],[ test "x$ac_cv_sys_posix_termios" = xyes ])
 AS_IF([test "x$ac_cv_sys_posix_termios" = xyes], [
   AC_SUBST([HAVE_TERMIOS], true)
   AC_DEFINE([HAVE_TERMIOS],[1],[Define if sytem has posix termios for serial device access.])
-
-  AC_CHECK_HEADERS([termios.h])
-  AC_CHECK_FUNC([cfmakeraw],
-    [AC_DEFINE([HAVE_CFMAKERAW],[1], [Define if cfmakeraw exists.])],)
 ],[])
 
 
@@ -41,16 +65,23 @@ AS_IF([test "x$ac_cv_sys_posix_termios" = xyes], [
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_C_INLINE
-AC_TYPE_INT32_T
-AC_TYPE_INT16_T
-AC_TYPE_INT64_T
 AC_TYPE_INT8_T
+AC_TYPE_INT16_T
+AC_TYPE_INT32_T
+AC_TYPE_INT64_T
+AC_TYPE_UINT8_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
-AC_TYPE_UINT8_T
 AC_TYPE_SIZE_T
 AC_STRUCT_TM
+
+for tp in c_int8_t c_int16_t c_int32_t c_int64_t c_uint8_t c_uint16_t c_uint32_t c_uint64_t type_size_t; do
+	eval have_type=\$ac_cv_$tp
+	if test "x$have_type" != xyes; then
+		AC_MSG_WARN([*** missing $tp: $have_type])
+	fi
+done
 
 
 # Checks for library functions.
@@ -58,26 +89,33 @@ AC_FUNC_MALLOC
 AC_FUNC_MEMCMP
 AC_FUNC_MKTIME
 AC_FUNC_REALLOC
-AC_CHECK_FUNCS([localtime_r mkstemps])
-AC_CHECK_FUNCS([memset strdup strrchr strerror getopt_long ])
+AC_CHECK_FUNCS([cfmakeraw localtime_r mkstemps nanosleep ])
+AC_CHECK_FUNCS([gettimeofday memset mkdir strcasecmp strdup strrchr strerror getopt_long ])
 
-for func in memset strdup strrchr strerror getopt_long; do
+for func in gettimeofday memset mkdir strcasecmp strdup strrchr strerror getopt_long; do
 	eval have_func=\$ac_cv_func_$func
 	if test "x$have_func" != xyes; then
-		AC_MSG_ERROR([missing working $func: $have_func])
+		AC_MSG_WARN([*** missing working $func: $have_func])
 	fi
 done
 
 # check for windows mkdir(dir) - stolen from wine
 AC_CACHE_CHECK([whether mkdir takes only one argument],
-	ac_cv_one_arg_mkdir,
-	AC_TRY_LINK(
-		[[ #include <sys/stat.h>
-#include <unistd.h>]],
-		[[_mkdir("foo");]],
-		[ac_cv_one_arg_mkdir=yes],
-		[ac_cv_one_arg_mkdir=no]
-	)
+  ac_cv_one_arg_mkdir,
+  AC_TRY_LINK([[
+#ifdef HAVE_SYS_STAT_H
+# include <sys/stat.h>
+#endif
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+  ]],[[
+mkdir("foo");
+  ]], [
+    ac_cv_one_arg_mkdir=yes
+  ], [
+    ac_cv_one_arg_mkdir=no
+  ])
 )
 if test "$ac_cv_one_arg_mkdir" = "yes"
 then
@@ -87,14 +125,18 @@ fi
 
 # check for windows Sleep(msec)
 AC_CACHE_CHECK([for windows Sleep using milliseconds],
-	ac_cv_msec_sleep,
-	AC_COMPILE_IFELSE(
-		[AC_LANG_PROGRAM(
-			[[#include <windows.h>]],
-			[[Sleep(1000);]]
-			)],
-		[ac_cv_msec_sleep=yes],
-		[ac_cv_msec_sleep=no])
+  ac_cv_msec_sleep,
+  AC_TRY_LINK([[
+#ifdef HAVE_WINDOWS_H
+# include <windows.h>
+#endif
+  ]], [[
+Sleep(1000);
+  ]], [
+    ac_cv_msec_sleep=yes
+  ], [
+    ac_cv_msec_sleep=no
+  ])
 )
 if test "$ac_cv_msec_sleep" = "yes"
 then
@@ -133,38 +175,47 @@ AC_CPP_FUNC
 # TODO: provide alternative implementations, use gnulib?
 
 AC_DEFUN([AC_DLOPEN_IFELSE],[
-  AC_COMPILE_IFELSE([
-    AC_LANG_PROGRAM([],[[
+  AC_TRY_LINK([[
 #ifdef HAVE_DLFCN_H
-#include <dlfcn.h>
+# include <dlfcn.h>
 #endif
-	  return 0 == dlopen($1, RTLD_NOW) ? 1 : 0;
-    ]])
-  ], [$2] , [$3] )
+  ]], [[
+    return 0 == dlopen($1, RTLD_NOW) ? 1 : 0;
+  ]], [$2] , [$3] )
 ])
 
 
-AC_ARG_WITH([ftd2xx],
-  [AS_HELP_STRING([--with-ftd2xx=<filename>],
-    [support libftd2xx for FTDI device serial access @<:@default=check@:>@])],
-  [],
-  [with_ftd2xx=check])
+AC_ARG_WITH([ftd2xx], [
+  AS_HELP_STRING([--with-ftd2xx=<filename>],
+    [support libftd2xx for FTDI device serial access @<:@default=check@:>@])
+],[
+],[
+  if test "x$ac_cv_header_ftd2xx_h" = xyes && test "x$ac_cv_dl" = xyes; then
+    with_ftd2xx=check
+  else
+    with_ftd2xx=no
+  fi
+])
+
 
 ac_cv_d2xx_libname=""
-AS_IF([test "x$with_ftd2xx" == xyes || test "x$with_ftd2xx" == xcheck], [
-  AC_CHECK_LIB([ftd2xx], [FT_OpenEx], [
-    AC_MSG_CHECKING([for ftd2xx filename])
-    #for lib in libftd2xx.so ftd2xx.dll libftd2xx.dylib "$with_ftd2xx"; do
-    AC_DLOPEN_IFELSE(["libftd2xx.so"],[
-      ac_cv_d2xx_libname="libftd2xx.so"
-    ], [
-      AC_DLOPEN_IFELSE(["libftd2xx.dylib"],[
-        ac_cv_d2xx_libname="libftd2xx.dylib"
+AC_MSG_CHECKING([for ftd2xx filename])
+
+AS_IF([ test "x$with_ftd2xx" = xno ], [
+  AC_MSG_RESULT([no])
+
+], [test "x$with_ftd2xx" == xyes || test "x$with_ftd2xx" == xcheck], [
+
+  #for lib in libftd2xx.so ftd2xx.dll libftd2xx.dylib "$with_ftd2xx"; do
+  AC_DLOPEN_IFELSE(["libftd2xx.so"],[
+    ac_cv_d2xx_libname="libftd2xx.so"
+  ], [
+    AC_DLOPEN_IFELSE(["libftd2xx.dylib"],[
+      ac_cv_d2xx_libname="libftd2xx.dylib"
+    ],[
+      AC_DLOPEN_IFELSE(["ftd2xx.dll"],[
+        ac_cv_d2xx_libname="ftd2xx.dll"
       ],[
-        AC_DLOPEN_IFELSE(["ftd2xx.dll"],[
-          ac_cv_d2xx_libname="ftd2xx.dll"
-        ],[
-        ])
       ])
     ])
   ])
@@ -178,41 +229,39 @@ AS_IF([test "x$with_ftd2xx" == xyes || test "x$with_ftd2xx" == xcheck], [
   else
     AC_MSG_RESULT("$ac_cv_d2xx_libname")
   fi
-], [test "x$with_ftd2xx" != xno ], [
+
+], [
   ac_cv_d2xx_libname="$with_ftd2xx"
-  AC_MSG_CHECKING([for ftd2xx filename])
   AC_MSG_RESULT("$ac_cv_d2xx_libname" - forced by user)
 ])
 
 AM_CONDITIONAL([HAVE_D2XX], [ test -n "$ac_cv_d2xx_libname" ])
 
-AS_IF([ test -n "$ac_cv_d2xx_libname"], [
+if test "x$with_ftd2xx" != xcheck && test -n "$ac_cv_d2xx_libname"; then
+  if test "x$ac_cv_dl" != xyes; then
+    AC_MSG_WARN([*** d2xx support is missing libdl/dlopen for ftd2xx ])
+  fi
+
+  if test "x$ac_cv_header_ftd2xx_h" != xyes; then
+    AC_MSG_WARN([*** d2xx support is missing ftd2xx.h header])
+  fi
+fi
+
+AS_IF([ test -n "$ac_cv_d2xx_libname" ], [
   AC_SUBST([HAVE_D2XX],[true])
   AC_DEFINE([HAVE_D2XX],[1],[Define if system has libftd2xx.])
   AC_DEFINE_UNQUOTED([D2XX_LIBNAME],"$ac_cv_d2xx_libname",[Define to libftd2xx filname for dlopen.])
-  AC_CHECK_LIB([pthread],[pthread_create],[
-    ac_cv_pthread=yes
-  ], [
-    ac_cv_pthread=no
-  ])
-  AC_CHECK_LIB([dl],[dlopen],[
-    ac_cv_dl=yes
-  ], [
-    ac_cv_dl=no
-  ])
+
+], [ test "x$ac_cv_sys_posix_termios" = xyes ], [
+  # ok
+
+], [
+  AC_MSG_WARN([*** neither termios nor d2xx is working, no serial driver available ])
 ])
 
-
-AM_CONDITIONAL([HAVE_DL], [ test "x$ac_cv_dl" = xyes ])
-AS_IF([ test "x$ac_cv_dl" = xyes ],[
-  AC_SUBST([HAVE_DL],[true])
-])
-
-AM_CONDITIONAL([HAVE_PTHREAD], [ test "x$ac_cv_pthread" = xyes ])
-AS_IF([ test "x$ac_cv_pthread" = xyes ],[
-  AC_SUBST([HAVE_PTHREAD],[true])
-])
-
+if test "x$ac_cv_func_nanosleep" != xyes && test "x$ac_cv_msec_sleep" != xyes ; then
+  AC_MSG_WARN([*** no high-precision sleep function found])
+fi
 
 AC_CONFIG_FILES([Makefile])
 
