@@ -42,6 +42,8 @@
 # endif
 #endif
 
+#include <malloc.h>
+
 #ifdef HAVE_STRING_H
 # if !defined STDC_HEADERS && defined HAVE_MEMORY_H
 #  include <memory.h>
@@ -73,6 +75,19 @@
 #endif
 
 #include <stdarg.h>
+
+#ifdef HAVE_WINDOWS_H
+#include <windows.h>
+#endif
+
+#ifdef HAVE_MSEC_SLEEP
+#define sleep(sec) Sleep(sec * 1000)
+#endif
+
+#ifdef HAVE_ONE_ARG_MKDIR
+#define mkdir(a,b) _mkdir(a)
+#endif
+
 
 #ifdef VERBOSE
 /* TODO: workaround for bad error reporting */

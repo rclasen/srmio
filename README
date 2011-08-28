@@ -61,7 +61,7 @@ chips. It's using the traditional unix termios to access the /dev/tty* or
 /dev/cu* devices offered by the kernel.
 
 Though, srmio is now easily extensible to other ways (FTDI D2xx, win32,
-...) through the abstracion layer in io.c.
+...) through the abstracion layer in serio.c.
 
 
 Linux:

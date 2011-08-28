@@ -74,7 +74,7 @@ bool srmio_list_add( srmio_list_t list, void *data )
 		void **tmp;
 
 		if( list->alloc > UINT_MAX - LIST_ALLOC ){
-			errno = EOVERFLOW;
+			errno = ERANGE;
 			return false;
 		}
 

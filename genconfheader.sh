@@ -56,11 +56,7 @@ else
 	echo "#include <time.h>"
 fi
 
-if [ -n "$HEADER_TERMIOS_H" ]; then
-	echo "#include <termios.h>"
-fi
-
-if [ -n "$HAVE_TERMIOS" ]; then
+if [ "$HAVE_TERMIOS"x = yesx ]; then
 	echo "#define SRMIO_HAVE_TERMIOS"
 fi
 

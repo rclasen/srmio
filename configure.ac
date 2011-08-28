@@ -22,7 +22,7 @@ AC_PROG_MAKE_SET
 # Checks for header files.
 AC_HEADER_STDC
 AC_HEADER_STDBOOL
-AC_CHECK_HEADERS([dlfcn.h fcntl.h getopt.h inttypes.h limits.h memory.h stddef.h stdint.h stdlib.h string.h sys/time.h termios.h unistd.h])
+AC_CHECK_HEADERS([dlfcn.h fcntl.h getopt.h inttypes.h limits.h memory.h stddef.h stdint.h stdlib.h string.h sys/time.h unistd.h windows.h])
 
 
 AC_SYS_POSIX_TERMIOS
@@ -30,6 +30,8 @@ AM_CONDITIONAL([HAVE_TERMIOS],[ test "x$ac_cv_sys_posix_termios" = xyes ])
 AS_IF([test "x$ac_cv_sys_posix_termios" = xyes], [
   AC_SUBST([HAVE_TERMIOS], true)
   AC_DEFINE([HAVE_TERMIOS],[1],[Define if sytem has posix termios for serial device access.])
+
+  AC_CHECK_HEADERS([termios.h])
   AC_CHECK_FUNC([cfmakeraw],
     [AC_DEFINE([HAVE_CFMAKERAW],[1], [Define if cfmakeraw exists.])],)
 ],[])
@@ -56,7 +58,7 @@ AC_FUNC_MALLOC
 AC_FUNC_MEMCMP
 AC_FUNC_MKTIME
 AC_FUNC_REALLOC
-AC_CHECK_FUNCS([localtime_r ])
+AC_CHECK_FUNCS([localtime_r mkstemps])
 AC_CHECK_FUNCS([memset strdup strrchr strerror getopt_long ])
 
 for func in memset strdup strrchr strerror getopt_long; do
@@ -65,6 +67,41 @@ for func in memset strdup strrchr strerror getopt_long; do
 		AC_MSG_ERROR([missing working $func: $have_func])
 	fi
 done
+
+# check for windows mkdir(dir) - stolen from wine
+AC_CACHE_CHECK([whether mkdir takes only one argument],
+	ac_cv_one_arg_mkdir,
+	AC_TRY_LINK(
+		[[ #include <sys/stat.h>
+#include <unistd.h>]],
+		[[_mkdir("foo");]],
+		[ac_cv_one_arg_mkdir=yes],
+		[ac_cv_one_arg_mkdir=no]
+	)
+)
+if test "$ac_cv_one_arg_mkdir" = "yes"
+then
+  AC_DEFINE([HAVE_ONE_ARG_MKDIR], [1], [Define if mkdir takes only one argument])
+fi
+
+
+# check for windows Sleep(msec)
+AC_CACHE_CHECK([for windows Sleep using milliseconds],
+	ac_cv_msec_sleep,
+	AC_COMPILE_IFELSE(
+		[AC_LANG_PROGRAM(
+			[[#include <windows.h>]],
+			[[Sleep(1000);]]
+			)],
+		[ac_cv_msec_sleep=yes],
+		[ac_cv_msec_sleep=no])
+)
+if test "$ac_cv_msec_sleep" = "yes"
+then
+  AC_DEFINE([HAVE_MSEC_SLEEP], [1], [Define to use Windows Sleep using milliseconds])
+fi
+
+
 # AC_CPP_FUNC
 # ------------------ #
 # Checks to see if ANSI C99 CPP variable __func__ works.
@@ -98,7 +135,9 @@ AC_CPP_FUNC
 AC_DEFUN([AC_DLOPEN_IFELSE],[
   AC_COMPILE_IFELSE([
     AC_LANG_PROGRAM([],[[
+#ifdef HAVE_DLFCN_H
 #include <dlfcn.h>
+#endif
 	  return 0 == dlopen($1, RTLD_NOW) ? 1 : 0;
     ]])
   ], [$2] , [$3] )
@@ -111,47 +150,68 @@ AC_ARG_WITH([ftd2xx],
   [],
   [with_ftd2xx=check])
 
-HAVE_D2XX=
-AS_IF([test "x$with_ftd2xx" != xno], [
+ac_cv_d2xx_libname=""
+AS_IF([test "x$with_ftd2xx" == xyes || test "x$with_ftd2xx" == xcheck], [
   AC_CHECK_LIB([ftd2xx], [FT_OpenEx], [
     AC_MSG_CHECKING([for ftd2xx filename])
     #for lib in libftd2xx.so ftd2xx.dll libftd2xx.dylib "$with_ftd2xx"; do
     AC_DLOPEN_IFELSE(["libftd2xx.so"],[
-      AC_SUBST([HAVE_D2XX],[true])
-      AC_DEFINE([HAVE_D2XX],[1],[Define if system has libftd2xx.])
-      AC_DEFINE([D2XX_LIBNAME],"libftd2xx.so",[Define to libftd2xx filname for dlopen.])
+      ac_cv_d2xx_libname="libftd2xx.so"
     ], [
       AC_DLOPEN_IFELSE(["libftd2xx.dylib"],[
-        AC_SUBST([HAVE_D2XX],[true])
-        AC_DEFINE([HAVE_D2XX],[1],[Define if system has libftd2xx.])
-        AC_DEFINE([D2XX_LIBNAME],"libftd2xx.dylib",[Define to libftd2xx filname for dlopen.])
+        ac_cv_d2xx_libname="libftd2xx.dylib"
       ],[
         AC_DLOPEN_IFELSE(["ftd2xx.dll"],[
-          AC_SUBST([HAVE_D2XX],[true])
-          AC_DEFINE([HAVE_D2XX],[1],[Define if system has libftd2xx.])
-          AC_DEFINE([D2XX_LIBNAME],"ftd2xx.dll",[Define to libftd2xx filname for dlopen.])
+          ac_cv_d2xx_libname="ftd2xx.dll"
         ],[
         ])
       ])
     ])
+  ])
 
-    if test -z "$HAVE_D2XX" ; then
-      if test "x$with_ftd2xx" != xcheck; then
-        AC_MSG_FAILURE([--with-ftd2x was given, but test for ftd2xx failed])
-      else
-        AC_MSG_RESULT([none])
-      fi
-    else
-      AC_MSG_RESULT(["found"])
-    fi
-  ],[
+  if test -z "$ac_cv_d2xx_libname" ; then
     if test "x$with_ftd2xx" != xcheck; then
       AC_MSG_FAILURE([--with-ftd2x was given, but test for ftd2xx failed])
+    else
+      AC_MSG_RESULT([none])
     fi
+  else
+    AC_MSG_RESULT("$ac_cv_d2xx_libname")
+  fi
+], [test "x$with_ftd2xx" != xno ], [
+  ac_cv_d2xx_libname="$with_ftd2xx"
+  AC_MSG_CHECKING([for ftd2xx filename])
+  AC_MSG_RESULT("$ac_cv_d2xx_libname" - forced by user)
+])
+
+AM_CONDITIONAL([HAVE_D2XX], [ test -n "$ac_cv_d2xx_libname" ])
+
+AS_IF([ test -n "$ac_cv_d2xx_libname"], [
+  AC_SUBST([HAVE_D2XX],[true])
+  AC_DEFINE([HAVE_D2XX],[1],[Define if system has libftd2xx.])
+  AC_DEFINE_UNQUOTED([D2XX_LIBNAME],"$ac_cv_d2xx_libname",[Define to libftd2xx filname for dlopen.])
+  AC_CHECK_LIB([pthread],[pthread_create],[
+    ac_cv_pthread=yes
+  ], [
+    ac_cv_pthread=no
+  ])
+  AC_CHECK_LIB([dl],[dlopen],[
+    ac_cv_dl=yes
+  ], [
+    ac_cv_dl=no
   ])
 ])
 
-AM_CONDITIONAL([HAVE_D2XX], [ test -n "$HAVE_D2XX" ])
+
+AM_CONDITIONAL([HAVE_DL], [ test "x$ac_cv_dl" = xyes ])
+AS_IF([ test "x$ac_cv_dl" = xyes ],[
+  AC_SUBST([HAVE_DL],[true])
+])
+
+AM_CONDITIONAL([HAVE_PTHREAD], [ test "x$ac_cv_pthread" = xyes ])
+AS_IF([ test "x$ac_cv_pthread" = xyes ],[
+  AC_SUBST([HAVE_PTHREAD],[true])
+])
 
 
 AC_CONFIG_FILES([Makefile])
@@ -165,7 +225,6 @@ HEADER_STDBOOL_H=$ac_cv_header_stdbool_h
 HAVE__BOOL=$ac_cv_type__Bool
 HEADER_TIME_WITH_SYS_TIME=$ac_cv_header_time
 HEADER_SYS_TIME_H=$ac_cv_header_sys_time_h
-HEADER_TERMIOS_H=$ac_cv_header_termios_h
 HAVE_TERMIOS=$ac_cv_sys_posix_termios
 HAVE_D2XX=$HAVE_D2XX
 ])

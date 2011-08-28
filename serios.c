@@ -28,7 +28,11 @@ or "solid" from kdelibs
 
 */
 
-#include "io.h"
+#include "serio.h"
+#ifdef HAVE_TERMIOS_H
+#include <termios.h>
+#endif
+
 
 static const tcflag_t _srmio_ios_baud[srmio_io_baud_max] = {
 	B2400,

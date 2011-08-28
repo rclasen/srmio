@@ -10,6 +10,7 @@
 #include "common.h"
 #include <stdarg.h>
 #include <sys/time.h>
+#include <ctype.h>
 
 const char *srmio_version = PACKAGE_STRING;
 

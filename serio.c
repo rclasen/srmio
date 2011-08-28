@@ -8,7 +8,7 @@
  */
 
 
-#include "io.h"
+#include "serio.h"
 
 static const unsigned _srmio_io_baudnames[srmio_io_baud_max] = {
 	2400,

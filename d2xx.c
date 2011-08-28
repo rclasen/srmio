@@ -10,7 +10,7 @@
 #include <ftd2xx.h>
 #include <dlfcn.h>
 
-#include "io.h"
+#include "serio.h"
 
 
 /************************************************************

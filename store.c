@@ -7,6 +7,7 @@
  *
  */
 
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
 
@@ -514,10 +515,20 @@ static bool srmio_store_fname( store_athlete_t athlete,
 
 
 	time = 0.1 * start;
+#ifdef HAVE_LOCALTIME_R
 	if( NULL == localtime_r( &time, &stm )){
 		srmio_error_errno( err, "localtime" );
 		return false;
 	}
+#else
+	{ struct tm *tmp;
+	if( NULL == ( tmp = localtime( &time ))){
+		srmio_error_errno( err, "localtime" );
+		return false;
+	}
+	memcpy( &stm, tmp, sizeof(struct tm));
+	}
+#endif
 
 	// find/add month dir
 	if( PATH_MAX <= snprintf( path, PATH_MAX,

@@ -125,6 +125,7 @@ bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 	srmio_ftype_t type, srmio_time_t split )
 {
 	srmio_error_t err;
+	FILE *fh;
 
 	if( ! (*srmdata)->cused ){
 		fprintf( stderr, "no data available\n" );
@@ -132,7 +133,6 @@ bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 	}
 
 	if( split == 0 ){
-		FILE *fh;
 
 		if( ! do_fixup( srmdata, fixup ))
 			return false;
@@ -153,6 +153,7 @@ bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 		return true;
 
 	} else {
+#ifdef HAVE_MKSTEMPS
 		srmio_data_t *dat, *list;
 		char *match;
 		int suffixlen;
@@ -178,7 +179,6 @@ bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 
 		for( dat = list; *dat; ++dat ){
 			int fd;
-			FILE *fh;
 
 			/* TODO: make min chunks per file configurable */
 			if( (*dat)->cused < 5 ){
@@ -216,6 +216,10 @@ bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 
 		free( nfname );
 		free( list );
+#else
+		fprintf( stderr, "split isn't supported on this platform\n" );
+		return false;
+#endif
 	}
 
 	return true;
@@ -330,7 +334,12 @@ int main( int argc, char **argv )
 			break;
 
 		  case 's':
+#ifdef HAVE_MKTEMPS
 			opt_split = atoi(optarg);
+#else
+			fprintf( stderr, "split isn't supported on this platform\n" );
+			++needhelp;
+#endif
 			break;
 
 		  case 't':

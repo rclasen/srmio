@@ -29,16 +29,28 @@ include_HEADERS= \
 	srmio.h \
 	srmio_config.h
 
+if HAVE_DL
+D2XX_LD_DL = -ldl
+else
+D2XX_LD_DL =
+endif
+
+if HAVE_PTHREAD
+D2XX_LD_PTHREAD = -lpthread
+else
+D2XX_LD_PTHREAD =
+endif
+
 if HAVE_D2XX
 D2XX_SRC = d2xx.c
-D2XX_LD = -ldl -lpthread
+D2XX_LD = $(D2XX_LD_DL) $(D2XX_LD_PTHREAD)
 else
 D2XX_SRC =
 D2XX_LD =
 endif
 
 if HAVE_TERMIOS
-TERMIOS_SRC = ios.c
+TERMIOS_SRC = serios.c
 else
 TERMIOS_SRC =
 endif
@@ -48,7 +60,7 @@ lib_LTLIBRARIES=libsrmio.la
 libsrmio_la_LDFLAGS= $(D2XX_LD)
 libsrmio_la_SOURCES= \
 	common.h \
-	io.h \
+	serio.h \
 	pc.h \
 	\
 	buf.c \
@@ -61,7 +73,7 @@ libsrmio_la_SOURCES= \
 	file_srm.c \
 	file_wkt.c \
 	fixup.c \
-	io.c \
+	serio.c \
 	$(TERMIOS_SRC) \
 	list.c \
 	marker.c \
