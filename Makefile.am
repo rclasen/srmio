@@ -90,17 +90,17 @@ libsrmio_la_SOURCES= \
 bin_PROGRAMS=srmcmd srmdump srmsync
 
 srmcmd_LDADD= libsrmio.la $(D2XX_LIB)
-srmcmd_DEPENDENCIES= $(LTDLDEPS)
+srmcmd_DEPENDENCIES= $(LTDLDEPS) libsrmio.la
 srmcmd_SOURCES= \
 	srmcmd.c
 
 srmdump_LDADD= libsrmio.la $(D2XX_LIB)
-srmdump_DEPENDENCIES= $(LTDLDEPS)
+srmdump_DEPENDENCIES= $(LTDLDEPS) libsrmio.la
 srmdump_SOURCES= \
 	srmdump.c
 
 srmsync_LDADD= libsrmio.la $(D2XX_LIB)
-srmsync_DEPENDENCIES= $(LTDLDEPS)
+srmsync_DEPENDENCIES= $(LTDLDEPS) libsrmio.la
 srmsync_SOURCES= \
 	srmsync.c
 
