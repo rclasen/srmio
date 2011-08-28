@@ -52,7 +52,7 @@ static FT_STATUS (*FP_SetBreakOff)( FT_HANDLE ftHandle) = NULL;
 
 static bool d2xx_dlopen( srmio_error_t *err )
 {
-	fprintf( stderr, "lt_dlopen %s\n", D2XX_LIBNAME );
+	DPRINTF( "%s", D2XX_LIBNAME );
 
 	if( 0 != lt_dlinit() ){
 		srmio_error_set( err, "d2xx: lt_dlinit failed: %s",
