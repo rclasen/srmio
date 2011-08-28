@@ -715,7 +715,7 @@ static int _srmio_pc5_msg( srmio_pc_t conn, char cmd,
 
 	assert( conn );
 
-	if( conn->xfer_state != srmio_pc_xfer_type_new ){
+	if( conn->xfer_state != srmio_pc_xfer_state_new ){
 		SRMIO_PC_ERROR( conn, err, "another command is still running" );
 		return -1;
 	}
