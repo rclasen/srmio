@@ -84,16 +84,26 @@ this to a file like "/etc/udev/rules.d/51-local.rules":
  #SUBSYSTEMS=="usb", KERNEL=="ttyUSB*", ATTRS{serial}=="A2QXXXXX", SYMLINK+="pc7"
  # you can retrieve the serial with "lsusb -v"
 
+
 Cygwin:
 =======
 
 - PCV: Works fine with the original driver from SRM. Shows up as
-  /dev/ttyS4 (com4) or similar. When I've got my first SRM I've had the
+  /dev/ttyS3 (COM4) or similar. When I've got my first SRM I've had the
   original prolific driver installed for a plain usb2serial cable: I've
   had very bad results with this driver. The issues vanished (for SRM and
   the usb2serial cable) when I've switched to the driver shipped by SRM.
 
-- PCVI/7: untested (yet)
+- PCVI/7: Successfully tested with VCP driver (i.e. /dev/ttyS5 / COM6 or
+  similar) on Vista. I guess, the VCP driver came from the SRM drivers
+  I've installed. D2XX refuses to load ftd2xx.dll if another version was
+  loaded, already. Might help to point LTDL_LIBRARY_PATH to the directory
+  with the currently loaded ftd2xx.dll.
+
+I've had problems accessing devices with high COM port numbers. Maybe
+cygwin doesn't handle this? In doubts assign a "low" number in Windows'
+device manager.
+
 
 Mac OS X:
 =========

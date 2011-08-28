@@ -6,10 +6,14 @@ AC_INIT([srmio], [0.1.0~git0], [bj@zuto.de])
 AM_INIT_AUTOMAKE([-Wall -Werror])
 AC_CONFIG_SRCDIR([srmio.h])
 AC_CONFIG_HEADER([config.h])
+AC_CONFIG_MACRO_DIR([m4])
+
+LT_CONFIG_LTDL_DIR([libltdl])
+LT_INIT([dlopen])
+LTDL_INIT([recursive])
 
 # Checks for programs.
 AC_PROG_CC
-AC_PROG_LIBTOOL
 AC_PROG_CPP
 AC_PROG_CXX
 AC_PROG_INSTALL
@@ -17,25 +21,16 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 
 # Checks for libraries.
-AC_CHECK_LIB([pthread],[pthread_create],[
-  ac_cv_pthread=yes
-], [
-  ac_cv_pthread=no
-])
-AM_CONDITIONAL([HAVE_PTHREAD], [ test "x$ac_cv_pthread" = xyes ])
-AS_IF([ test "x$ac_cv_pthread" = xyes ],[
-  AC_SUBST([HAVE_PTHREAD],[true])
-])
+AM_CONDITIONAL([HAVE_LIBDL], [ test "x$libltdl_cv_lib_dl_dlopen" = xyes ])
 
-AC_CHECK_LIB([dl],[dlopen],[
-  ac_cv_dl=yes
-  LIBS="$LIBS -ldl"
+AC_CHECK_LIB([pthread],[pthread_create],[
+  ac_cv_lib_pthread=yes
 ], [
-  ac_cv_dl=no
+  ac_cv_lib_pthread=no
 ])
-AM_CONDITIONAL([HAVE_DL], [ test "x$ac_cv_dl" = xyes ])
-AS_IF([ test "x$ac_cv_dl" = xyes ],[
-  AC_SUBST([HAVE_DL],[true])
+AM_CONDITIONAL([HAVE_LIBPTHREAD], [ test "x$ac_cv_lib_pthread" = xyes ])
+AS_IF([ test "x$ac_cv_lib_pthread" = xyes ],[
+  AC_SUBST([HAVE_LIBPTHREAD],[true])
 ])
 
 
@@ -174,23 +169,12 @@ AC_CPP_FUNC
 # TODO: getopt_long alternatives (FreeBSD)
 # TODO: provide alternative implementations, use gnulib?
 
-AC_DEFUN([AC_DLOPEN_IFELSE],[
-  AC_TRY_LINK([[
-#ifdef HAVE_DLFCN_H
-# include <dlfcn.h>
-#endif
-  ]], [[
-    return 0 == dlopen($1, RTLD_NOW) ? 1 : 0;
-  ]], [$2] , [$3] )
-])
-
-
 AC_ARG_WITH([ftd2xx], [
   AS_HELP_STRING([--with-ftd2xx=<filename>],
     [support libftd2xx for FTDI device serial access @<:@default=check@:>@])
 ],[
 ],[
-  if test "x$ac_cv_header_ftd2xx_h" = xyes && test "x$ac_cv_dl" = xyes; then
+  if test "x$ac_cv_header_ftd2xx_h" = xyes ; then
     with_ftd2xx=check
   else
     with_ftd2xx=no
@@ -206,19 +190,14 @@ AS_IF([ test "x$with_ftd2xx" = xno ], [
 
 ], [test "x$with_ftd2xx" == xyes || test "x$with_ftd2xx" == xcheck], [
 
-  #for lib in libftd2xx.so ftd2xx.dll libftd2xx.dylib "$with_ftd2xx"; do
-  AC_DLOPEN_IFELSE(["libftd2xx.so"],[
-    ac_cv_d2xx_libname="libftd2xx.so"
-  ], [
-    AC_DLOPEN_IFELSE(["libftd2xx.dylib"],[
-      ac_cv_d2xx_libname="libftd2xx.dylib"
-    ],[
-      AC_DLOPEN_IFELSE(["ftd2xx.dll"],[
-        ac_cv_d2xx_libname="ftd2xx.dll"
-      ],[
-      ])
-    ])
-  ])
+  case "$host" in
+   *cygwin*|*mingw*)
+     ac_cv_d2xx_libname=ftd2xx	# .dll
+     ;;
+   *)
+     ac_cv_d2xx_libname=libftd2xx # .so libftd2xx.dylib
+     ;;
+  esac
 
   if test -z "$ac_cv_d2xx_libname" ; then
     if test "x$with_ftd2xx" != xcheck; then
@@ -238,12 +217,8 @@ AS_IF([ test "x$with_ftd2xx" = xno ], [
 AM_CONDITIONAL([HAVE_D2XX], [ test -n "$ac_cv_d2xx_libname" ])
 
 if test "x$with_ftd2xx" != xcheck && test -n "$ac_cv_d2xx_libname"; then
-  if test "x$ac_cv_dl" != xyes; then
-    AC_MSG_WARN([*** d2xx support is missing libdl/dlopen for ftd2xx ])
-  fi
-
   if test "x$ac_cv_header_ftd2xx_h" != xyes; then
-    AC_MSG_WARN([*** d2xx support is missing ftd2xx.h header])
+    AC_MSG_WARN([*** d2xx requires ftd2xx.h header])
   fi
 fi
 
@@ -263,7 +238,7 @@ if test "x$ac_cv_func_nanosleep" != xyes && test "x$ac_cv_msec_sleep" != xyes ; 
   AC_MSG_WARN([*** no high-precision sleep function found])
 fi
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile libltdl/Makefile])
 
 AC_CONFIG_COMMANDS([genconfheader.sh],[
 . $srcdir/genconfheader.sh > srmio_config.h

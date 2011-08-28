@@ -13,7 +13,7 @@ libtoolize=libtoolize
 if which glibtoolize > /dev/null 2>&1; then
 	libtoolize=glibtoolize
 fi
-$libtoolize --copy --force
+$libtoolize --copy --force --ltdl
 autoheader
 automake --add-missing --copy --force-missing
 autoconf

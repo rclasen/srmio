@@ -24,7 +24,9 @@ depcomp
 install-sh
 libtool
 ltmain.sh
+libltdl
 missing
+m4
 stamp-h1
 srmcmd
 srmdump

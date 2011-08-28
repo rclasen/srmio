@@ -9,9 +9,7 @@
 
 #include "serio.h"
 
-#ifdef HAVE_DLFCN_H
-# include <dlfcn.h>
-#endif
+#include <ltdl.h>
 
 #ifdef HAVE_WINDOWS_H
 # include <windows.h>
@@ -28,7 +26,7 @@
  * dynamic lib loading
  */
 
-static void *d2xx_lib = NULL;
+static lt_dlhandle d2xx_lib = NULL;
 static FT_STATUS (*FP_OpenEx)( PVOID pArg1, DWORD Flags, FT_HANDLE *pHandle) = NULL;
 static FT_STATUS (*FP_Close)( FT_HANDLE ftHandle) = NULL;
 static FT_STATUS (*FP_Purge)( FT_HANDLE ftHandle, DWORD dwMask ) = NULL;
@@ -46,19 +44,26 @@ static FT_STATUS (*FP_SetBreakOff)( FT_HANDLE ftHandle) = NULL;
 
 
 #define SYM(handle, var, name)	\
-	if( ! (var = dlsym(handle, name ) )){ \
+	if( ! (var = lt_dlsym(handle, name ) )){ \
 		srmio_error_set(err, "d2xx: failed to load symbol %s: %s", \
-			 name, dlerror() ); \
+			 name, lt_dlerror() ); \
 		goto clean; \
 	}
 
 static bool d2xx_dlopen( srmio_error_t *err )
 {
-	fprintf( stderr, "dlopen %s\n", D2XX_LIBNAME );
-	if( NULL == (d2xx_lib = dlopen( D2XX_LIBNAME, RTLD_NOW ) )){
-		srmio_error_set( err, "d2xx: dlopen(%s) failed:%s\n", D2XX_LIBNAME,
-			dlerror() );
+	fprintf( stderr, "lt_dlopen %s\n", D2XX_LIBNAME );
+
+	if( 0 != lt_dlinit() ){
+		srmio_error_set( err, "d2xx: lt_dlinit failed: %s",
+			lt_dlerror() );
 		return false;
+	}
+
+	if( NULL == (d2xx_lib = lt_dlopenext( D2XX_LIBNAME ) )){
+		srmio_error_set( err, "d2xx: lt_dlopen(%s) failed: %s\n",
+			D2XX_LIBNAME, lt_dlerror() );
+		goto clean1;
 	}
 
 	SYM(d2xx_lib, FP_OpenEx, "FT_OpenEx" );
@@ -78,8 +83,10 @@ static bool d2xx_dlopen( srmio_error_t *err )
 
 	return true;
 clean:
-	dlclose( d2xx_lib );
+	lt_dlclose( d2xx_lib );
 	d2xx_lib = NULL;
+clean1:
+	lt_dlexit();
 	return false;
 }
 
