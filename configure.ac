@@ -241,7 +241,13 @@ fi
 AC_CONFIG_FILES([Makefile libltdl/Makefile])
 
 AC_CONFIG_COMMANDS([genconfheader.sh],[
-. $srcdir/genconfheader.sh > srmio_config.h
+. $srcdir/genconfheader.sh > "$tmp/srmio_config.h"
+if diff "$tmp/srmio_config.h" srmio_config.h > /dev/null 2>&1; then
+  : # unchanged
+else
+  rm -f srmio_config.h
+  mv "$tmp/srmio_config.h" srmio_config.h
+fi
 ],[
 HEADER_STDINT_H=$ac_cv_header_stdint_h
 HEADER_INTTYPES_H=$ac_cv_header_inttypes_h
