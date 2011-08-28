@@ -131,7 +131,7 @@ int main( int argc, char **argv )
 			return 1;
 		}
 #else
-		fprintf( stderr "ftdi support is not enabled\n" )
+		fprintf( stderr, "ftdi support is not enabled\n" );
 		return 1;
 #endif
 
@@ -143,7 +143,7 @@ int main( int argc, char **argv )
 			return 1;
 		}
 #else
-		fprintf( stderr "termios support is not enabled\n" )
+		fprintf( stderr, "termios support is not enabled\n" );
 		return 1;
 #endif
 	}

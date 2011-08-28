@@ -114,7 +114,7 @@ bool do_open()
 			return false;
 		}
 #else
-		fprintf( stderr "ftdi support is not enabled\n" )
+		fprintf( stderr, "ftdi support is not enabled\n" );
 		return false;
 #endif
 
@@ -126,7 +126,7 @@ bool do_open()
 			return false;
 		}
 #else
-		fprintf( stderr "termios support is not enabled\n" )
+		fprintf( stderr, "termios support is not enabled\n" );
 		return false;
 #endif
 	}
