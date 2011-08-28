@@ -169,8 +169,7 @@ AC_CPP_FUNC
 # TODO: getopt_long alternatives (FreeBSD)
 # TODO: provide alternative implementations, use gnulib?
 
-AC_ARG_WITH([ftd2xx], [
-  AS_HELP_STRING([--with-ftd2xx=<filename>],
+AC_ARG_WITH([ftd2xx], [AS_HELP_STRING([--with-ftd2xx=<filename>],
     [support libftd2xx for FTDI device serial access @<:@default=check@:>@])
 ],[
 ],[
