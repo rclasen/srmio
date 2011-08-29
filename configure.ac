@@ -138,6 +138,29 @@ then
   AC_DEFINE([HAVE_MSEC_SLEEP], [1], [Define to use Windows Sleep using milliseconds])
 fi
 
+AC_CACHE_CHECK([for windwos comm SetCommState],
+  ac_cv_func_SetCommState,
+  AC_TRY_LINK([[
+#ifdef HAVE_WINDOWS_H
+# include <windows.h>
+#endif
+ ]],[[
+HANDLE fh;
+DCB dcb;
+SetCommState(fh, &dcb);
+ ]], [
+   ac_cv_func_SetCommState=yes
+ ], [
+   ac_cv_func_SetCommState=no
+ ])
+)
+
+AM_CONDITIONAL([HAVE_WINCOM],[ test "x$ac_cv_func_SetCommState" = xyes ])
+AS_IF([test "x$ac_cv_func_SetCommState" = xyes], [
+  AC_SUBST([HAVE_WINCOM], true)
+  AC_DEFINE([HAVE_WINCOM],[1],[Define if sytem has win32 commport API.])
+],[])
+
 
 # AC_CPP_FUNC
 # ------------------ #
@@ -229,8 +252,11 @@ AS_IF([ test -n "$ac_cv_d2xx_libname" ], [
 ], [ test "x$ac_cv_sys_posix_termios" = xyes ], [
   # ok
 
+], [ test "x$ac_cv_func_SetCommState" = xyes ], [
+  # ok
+
 ], [
-  AC_MSG_WARN([*** neither termios nor d2xx is working, no serial driver available ])
+  AC_MSG_WARN([*** no working serial API found ])
 ])
 
 if test "x$ac_cv_func_nanosleep" != xyes && test "x$ac_cv_msec_sleep" != xyes ; then
@@ -255,6 +281,7 @@ HAVE__BOOL=$ac_cv_type__Bool
 HEADER_TIME_WITH_SYS_TIME=$ac_cv_header_time
 HEADER_SYS_TIME_H=$ac_cv_header_sys_time_h
 HAVE_TERMIOS=$ac_cv_sys_posix_termios
+HAVE_WINCOM=$ac_cv_func_SetCommState
 HAVE_D2XX=$HAVE_D2XX
 ])
 

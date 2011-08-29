@@ -270,6 +270,18 @@ srmio_io_t srmio_ios_new( const char *fname, srmio_error_t *err );
 
 /************************************************************
  *
+ * from seriow32.c
+ *
+ ************************************************************/
+
+#ifdef SRMIO_HAVE_WINCOM
+
+srmio_io_t srmio_iow32_new( const char *fname, srmio_error_t *err );
+
+#endif
+
+/************************************************************
+ *
  * from d2xx.c
  *
  ************************************************************/

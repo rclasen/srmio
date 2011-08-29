@@ -58,6 +58,12 @@ else
 TERMIOS_SRC =
 endif
 
+if HAVE_WINCOM
+WINCOM_SRC = seriow32.c
+else
+WINCOM_SRC =
+endif
+
 lib_LTLIBRARIES=libsrmio.la
 
 libsrmio_la_LIBADD=$(LIBLTDL) $(D2XX_LIB)
@@ -79,6 +85,7 @@ libsrmio_la_SOURCES= \
 	fixup.c \
 	serio.c \
 	$(TERMIOS_SRC) \
+	$(WINCOM_SRC) \
 	list.c \
 	marker.c \
 	pc.c \

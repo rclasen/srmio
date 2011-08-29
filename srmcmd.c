@@ -476,6 +476,12 @@ int main( int argc, char **argv )
 				fname, err.message );
 			return 1;
 		}
+#elif defined(SRMIO_HAVE_WINCOM)
+		if( NULL == (io = srmio_iow32_new( fname, &err ))){
+			fprintf( stderr, "srmio_iow32_new(%s) failed: %s\n",
+				fname, err.message );
+			return 1;
+		}
 #else
 		fprintf( stderr, "termios support is not enabled\n" );
 		return 1;

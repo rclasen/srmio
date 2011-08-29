@@ -79,6 +79,7 @@
 #include <stdarg.h>
 
 #ifdef HAVE_WINDOWS_H
+# define UNICODE
 # include <windows.h>
 #endif
 

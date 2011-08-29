@@ -60,6 +60,10 @@ if [ "$HAVE_TERMIOS"x = yesx ]; then
 	echo "#define SRMIO_HAVE_TERMIOS"
 fi
 
+if [ "$HAVE_WINCOM"x = yesx ]; then
+	echo "#define SRMIO_HAVE_WINCOM"
+fi
+
 if [ -n "$HAVE_D2XX" ]; then
 	echo "#define SRMIO_HAVE_D2XX"
 fi
