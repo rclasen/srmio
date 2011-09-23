@@ -21,6 +21,9 @@
 #define PC7_PKT_CHUNKS		16
 #define PC7_CHUNK_SIZE		16
 
+#define PC7_CLEAR_BUSY		0x01
+#define PC7_CLEAR_DONE		0x02
+
 struct _srmio_pc7_packet_t {
 	uint16_t	magic;
 	uint16_t	cmd;
@@ -620,15 +623,23 @@ static bool _srmio_pc7_cmd_clear( srmio_pc_t conn, srmio_error_t *err )
 	if( ! _srmio_pc7_msg( conn, &send, NULL, &recv, err ) )
 		return false;
 
-	if( recv.datalen != 0 ){
-		SRMIO_PC_ERROR( conn, err, "unexpected response size" );
+	// TODO: handle "no response = nothing to clear" more graceful
+
+	while( recv.datalen == 2 && recv.data[0] != PC7_CLEAR_DONE ){
+		if( ! _srmio_pc7_msg_recv( conn, &recv, err ) )
+			return false;
+	}
+
+	if( recv.datalen != 2 ){
+		SRMIO_PC_ERROR( conn, err, "unexpected clear response size: %u",
+			recv.datalen );
 		return false;
 	}
 
-	while( *recv.data < 2 ){
-		if( ! _srmio_pc7_msg_recv( conn, &recv, err ) )
-			// not really true, but who cares...
-			return true;
+	if( recv.data[0] != PC7_CLEAR_DONE ){
+		SRMIO_PC_ERROR( conn, err, "unexpected clear status: %c/%c",
+			recv.data[0], recv.data[1] );
+		return false;
 	}
 
 	return true;
