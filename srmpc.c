@@ -332,14 +332,16 @@ srmpc_conn_t srmpc_open( const char *fname, int force,
 	int		pcv;
 
 	DPRINTF( "srmpc_open %s", fname );
+	_srm_log( conn, "%s opening device %s",
+		PACKAGE_STRING,
+		fname );
 
 	if( NULL == (conn = malloc(sizeof(struct _srmpc_conn_t))))
 		return NULL;
 	conn->lfunc = lfunc;
-
-	_srm_log( conn, "%s opening device %s",
-		PACKAGE_STRING,
-		fname );
+	conn->cmd_running = 0;
+	conn->stxetx = 1;
+	conn->nready = 0;
 
 	/* TODO: uucp style lockfils */
 
