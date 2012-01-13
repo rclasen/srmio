@@ -263,6 +263,8 @@ static bool _srmio_pc5_probe_parity( srmio_pc_t conn,
 	const srmio_io_parity_t *parity;
 	unsigned baud;
 
+	*lerr.message = 0;
+
 	if( ! srmio_io_baud2name( rate, &baud ) ){
 		SRMIO_PC_ERROR( conn, err, "invalid baudrate" );
 		return false;
@@ -278,7 +280,8 @@ static bool _srmio_pc5_probe_parity( srmio_pc_t conn,
 			baud, *parity, lerr.message );
 	}
 
-	SRMIO_PC_ERROR( conn, err, "no PCV found at %u baud", baud );
+	SRMIO_PC_ERROR( conn, err, "no PCV found at %u baud: %s",
+		baud, lerr.message );
 	return false;
 }
 
@@ -287,6 +290,8 @@ static bool _srmio_pc5_probe_baud( srmio_pc_t conn,
 {
 	srmio_error_t lerr;
 	const srmio_io_baudrate_t *rate;
+
+	*lerr.message = 0;
 
 	for( rate = _srmio_pc5_baud_probe; *rate < srmio_io_baud_max; ++rate ){
 		if( conn->parity == srmio_io_parity_max ){
@@ -305,7 +310,9 @@ static bool _srmio_pc5_probe_baud( srmio_pc_t conn,
 		}
 	}
 
-	SRMIO_PC_ERROR( conn, err, "no PCV found at any baudrate" );
+	SRMIO_PC_ERROR( conn, err, "no PCV found at any baudrate: %s",
+		lerr.message );
+
 	return false;
 }
 
@@ -1810,6 +1817,8 @@ srmio_pc_t srmio_pc5_new( srmio_error_t *err )
 	conn->can_preview = false;
 	conn->baudrate = srmio_io_baud_max;
 	conn->parity = srmio_io_parity_max;
+	SELF(conn)->stxetx = 0; /* will be updated during init */
+	SELF(conn)->nready = 0;
 
 	return conn;
 
