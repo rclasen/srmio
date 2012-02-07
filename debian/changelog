@@ -1,3 +1,9 @@
+srmio (0.0.7) unstable; urgency=low
+
+  * srmpc: fix missing initialization of device handle.
+
+ -- Rainer Clasen <bj@schlepp.mich.zuto.de>  Tue, 07 Feb 2012 19:39:36 +0100
+
 srmio (0.0.6) unstable; urgency=low
 
   * srmpc: try to catch mktime errors properly
