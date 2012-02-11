@@ -61,7 +61,7 @@ static bool d2xx_dlopen( srmio_error_t *err )
 	}
 
 	if( NULL == (d2xx_lib = lt_dlopenext( D2XX_LIBNAME ) )){
-		srmio_error_set( err, "d2xx: lt_dlopen(%s) failed: %s\n",
+		srmio_error_set( err, "d2xx: lt_dlopen(%s) failed: %s",
 			D2XX_LIBNAME, lt_dlerror() );
 		goto clean1;
 	}

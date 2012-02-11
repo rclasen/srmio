@@ -102,6 +102,13 @@ static void progress( size_t total, size_t done, void *data )
 	fprintf( stderr, "progress: %u/%u\r", done, total );
 }
 
+static void logfunc( const char *msg, void *data )
+{
+	(void)data;
+
+	fprintf( stderr, "%s\n", msg );
+}
+
 bool do_fixup( srmio_data_t *srmdata, bool fixup )
 {
 	srmio_error_t err;
@@ -517,6 +524,10 @@ int main( int argc, char **argv )
 		return 1;
 	}
 
+	if( opt_verb ){
+		srmio_pc_set_logfunc( srm, logfunc, NULL );
+	}
+
 	if( ! srmio_pc_set_device( srm, io, &err )){
 		fprintf( stderr, "srmio_pc_set_device failed: %s\n",
 			err.message );
@@ -561,7 +572,9 @@ int main( int argc, char **argv )
 			srmio_pc_set_xfer( srm, srmio_pc_xfer_type_all, NULL );
 
 		/* get new/all chunks */
-		if( ! srmio_pc_xfer_all( srm, srmdata, progress, NULL, &err )){
+		if( ! srmio_pc_xfer_all( srm, srmdata,
+			progress, NULL, &err )){
+
 			fprintf( stderr, "srmio_pc_xfer_all failed: %s\n",
 				err.message );
 			return 1;

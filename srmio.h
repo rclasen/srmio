@@ -339,8 +339,10 @@ bool srmio_pc_get_device( srmio_pc_t conn, srmio_io_t *h, srmio_error_t *err );
 bool srmio_pc_set_baudrate( srmio_pc_t pch, srmio_io_baudrate_t rate, srmio_error_t *err );
 bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity, srmio_error_t *err );
 
-bool srmio_pc_set_debug( srmio_pc_t pch, FILE *fh );
-bool srmio_pc_get_debug( srmio_pc_t pch, FILE **fh );
+typedef void (*srmio_logfunc_t)( const char *msg,
+	void *user_data );
+bool srmio_pc_set_logfunc( srmio_pc_t pch, srmio_logfunc_t, void *user_data );
+bool srmio_pc_set_debugfunc( srmio_pc_t pch, srmio_logfunc_t, void *user_data );
 
 bool srmio_pc_open( srmio_pc_t conn, srmio_error_t *err );
 bool srmio_pc_close( srmio_pc_t conn, srmio_error_t *err );
@@ -373,7 +375,8 @@ bool srmio_pc_xfer_block_progress( srmio_pc_t conn, size_t *block_done );
 
 bool srmio_pc_xfer_all( srmio_pc_t conn,
 	srmio_data_t data,
-	srmio_progress_t pfunc, void *user_data, srmio_error_t *err );
+	srmio_progress_t pfunc, void *prog_data,
+	srmio_error_t *err );
 
 
 /************************************************************

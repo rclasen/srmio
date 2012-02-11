@@ -12,6 +12,28 @@
 
 #include <stdarg.h>
 
+void srmio_pc_logv( srmio_pc_t pch, const char *fmt, va_list ap )
+{
+	char buf[SRMIO_ERROR_MSG_SIZE];
+
+	if( ! pch->lfunc )
+		return;
+
+	if( 0 > vsnprintf( buf, SRMIO_ERROR_MSG_SIZE, fmt, ap ) )
+		return;
+
+	(*pch->lfunc)( buf, pch->ldata );
+}
+
+void srmio_pc_log( srmio_pc_t pch, const char *fmt, ... )
+{
+	va_list ap;
+
+	va_start( ap, fmt );
+	srmio_pc_logv( pch, fmt, ap );
+	va_end( ap );
+}
+
 srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child,
 	srmio_error_t *err )
 {
@@ -31,10 +53,6 @@ srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child,
 	pch->child = child;
 	pch->xfer_state = srmio_pc_xfer_state_new;
 	pch->xfer_type = srmio_pc_xfer_type_new;
-
-#ifdef DEBUG
-	pch->debugfh = stderr;
-#endif
 
 	return pch;
 }
@@ -96,20 +114,23 @@ bool srmio_pc_close( srmio_pc_t pch, srmio_error_t *err )
 	return true;
 }
 
-bool srmio_pc_set_debug( srmio_pc_t pch, FILE *fh )
+bool srmio_pc_set_debugfunc( srmio_pc_t pch,
+	srmio_logfunc_t func, void *data )
 {
 	assert( pch );
 
-	pch->debugfh = fh;
+	pch->dfunc = func;
+	pch->ddata = data;
 	return true;
 }
 
-bool srmio_pc_get_debug( srmio_pc_t pch, FILE **fh )
+bool srmio_pc_set_logfunc( srmio_pc_t pch,
+	srmio_logfunc_t func, void *data )
 {
 	assert( pch );
-	assert( fh );
 
-	*fh = pch->debugfh;
+	pch->lfunc = func;
+	pch->ldata = data;
 	return true;
 }
 
@@ -373,7 +394,7 @@ bool srmio_pc_xfer_block_progress( srmio_pc_t pch, size_t *block_done )
  */
 bool srmio_pc_xfer_all( srmio_pc_t pch,
 	srmio_data_t data,
-	srmio_progress_t pfunc, void *user_data,
+	srmio_progress_t pfunc, void *prog_data,
 	srmio_error_t *err  )
 {
 	int mfirst = -1;
@@ -395,6 +416,8 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 
 	if( ! srmio_pc_xfer_get_blocks( pch, &block_cnt, err ) )
 		goto clean;
+
+	srmio_pc_log( pch, "found %d ride blocks", block_cnt );
 
 	if( block_cnt > 1 ){
 		if( srmio_pc_can_preview( pch ) ){
@@ -423,6 +446,9 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 		bool is_int;
 		bool is_first;
 		size_t prog_total;
+
+		srmio_pc_log( pch, "downloading ride block %d/%d",
+			block_num, block_cnt );
 
 		data->slope = block.slope;
 		data->zeropos = block.zeropos;
@@ -463,7 +489,7 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 				SRMIO_PC_DEBUG( pch,
 					"prog_total %d, prog_prev %d, block_done %d",
 					prog_total, prog_prev, block_done );
-				(*pfunc)( prog_total, block_done, user_data );
+				(*pfunc)( prog_total, block_done, prog_data );
 			}
 
 
@@ -520,6 +546,9 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 		goto clean;
 
 	srmio_pc_xfer_finish( pch, NULL  );
+
+	srmio_pc_log( pch, "got %d records", data->cused );
+
 	return true;
 
 clean:

@@ -17,24 +17,48 @@
 
 const char *srmio_version = PACKAGE_STRING;
 
-void srmio_dumphexv(FILE *fh, const unsigned char *buf, size_t blen,
+#ifdef DEBUG
+void srmio_debugfunc( const char *msg, void *data )
+{
+	fprintf( stderr, "%s\n", msg );
+}
+#endif
+
+void srmio_dumphexv(srmio_logfunc_t func, void *data,
+	const unsigned char *buf, size_t blen,
 	const char *fmt, va_list ap )
 {
 	struct timeval tv;
 	size_t i;
+	char msg[SRMIO_ERROR_MSG_SIZE];
+	int len;
+	int r;
 
 	assert( ! blen || buf );
 	assert( fmt );
 
-	if( ! fh )
+#ifndef DEBUG
+	if( ! func )
 		return;
+#endif
 
 	if( 0 != gettimeofday( &tv, NULL ))
 		return;
 
-	fprintf( fh, "%lu.%03lu ", tv.tv_sec, (unsigned long)tv.tv_usec / 1000 );
-	vfprintf( fh, fmt, ap );
-	fprintf( fh, " %d: ", blen );
+	len = snprintf( msg, SRMIO_ERROR_MSG_SIZE,
+		"%lu.%03lu ", tv.tv_sec, (unsigned long)tv.tv_usec / 1000 );
+	if( 0 > len )
+		return;
+
+	r = vsnprintf( msg+len, SRMIO_ERROR_MSG_SIZE - len, fmt, ap );
+	if( 0 > r || r > SRMIO_ERROR_MSG_SIZE - len )
+		return;
+	len += r;
+
+	r = snprintf( msg+len, SRMIO_ERROR_MSG_SIZE - len, " %d:", blen );
+	if( 0 > r || r > SRMIO_ERROR_MSG_SIZE - len )
+		return;
+	len +=r;
 
 	for( i=0; i < blen; ++i ){
 		unsigned char c = buf[i];
@@ -43,45 +67,67 @@ void srmio_dumphexv(FILE *fh, const unsigned char *buf, size_t blen,
 		if( ! isprint(c) )
 			p=' ';
 
-		if( i )
-			fprintf( fh, " " );
-		fprintf( fh, "0x%02x/%c", c, p );
+		r = snprintf( msg+len, SRMIO_ERROR_MSG_SIZE - len,
+			" 0x%02x/%c", c, p );
+		if( 0 > r || r > SRMIO_ERROR_MSG_SIZE - len )
+			return;
+		len +=r;
 	}
-	fprintf( fh, "\n" );
+
+#ifdef DEBUG
+	fprintf( stderr, "%s\n", msg );
+	if( func )
+#endif
+		(*func)( msg, data );
 }
 
-void srmio_dumphex(FILE *fh, const unsigned char *buf, size_t blen,
+void srmio_dumphex(srmio_logfunc_t func, void *data,
+	const unsigned char *buf, size_t blen,
 	const char *fmt, ... )
 {
 	va_list ap;
 
 	va_start( ap, fmt );
-	srmio_dumphexv( fh, buf, blen, fmt, ap );
+	srmio_dumphexv( func, data, buf, blen, fmt, ap );
 	va_end( ap );
 }
 
-void srmio_debugv(FILE *fh, const char *fmt, va_list ap )
+void srmio_debugv( srmio_logfunc_t func, void *data, const char *fmt, va_list ap )
 {
 	struct timeval tv;
+	char msg[SRMIO_ERROR_MSG_SIZE];
+	int len;
 
 	assert(fmt);
 
-	if( ! fh )
+#ifndef DEBUG
+	if( ! func )
 		return;
+#endif
 
 	if( 0 != gettimeofday( &tv, NULL ))
 		return;
 
-	fprintf( fh, "%lu.%03lu ", tv.tv_sec, (unsigned long)tv.tv_usec / 1000 );
-	vfprintf( fh, fmt, ap );
-	fprintf( fh, "\n" );
+	len = snprintf( msg, SRMIO_ERROR_MSG_SIZE, "%lu.%03lu ",
+		tv.tv_sec, (unsigned long)tv.tv_usec / 1000 );
+	if( 0 > len )
+		return;
+
+	if( 0 > vsnprintf( msg+len, SRMIO_ERROR_MSG_SIZE - len, fmt, ap ))
+		return;
+
+#ifdef DEBUG
+	fprintf( stderr, "%s\n", msg );
+	if( func )
+#endif
+		(*func)( msg, data );
 }
 
-void srmio_debug(FILE *fh, const char *fmt, ... )
+void srmio_debug( srmio_logfunc_t func, void *data, const char *fmt, ... )
 {
 	va_list ap;
 
 	va_start( ap, fmt );
-	srmio_debugv( fh, fmt, ap );
+	srmio_debugv( func, data, fmt, ap );
 	va_end( ap );
 }

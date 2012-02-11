@@ -227,7 +227,7 @@ static bool _srmio_pc7_msg( srmio_pc_t conn,
 	for( retries = 0; retries < 3; ++retries ){
 		if( retries ){
 			if( retry ) send = retry;
-			SRMIO_PC_STATUS( conn, "cmd 0x%04x/0x%04x retry %d",
+			SRMIO_PC_LOG( conn, "cmd 0x%04x/0x%04x retry %d",
 				first->cmd, send->cmd, retries );
 			srmio_io_send_break( conn->io, NULL );
 			sleep(1);
@@ -238,7 +238,7 @@ static bool _srmio_pc7_msg( srmio_pc_t conn,
 			return false;
 
 		if( ! _srmio_pc7_msg_recv( conn, recv, err ) ){
-			SRMIO_PC_STATUS( conn,
+			SRMIO_PC_LOG( conn,
 				"failed to get response, considering retry");
 			continue;
 		}
@@ -314,7 +314,7 @@ static bool _srmio_pc7_open( srmio_pc_t conn, srmio_error_t *err )
 	}
 
 	conn->firmware = buf_get_buint16( recv.data, 0 );
-	SRMIO_PC_DEBUG( conn, "firmware 0x%04x", conn->firmware );
+	SRMIO_PC_LOG( conn, "firmware 0x%04x", conn->firmware );
 
 	return true;
 }
@@ -817,7 +817,7 @@ static bool _srmio_pc7_xfer_block_next( srmio_pc_t conn, srmio_pc_xfer_block_t b
 		goto fail;
 	bstart = mktime( &bstarts );
 	if( (time_t)-1 == bstart ){
-		SRMIO_PC_STATUS( conn, "bad timestamp, skipping block %u",
+		SRMIO_PC_LOG( conn, "bad timestamp, skipping block %u",
 			block_num );
 		SELF(conn)->chunk_cnt = 0;
 		bstart = 0;

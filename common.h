@@ -94,10 +94,8 @@
 
 #ifdef VERBOSE
 /* TODO: workaround for bad error reporting */
-# define ERRMSG(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
 # define STATMSG(x, ...)	fprintf( stderr, x "\n", ##__VA_ARGS__ );
 #else
-# define ERRMSG(x, ...)	while(0);
 # define STATMSG(x, ...)	while(0);
 #endif
 
@@ -119,21 +117,26 @@ void srmio_error_copy( srmio_error_t *dst, srmio_error_t *src );
  *
  ************************************************************/
 
-void srmio_dumphexv(FILE *fh, const unsigned char *buf, size_t blen,
+void srmio_dumphexv(srmio_logfunc_t func, void *data,
+	const unsigned char *buf, size_t blen,
 	const char *fmt, va_list ap );
-void srmio_dumphex(FILE *fh, const unsigned char *buf, size_t blen,
+void srmio_dumphex(srmio_logfunc_t func, void *data,
+	const unsigned char *buf, size_t blen,
 	const char *fmt, ... );
 
-void srmio_debugv( FILE *fh, const char *fmt, va_list ap );
-void srmio_debug( FILE *fh, const char *fmt, ... );
+void srmio_debugv( srmio_logfunc_t func, void *data, const char *fmt, va_list ap );
+void srmio_debug( srmio_logfunc_t func, void *data, const char *fmt, ... );
 
 #ifdef DEBUG
 
 #include <ctype.h>
 
+void srmio_debugfunc( const char *msg, void *data );
+
 #define DPRINTF(x, ...)	fprintf( stderr, "%s: " x "\n", __func__, ##__VA_ARGS__ );
 #define DUMPHEX(fmt, buf, blen, ... ) \
-	srmio_dumphex(stderr, buf, blen, "%s: " fmt, __func__, ##__VA_ARGS__ );
+	srmio_dumphex(srmio_debugfunc, NULL, \
+	buf, blen, "%s: " fmt, __func__, ##__VA_ARGS__ );
 
 #else
 

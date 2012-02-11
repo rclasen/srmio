@@ -171,7 +171,7 @@ static bool _srmio_pc5_init(
 	srmio_io_baud2name( baudrate, &baudname );
 	srmio_io_parity2name( parity, &parityname );
 
-	SRMIO_PC_STATUS( conn, "trying comm %d/8%c1",
+	SRMIO_PC_LOG( conn, "trying comm %d/8%c1",
 		baudname,
 		parityname );
 
@@ -248,7 +248,7 @@ static bool _srmio_pc5_init(
 	conn->parity = parity;
 	conn->firmware = buf_get_buint16( verbuf, 0 );
 
-	SRMIO_PC_DEBUG( conn, "found PCV version 0x%x at %d/8%c1",
+	SRMIO_PC_LOG( conn, "found PCV version 0x%x at %d/8%c1",
 		conn->firmware,
 		baudname,
 		parityname );
@@ -273,14 +273,18 @@ static bool _srmio_pc5_probe_parity( srmio_pc_t conn,
 	for( parity = _srmio_pc5_parity_probe;
 		*parity < srmio_io_parity_max; ++parity ){
 
+		char pname;
+
 		if( _srmio_pc5_init( conn, rate, *parity, &lerr ) )
 			return true;
 
-		SRMIO_PC_STATUS( conn, "probe %u baud, parityID %u failed: %s",
-			baud, *parity, lerr.message );
+		srmio_io_parity2name( *parity, &pname );
+
+		SRMIO_PC_LOG( conn, "probe comm %u/8%c1 failed: %s",
+			baud, pname, lerr.message );
 	}
 
-	SRMIO_PC_ERROR( conn, err, "no PCV found at %u baud: %s",
+	SRMIO_PC_ERROR( conn, err, "no PCV found at %u/8x1: %s",
 		baud, lerr.message );
 	return false;
 }
@@ -294,19 +298,27 @@ static bool _srmio_pc5_probe_baud( srmio_pc_t conn,
 	*lerr.message = 0;
 
 	for( rate = _srmio_pc5_baud_probe; *rate < srmio_io_baud_max; ++rate ){
+		unsigned baud;
+
+		srmio_io_baud2name( *rate, &baud );
+
 		if( conn->parity == srmio_io_parity_max ){
 			if( _srmio_pc5_probe_parity( conn, *rate, &lerr ) )
 				return true;
 
-			SRMIO_PC_STATUS( conn, "probe baudID %u failed: %s",
-				*rate, lerr.message );
+			SRMIO_PC_LOG( conn, "probe comm %u/8x1 failed: %s",
+				baud, lerr.message );
 
 		} else {
 			if( _srmio_pc5_init( conn, *rate, conn->parity, &lerr ) )
 				return true;
 
-			SRMIO_PC_STATUS( conn, "probe baudID %u, parityID %u failed: %s",
-				*rate, conn->parity, lerr.message );
+			char pname;
+
+			srmio_io_parity2name( conn->parity, &pname );
+
+			SRMIO_PC_LOG( conn, "probe comm %u/8%c1 failed: %s",
+				baud, pname, lerr.message );
 		}
 	}
 
@@ -696,7 +708,7 @@ static void _srmio_pc5_msg_ready( srmio_pc_t conn )
 
 	delta = SELF(conn)->nready - now;
 
-	SRMIO_PC_STATUS( conn, "PCV still busy for %usec, waiting...", delta );
+	SRMIO_PC_LOG( conn, "PCV still busy for %usec, waiting...", delta );
 	sleep( delta );
 
 	return;
@@ -732,7 +744,7 @@ static int _srmio_pc5_msg( srmio_pc_t conn, char cmd,
 	for( retries = 0; retries < 3; ++retries ){
 
 		if( retries ){
-			SRMIO_PC_STATUS( conn,
+			SRMIO_PC_LOG( conn,
 				"SRM isn't responding, send break and retry" );
 			srmio_io_send_break( conn->io, err );
 			sleep(1);
@@ -1279,7 +1291,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 		if( retries ){
 			/* request retransmit */
-			SRMIO_PC_STATUS( conn, "received bad pkt %u, "
+			SRMIO_PC_LOG( conn, "received bad pkt %u, "
 				"requesting retransmit",
 				SELF(conn)->pkt_num );
 
@@ -1367,7 +1379,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 		} else if( ret < PC5_PKT_SIZE ){
 			/* incomplete pkt, retry */
-			SRMIO_PC_STATUS( conn, "pkt %d is too short: %d",
+			SRMIO_PC_LOG( conn, "pkt %d is too short: %d",
 				SELF(conn)->pkt_num,
 				ret );
 
@@ -1414,7 +1426,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 
 		if( ! SELF(conn)->pkt_recint ){
-			SRMIO_PC_STATUS( conn, "pkt #%u has no recint",
+			SRMIO_PC_LOG( conn, "pkt #%u has no recint",
 				SELF(conn)->pkt_num );
 			continue;
 		}
@@ -1473,7 +1485,7 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 
 	assert( conn );
 
-	SRMIO_PC_DEBUG( conn,"getting meta info");
+	SRMIO_PC_LOG( conn,"getting meta info");
 	if( conn->xfer_state != srmio_pc_xfer_state_new ){
 		SRMIO_PC_ERROR( conn, err, "device is busy" );
 		return false;
@@ -1516,7 +1528,7 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 
 	_srmio_pc5_msg_ready( conn );
 
-	SRMIO_PC_DEBUG( conn,"starting %c", cmd );
+	SRMIO_PC_LOG( conn,"starting download (%c)", cmd );
 	if( ! _srmio_pc5_msg_send( conn, cmd, NULL, 0, err ) )
 		goto clean1;
 
@@ -1719,7 +1731,7 @@ static bool _srmio_pc5_xfer_finish( srmio_pc_t conn, srmio_error_t *err )
 
 	/* abort */
 	if( SELF(conn)->pkt_num < SELF(conn)->pkt_cnt ){
-		SRMIO_PC_STATUS( conn, "aborting download" );
+		SRMIO_PC_LOG( conn, "aborting download" );
 		srmio_io_flush( conn->io, err );
 		_srmio_pc5_write( conn, BLOCK_ABRT, 1, err );
 		sleep(1);

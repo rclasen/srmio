@@ -40,7 +40,12 @@ typedef struct {
 
 struct _srmio_pc_t {
 	/* debug */
-	FILE				*debugfh;
+	srmio_logfunc_t			dfunc;
+	void *				ddata;
+
+	/* log */
+	srmio_logfunc_t			lfunc;
+	void *				ldata;
 
 	/* io */
 	srmio_io_baudrate_t		baudrate;
@@ -64,12 +69,20 @@ struct _srmio_pc_t {
 	void				*child;
 };
 
+void srmio_pc_log( srmio_pc_t pch, const char *fmt, ... );
+
 srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child, srmio_error_t *err );
 
 #define SRMIO_PC_DEBUG(pch, fmt,...) \
-	srmio_debug( pch->debugfh, "%s: " fmt, __func__, ##__VA_ARGS__ );
+	srmio_debug( pch->dfunc, pch->ddata, \
+	"%s: " fmt, __func__, ##__VA_ARGS__ );
 #define SRMIO_PC_DUMP(pch, buf, len, fmt,...) \
-	srmio_dumphex( pch->debugfh, buf, len, "%s: " fmt, __func__, ##__VA_ARGS__ );
+	srmio_dumphex( pch->dfunc, pch->ddata, buf, len, \
+	"%s: " fmt, __func__, ##__VA_ARGS__ );
+
+#define SRMIO_PC_LOG( pch, fmt, ... )\
+	SRMIO_PC_DEBUG(pch, fmt, ##__VA_ARGS__ ); \
+	srmio_pc_log( pch, fmt, ##__VA_ARGS__ );
 
 #define SRMIO_PC_ERROR(pch, err, fmt,...) { \
 	SRMIO_PC_DEBUG(pch, fmt, ##__VA_ARGS__ ); \
@@ -81,13 +94,4 @@ srmio_pc_t srmio_pc_new( const srmio_pc_methods_t *methods, void *child, srmio_e
 	srmio_error_set( err, fmt ": %s", ##__VA_ARGS__, strerror(errno) ); \
 	}
 
-#ifdef VERBOSE
-#define SRMIO_PC_STATUS(pch, fmt,...) { \
-	SRMIO_PC_DEBUG( pch, fmt, ##__VA_ARGS__ ); \
-	fprintf( stderr, fmt"\n", ##__VA_ARGS__ ); \
-	}
-#else
-#define SRMIO_PC_STATUS(pch, fmt,...) \
-	SRMIO_PC_DEBUG( pch, fmt, ##__VA_ARGS__ )
-#endif
 #endif // _SRMIO_PC_H
