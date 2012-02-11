@@ -115,9 +115,11 @@ bool srmio_pc_close( srmio_pc_t pch, srmio_error_t *err )
 }
 
 bool srmio_pc_set_debugfunc( srmio_pc_t pch,
-	srmio_logfunc_t func, void *data )
+	srmio_logfunc_t func, void *data,
+	srmio_error_t *err )
 {
 	assert( pch );
+	(void)err;
 
 	pch->dfunc = func;
 	pch->ddata = data;
@@ -125,9 +127,11 @@ bool srmio_pc_set_debugfunc( srmio_pc_t pch,
 }
 
 bool srmio_pc_set_logfunc( srmio_pc_t pch,
-	srmio_logfunc_t func, void *data )
+	srmio_logfunc_t func, void *data,
+	srmio_error_t *err )
 {
 	assert( pch );
+	(void)err;
 
 	pch->lfunc = func;
 	pch->ldata = data;

@@ -525,7 +525,7 @@ int main( int argc, char **argv )
 	}
 
 	if( opt_verb ){
-		srmio_pc_set_logfunc( srm, logfunc, NULL );
+		srmio_pc_set_logfunc( srm, logfunc, NULL, NULL );
 	}
 
 	if( ! srmio_pc_set_device( srm, io, &err )){

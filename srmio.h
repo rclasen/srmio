@@ -341,8 +341,12 @@ bool srmio_pc_set_parity( srmio_pc_t pch, srmio_io_parity_t parity, srmio_error_
 
 typedef void (*srmio_logfunc_t)( const char *msg,
 	void *user_data );
-bool srmio_pc_set_logfunc( srmio_pc_t pch, srmio_logfunc_t, void *user_data );
-bool srmio_pc_set_debugfunc( srmio_pc_t pch, srmio_logfunc_t, void *user_data );
+bool srmio_pc_set_logfunc( srmio_pc_t pch,
+	srmio_logfunc_t, void *user_data,
+	srmio_error_t *err  );
+bool srmio_pc_set_debugfunc( srmio_pc_t pch,
+	srmio_logfunc_t, void *user_data,
+	srmio_error_t *err );
 
 bool srmio_pc_open( srmio_pc_t conn, srmio_error_t *err );
 bool srmio_pc_close( srmio_pc_t conn, srmio_error_t *err );

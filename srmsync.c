@@ -102,6 +102,13 @@ size_t block_cnt=0, block_num = 0;
 bool *want_block = NULL;
 size_t prog_sum = 0, prog_prev = 0;
 
+static void logfunc( const char *msg, void *data )
+{
+	(void)data;
+
+	fprintf( stderr, "%s\n", msg );
+}
+
 bool do_open()
 {
 	unsigned fw_version;
@@ -165,8 +172,10 @@ bool do_open()
 		fprintf( stderr, "invalid power control type: %d\n", opt_pc);
 		return false;
 	}
-	if( opt_verbose )
+	if( opt_verbose ){
 		fprintf( stderr, "powercontrol %d protocol is used\n", opt_pc );
+		srmio_pc_set_logfunc( srm, logfunc, NULL, NULL );
+	}
 
 	if( ! srmio_pc_set_device( srm, io, &err )){
 		fprintf( stderr, "srmio_pc_set_device failed: %s\n",
