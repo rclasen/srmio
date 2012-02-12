@@ -314,7 +314,7 @@ static bool _srmio_pc7_open( srmio_pc_t conn, srmio_error_t *err )
 	}
 
 	conn->firmware = buf_get_buint16( recv.data, 0 );
-	SRMIO_PC_LOG( conn, "firmware 0x%04x", conn->firmware );
+	SRMIO_PC_LOG( conn, "found Powercontrol 6/7, version 0x%04x", conn->firmware );
 
 	return true;
 }

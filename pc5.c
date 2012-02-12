@@ -248,7 +248,7 @@ static bool _srmio_pc5_init(
 	conn->parity = parity;
 	conn->firmware = buf_get_buint16( verbuf, 0 );
 
-	SRMIO_PC_LOG( conn, "found PCV version 0x%x at %d/8%c1",
+	SRMIO_PC_LOG( conn, "found Powercontrol V, version 0x%x at %d/8%c1",
 		conn->firmware,
 		baudname,
 		parityname );
