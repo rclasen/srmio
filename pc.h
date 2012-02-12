@@ -23,6 +23,11 @@ typedef bool (*srmio_pc_method_chunk)( srmio_pc_t h, srmio_chunk_t chunk,
 	bool *is_intervall, bool *start_intervall );
 typedef bool (*srmio_pc_method_progress)( srmio_pc_t h, size_t *block_done );
 
+typedef bool (*srmio_pc_method_uintp)( srmio_pc_t h, unsigned *circum, srmio_error_t *err );
+typedef bool (*srmio_pc_method_doublep)( srmio_pc_t h, double *slope, srmio_error_t *err );
+typedef bool (*srmio_pc_method_timep)( srmio_pc_t h, srmio_time_t *recint, srmio_error_t *err );
+
+
 typedef struct {
 	srmio_pc_method_void		free;
 	srmio_pc_method_bool		open;
@@ -36,6 +41,11 @@ typedef struct {
 	srmio_pc_method_progress	xfer_block_progress;
 	srmio_pc_method_chunk		xfer_chunk_next;
 	srmio_pc_method_bool		xfer_finish;
+	srmio_pc_method_tm		cmd_get_time;
+	srmio_pc_method_uintp		cmd_get_circum;
+	srmio_pc_method_doublep		cmd_get_slope;
+	srmio_pc_method_uintp		cmd_get_zeropos;
+	srmio_pc_method_timep		cmd_get_recint;
 } srmio_pc_methods_t;
 
 struct _srmio_pc_t {

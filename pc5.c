@@ -864,7 +864,7 @@ static bool _srmio_pc5_cmd_get_athlete( srmio_pc_t conn, char **name,
  *
  * returns true on success
  */
-bool srmio_pc5_cmd_get_time( srmio_pc_t conn, struct tm *timep,
+static bool _srmio_pc5_cmd_get_time( srmio_pc_t conn, struct tm *timep,
 	srmio_error_t *err )
 {
 	unsigned char buf[20];
@@ -945,7 +945,7 @@ static bool _srmio_pc5_cmd_set_time( srmio_pc_t conn, struct tm *timep,
  * gets circumference
  * returns true on success
  */
-bool srmio_pc5_cmd_get_circum( srmio_pc_t conn, unsigned *circum,
+static bool _srmio_pc5_cmd_get_circum( srmio_pc_t conn, unsigned *circum,
 	srmio_error_t *err )
 {
 	unsigned char buf[20];
@@ -984,7 +984,7 @@ bool srmio_pc5_cmd_get_circum( srmio_pc_t conn, unsigned *circum,
  * gets slope  eg. 17.4
  * returns true on success
  */
-bool srmio_pc5_cmd_get_slope( srmio_pc_t conn, double *slope,
+static bool _srmio_pc5_cmd_get_slope( srmio_pc_t conn, double *slope,
 	srmio_error_t *err )
 {
 	unsigned char buf[20];
@@ -1023,7 +1023,7 @@ bool srmio_pc5_cmd_get_slope( srmio_pc_t conn, double *slope,
  *
  * returns true on success
  */
-bool srmio_pc5_cmd_get_zeropos( srmio_pc_t conn,
+static bool _srmio_pc5_cmd_get_zeropos( srmio_pc_t conn,
 	unsigned *zeropos, srmio_error_t *err )
 {
 	unsigned char buf[20];
@@ -1068,7 +1068,7 @@ bool srmio_pc5_cmd_get_zeropos( srmio_pc_t conn,
  * gets recint * 10 -> 1sec becomes 10
  * returns true on success
  */
-bool srmio_pc5_cmd_get_recint( srmio_pc_t conn,
+static bool _srmio_pc5_cmd_get_recint( srmio_pc_t conn,
 	srmio_time_t *recint, srmio_error_t *err )
 {
 	unsigned char buf[10];
@@ -1506,19 +1506,19 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 	}
 
 	SELF(conn)->block.athlete = NULL;
-	if( ! srmio_pc5_cmd_get_time( conn, &SELF(conn)->pctime, err ))
+	if( ! srmio_pc_cmd_get_time( conn, &SELF(conn)->pctime, err ))
 		return false;
 
-	if( ! srmio_pc5_cmd_get_slope( conn, &SELF(conn)->block.slope, err ) )
+	if( ! srmio_pc_cmd_get_slope( conn, &SELF(conn)->block.slope, err ) )
 		return false;
 
-	if( ! srmio_pc5_cmd_get_zeropos( conn, &SELF(conn)->block.zeropos, err) )
+	if( ! srmio_pc_cmd_get_zeropos( conn, &SELF(conn)->block.zeropos, err) )
 		return false;
 
-	if( ! srmio_pc5_cmd_get_circum( conn, &SELF(conn)->block.circum, err ) )
+	if( ! srmio_pc_cmd_get_circum( conn, &SELF(conn)->block.circum, err ) )
 		return false;
 
-	if( ! srmio_pc5_cmd_get_recint( conn, &SELF(conn)->block.recint, err  ) )
+	if( ! srmio_pc_cmd_get_recint( conn, &SELF(conn)->block.recint, err  ) )
 		return false;
 
 	if( ! srmio_pc_cmd_get_athlete( conn, &SELF(conn)->block.athlete, err ) )
@@ -1806,6 +1806,12 @@ static const srmio_pc_methods_t _pc5_methods = {
 	.xfer_block_progress		= _srmio_pc5_xfer_block_progress,
 	.xfer_chunk_next		= _srmio_pc5_xfer_chunk_next,
 	.xfer_finish			= _srmio_pc5_xfer_finish,
+	.cmd_get_time			= _srmio_pc5_cmd_get_time,
+	.cmd_get_circum			= _srmio_pc5_cmd_get_circum,
+	.cmd_get_slope			= _srmio_pc5_cmd_get_slope,
+	.cmd_get_zeropos		= _srmio_pc5_cmd_get_zeropos,
+	.cmd_get_recint			= _srmio_pc5_cmd_get_recint,
+
 };
 
 /*

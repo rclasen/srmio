@@ -359,6 +359,12 @@ bool srmio_pc_cmd_get_athlete( srmio_pc_t conn, char **athlete, srmio_error_t *e
 bool srmio_pc_cmd_set_time( srmio_pc_t conn, struct tm *timep, srmio_error_t *err );
 bool srmio_pc_cmd_set_recint( srmio_pc_t conn, srmio_time_t recint, srmio_error_t *err );
 
+bool srmio_pc_cmd_get_time( srmio_pc_t conn, struct tm *timep, srmio_error_t *err );
+bool srmio_pc_cmd_get_circum( srmio_pc_t conn, unsigned *circum, srmio_error_t *err );
+bool srmio_pc_cmd_get_slope( srmio_pc_t conn, double *slope, srmio_error_t *err );
+bool srmio_pc_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos, srmio_error_t *err );
+bool srmio_pc_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint, srmio_error_t *err );
+
 bool srmio_pc_cmd_clear( srmio_pc_t conn, srmio_error_t *err );
 
 bool srmio_pc_set_xfer( srmio_pc_t conn, srmio_pc_xfer_type_t type, srmio_error_t *err );
@@ -392,13 +398,6 @@ bool srmio_pc_xfer_all( srmio_pc_t conn,
 
 srmio_pc_t srmio_pc5_new( srmio_error_t *err );
 
-// TODO: obsolete, need migration
-bool srmio_pc5_cmd_get_time( srmio_pc_t conn, struct tm *timep, srmio_error_t *err );
-bool srmio_pc5_cmd_get_circum( srmio_pc_t conn, unsigned *circum, srmio_error_t *err );
-bool srmio_pc5_cmd_get_slope( srmio_pc_t conn, double *slope, srmio_error_t *err );
-bool srmio_pc5_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos, srmio_error_t *err );
-bool srmio_pc5_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint, srmio_error_t *err );
-
 
 /************************************************************
  *
@@ -407,13 +406,6 @@ bool srmio_pc5_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint, srmio_erro
  ************************************************************/
 
 srmio_pc_t srmio_pc7_new( srmio_error_t *err );
-
-// TODO: obsolete, need migration
-bool srmio_pc7_cmd_get_time( srmio_pc_t conn, struct tm *timep, srmio_error_t *err );
-bool srmio_pc7_cmd_get_circum( srmio_pc_t conn, unsigned *circum, srmio_error_t *err );
-bool srmio_pc7_cmd_get_slope( srmio_pc_t conn, double *slope, srmio_error_t *err );
-bool srmio_pc7_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos, srmio_error_t *err );
-bool srmio_pc7_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint, srmio_error_t *err );
 
 # ifdef __cplusplus
 }

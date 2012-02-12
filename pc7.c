@@ -403,7 +403,7 @@ static bool set_time( unsigned char *buf, size_t pos, struct tm *src )
 	return true;
 }
 
-bool srmio_pc7_cmd_get_time( srmio_pc_t conn, struct tm *timep,
+static bool _srmio_pc7_cmd_get_time( srmio_pc_t conn, struct tm *timep,
 	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
@@ -453,7 +453,7 @@ static bool _srmio_pc7_cmd_set_time( srmio_pc_t conn, struct tm *timep,
 	return _srmio_pc7_msg( conn, &send, NULL, &recv, err );
 }
 
-bool srmio_pc7_cmd_get_circum( srmio_pc_t conn, unsigned *circum,
+static bool _srmio_pc7_cmd_get_circum( srmio_pc_t conn, unsigned *circum,
 	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
@@ -481,7 +481,7 @@ bool srmio_pc7_cmd_get_circum( srmio_pc_t conn, unsigned *circum,
 }
 
 
-bool srmio_pc7_cmd_get_slope( srmio_pc_t conn, double *slope,
+static bool _srmio_pc7_cmd_get_slope( srmio_pc_t conn, double *slope,
 	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
@@ -508,7 +508,7 @@ bool srmio_pc7_cmd_get_slope( srmio_pc_t conn, double *slope,
 	return true;
 }
 
-bool srmio_pc7_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos,
+static bool _srmio_pc7_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos,
 	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
@@ -536,7 +536,7 @@ bool srmio_pc7_cmd_get_zeropos( srmio_pc_t conn, unsigned *zeropos,
 	return true;
 }
 
-bool srmio_pc7_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint,
+static bool _srmio_pc7_cmd_get_recint( srmio_pc_t conn, srmio_time_t *recint,
 	srmio_error_t *err )
 {
 	struct _srmio_pc7_packet_t send = {
@@ -1078,6 +1078,11 @@ static const srmio_pc_methods_t _pc7_methods = {
 	.xfer_block_progress	= _srmio_pc7_xfer_block_progress,
 	.xfer_chunk_next	= _srmio_pc7_xfer_chunk_next,
 	.xfer_finish		= _srmio_pc7_xfer_finish,
+	.cmd_get_time		= _srmio_pc7_cmd_get_time,
+	.cmd_get_circum		= _srmio_pc7_cmd_get_circum,
+	.cmd_get_slope		= _srmio_pc7_cmd_get_slope,
+	.cmd_get_zeropos	= _srmio_pc7_cmd_get_zeropos,
+	.cmd_get_recint		= _srmio_pc7_cmd_get_recint,
 };
 
 srmio_pc_t srmio_pc7_new( srmio_error_t *err )

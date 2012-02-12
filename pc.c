@@ -314,6 +314,46 @@ bool srmio_pc_cmd_set_recint( srmio_pc_t pch, srmio_time_t t,
 	return (*pch->methods->cmd_set_recint)( pch, t, err );
 }
 
+bool srmio_pc_cmd_get_time( srmio_pc_t pch, struct tm *timep, srmio_error_t *err )
+{
+	assert(pch);
+	assert(pch->methods->cmd_get_time);
+
+	return (*pch->methods->cmd_get_time)( pch, timep, err );
+}
+
+bool srmio_pc_cmd_get_circum( srmio_pc_t pch, unsigned *circum, srmio_error_t *err )
+{
+	assert(pch);
+	assert(pch->methods->cmd_get_circum);
+
+	return (*pch->methods->cmd_get_circum)( pch, circum, err );
+}
+
+bool srmio_pc_cmd_get_slope( srmio_pc_t pch, double *slope, srmio_error_t *err )
+{
+	assert(pch);
+	assert(pch->methods->cmd_get_slope);
+
+	return (*pch->methods->cmd_get_slope)( pch, slope, err );
+}
+
+bool srmio_pc_cmd_get_zeropos( srmio_pc_t pch, unsigned *zeropos, srmio_error_t *err )
+{
+	assert(pch);
+	assert(pch->methods->cmd_get_zeropos);
+
+	return (*pch->methods->cmd_get_zeropos)( pch, zeropos, err );
+}
+
+bool srmio_pc_cmd_get_recint( srmio_pc_t pch, srmio_time_t *recint, srmio_error_t *err )
+{
+	assert(pch);
+	assert(pch->methods->cmd_get_recint);
+
+	return (*pch->methods->cmd_get_recint)( pch, recint, err );
+}
+
 bool srmio_pc_cmd_clear( srmio_pc_t pch, srmio_error_t *err )
 {
 	assert(pch);
