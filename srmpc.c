@@ -193,10 +193,9 @@ static int _srmpc_init(
 		_srmpc_baudnames[baudrate], 
 		parity ? 'e' : 'n' );
 
+	memset(&ios, 0, sizeof(struct termios));
 #ifdef HAVE_CFMAKERAW
 	cfmakeraw( &ios );
-#else
-	memset(&ios, 0, sizeof(struct termios));
 #endif
 	ios.c_cflag = CS8 | CLOCAL | CREAD;
 	if( parity ) ios.c_cflag |= PARENB;
