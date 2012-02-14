@@ -136,11 +136,12 @@ static bool _srmio_ios_update( srmio_io_t h, srmio_error_t *err )
 {
 	struct termios ios;
 
-#ifdef HAVE_CFMAKERAW
-	cfmakeraw( &ios );
-#else
 	memset(&ios, 0, sizeof(struct termios));
+#ifdef HAVE_CFMAKERAW
+	/* not sure, if this is needed right after memset ...: */
+	cfmakeraw( &ios );
 #endif
+
 	/* TODO: make other termios parameters configurable */
 
 	ios.c_iflag = IGNPAR;
