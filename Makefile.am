@@ -1,9 +1,9 @@
 AUTOMAKE_OPTIONS=foreign
 
-SUBDIRS = libltdl
+SUBDIRS =
 
 AM_CFLAGS=-g -Wall -Wextra
-AM_CPPFLAGS = $(LTDLINCL)
+AM_CPPFLAGS =
 ACLOCAL_AMFLAGS = -I m4
 
 man1_INS=srmcmd.man_in srmdump.man_in srmsync.man_in
@@ -66,8 +66,8 @@ endif
 
 lib_LTLIBRARIES=libsrmio.la
 
-libsrmio_la_LIBADD=$(LIBLTDL) $(D2XX_LIB)
-libsrmio_la_DEPENDENCIES=$(LTDLDEPS)
+libsrmio_la_LIBADD=$(D2XX_LIB)
+libsrmio_la_DEPENDENCIES=
 libsrmio_la_SOURCES= \
 	common.h \
 	serio.h \
@@ -97,17 +97,17 @@ libsrmio_la_SOURCES= \
 bin_PROGRAMS=srmcmd srmdump srmsync
 
 srmcmd_LDADD= libsrmio.la $(D2XX_LIB)
-srmcmd_DEPENDENCIES= $(LTDLDEPS) libsrmio.la
+srmcmd_DEPENDENCIES= libsrmio.la
 srmcmd_SOURCES= \
 	srmcmd.c
 
 srmdump_LDADD= libsrmio.la $(D2XX_LIB)
-srmdump_DEPENDENCIES= $(LTDLDEPS) libsrmio.la
+srmdump_DEPENDENCIES= libsrmio.la
 srmdump_SOURCES= \
 	srmdump.c
 
 srmsync_LDADD= libsrmio.la $(D2XX_LIB)
-srmsync_DEPENDENCIES= $(LTDLDEPS) libsrmio.la
+srmsync_DEPENDENCIES= libsrmio.la
 srmsync_SOURCES= \
 	srmsync.c
 

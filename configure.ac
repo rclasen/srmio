@@ -8,9 +8,7 @@ AC_CONFIG_SRCDIR([srmio.h])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
-LT_CONFIG_LTDL_DIR([libltdl])
-LT_INIT([dlopen])
-LTDL_INIT([recursive])
+LT_INIT()
 
 # Checks for programs.
 AC_PROG_CC
@@ -21,7 +19,17 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 
 # Checks for libraries.
-AM_CONDITIONAL([HAVE_LIBDL], [ test "x$libltdl_cv_lib_dl_dlopen" = xyes ])
+AC_CHECK_LIB([dl],[dlopen],[
+  ac_cv_lib_dl=yes
+], [
+  ac_cv_lib_dl=no
+])
+AM_CONDITIONAL([HAVE_LIBDL], [ test "x$ac_cv_lib_dl" = xyes ])
+AS_IF([ test "x$ac_cv_lib_dl" = xyes ],[
+  AC_SUBST([HAVE_LIBDL],[true])
+  AC_DEFINE([HAVE_LIBDL],[1],[Define to 1 if you have libdl/dlopen])
+])
+
 
 AC_CHECK_LIB([pthread],[pthread_create],[
   ac_cv_lib_pthread=yes
@@ -164,6 +172,7 @@ AS_IF([test "x$ac_cv_func_SetCommState" = xyes], [
   io_backends="$io_backends wincom"
 ],[])
 
+# TODO: check for windows LoadLibraryA/FreeLibrary/GetProcAddress
 
 # AC_CPP_FUNC
 # ------------------ #
@@ -217,10 +226,13 @@ AS_IF([ test "x$with_ftd2xx" = xno ], [
 
   case "$host" in
    *cygwin*|*mingw*)
-     ac_cv_d2xx_libname=ftd2xx	# .dll
+     ac_cv_d2xx_libname=ftd2xx.dll
+     ;;
+   *darwin*)
+     ac_cv_d2xx_libname=libftd2xx.dylib
      ;;
    *)
-     ac_cv_d2xx_libname=libftd2xx # .so libftd2xx.dylib
+     ac_cv_d2xx_libname=libftd2xx.so
      ;;
   esac
 
@@ -266,7 +278,7 @@ if test "x$ac_cv_func_nanosleep" != xyes && test "x$ac_cv_msec_sleep" != xyes ; 
   AC_MSG_WARN([*** no high-precision sleep function found])
 fi
 
-AC_CONFIG_FILES([Makefile libltdl/Makefile])
+AC_CONFIG_FILES([Makefile])
 
 AC_CONFIG_COMMANDS([genconfheader.sh],[
 . $srcdir/genconfheader.sh > "$tmp/srmio_config.h"

@@ -97,7 +97,7 @@ Cygwin:
 - PCVI/7: Successfully tested with VCP driver (i.e. /dev/ttyS5 / COM6 or
   similar) on Vista. I guess, the VCP driver came from the SRM drivers
   I've installed. D2XX refuses to load ftd2xx.dll if another version was
-  loaded, already. Might help to point LTDL_LIBRARY_PATH to the directory
+  loaded, already. Might help to point LD_LIBRARY_PATH to the directory
   with the currently loaded ftd2xx.dll.
 
 I've had problems accessing devices with high COM port numbers. Maybe

@@ -9,7 +9,9 @@
 
 #include "serio.h"
 
-#include <ltdl.h>
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
 
 #ifdef HAVE_WINDOWS_H
 # include <windows.h>
@@ -25,8 +27,6 @@
  *
  * dynamic lib loading
  */
-
-static lt_dlhandle d2xx_lib = NULL;
 
 #ifdef WIN32
 #define WIN32_STDCALL __stdcall
@@ -50,28 +50,50 @@ static FT_STATUS WIN32_STDCALL (*FP_SetBreakOff)( FT_HANDLE ftHandle) = NULL;
 //static FT_STATUS WIN32_STDCALL (*FP_GetDeviceInfoList)( FT_DEVICE_LIST_INFO_NODE *pDest, LPDWORD lpdwNumDevs) = NULL;
 
 
+#ifdef HAVE_LIBDL
+static void *d2xx_lib = NULL;
+
 #define SYM(handle, var, name)	\
-	if( ! (var = lt_dlsym(handle, name ) )){ \
+	if( ! (var = dlsym(handle, name ) )){ \
 		srmio_error_set(err, "d2xx: failed to load symbol %s: %s", \
-			 name, lt_dlerror() ); \
+			 name, dlerror() ); \
 		goto clean; \
 	}
+
+#elif defined(HAVE_WINDOWS_H)
+
+static HINSTANCE d2xx_lib = NULL;
+
+#define SYM(handle, var, name)	\
+	if( ! (var = (void*)GetProcAddress(handle, name ) )){ \
+		srmio_error_win(err, "d2xx: failed to load symbol %s", \
+			 name ); \
+		goto clean; \
+	}
+
+
+#else
+#error no supported dynamic library loading interface found
+#endif
 
 static bool d2xx_dlopen( srmio_error_t *err )
 {
 	DPRINTF( "%s", D2XX_LIBNAME );
 
-	if( 0 != lt_dlinit() ){
-		srmio_error_set( err, "d2xx: lt_dlinit failed: %s",
-			lt_dlerror() );
-		return false;
-	}
-
-	if( NULL == (d2xx_lib = lt_dlopenext( D2XX_LIBNAME ) )){
-		srmio_error_set( err, "d2xx: lt_dlopen(%s) failed: %s",
-			D2XX_LIBNAME, lt_dlerror() );
+#ifdef HAVE_LIBDL
+	if( NULL == (d2xx_lib = dlopen( D2XX_LIBNAME, RTLD_NOW ) )){
+		srmio_error_set( err, "d2xx: dlopen(%s) failed: %s",
+			D2XX_LIBNAME, dlerror() );
 		goto clean1;
 	}
+#elif defined(HAVE_WINDOWS_H)
+	if( NULL == (d2xx_lib = LoadLibraryA( D2XX_LIBNAME ) )){
+		srmio_error_win( err, "d2xx: LoadLibraryA(%s) failed",
+			D2XX_LIBNAME );
+		goto clean1;
+	}
+
+#endif
 
 	SYM(d2xx_lib, FP_OpenEx, "FT_OpenEx" );
 	SYM(d2xx_lib, FP_Close, "FT_Close" );
@@ -90,10 +112,13 @@ static bool d2xx_dlopen( srmio_error_t *err )
 
 	return true;
 clean:
-	lt_dlclose( d2xx_lib );
+#ifdef HAVE_LIBDL
+	dlclose( d2xx_lib );
+#elif defined(HAVE_WINDOWS_H)
+	FreeLibrary( d2xx_lib );
+#endif
 	d2xx_lib = NULL;
 clean1:
-	lt_dlexit();
 	return false;
 }
 
