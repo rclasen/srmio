@@ -20,6 +20,7 @@ const char *srmio_version = PACKAGE_STRING;
 #ifdef DEBUG
 void srmio_debugfunc( const char *msg, void *data )
 {
+	(void)data;
 	fprintf( stderr, "%s\n", msg );
 }
 #endif
