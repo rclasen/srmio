@@ -378,7 +378,7 @@ int main( int argc, char **argv )
 
 	struct _srmio_chunk_t chunk;
 
-	while( -1 != ( c = getopt_long( argc, argv, "ab:df:hp:S:s:Vvw:x", lopts, NULL ))){
+	while( -1 != ( c = getopt_long( argc, argv, "ab:dfhp:S:s:Vvw:x", lopts, NULL ))){
 		switch(c){
 		  case 'a':
 			++opt_all;
