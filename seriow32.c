@@ -73,7 +73,7 @@ static void iow32_error( srmio_error_t *err, const char *fmt, ... )
 		return;
 	}
 
-	srmio_error_set( err, "%s: %s", converted );
+	srmio_error_set( err, "%s: %s", buf, converted );
 }
 
 static int _srmio_iow32_write( srmio_io_t h, const unsigned char *buf,
