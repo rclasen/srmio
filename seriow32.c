@@ -35,47 +35,6 @@ typedef struct _srmio_iow32_t *srmio_iow32_t;
 #define SELF(x)	((srmio_iow32_t)x->child)
 
 
-static void iow32_error( srmio_error_t *err, const char *fmt, ... )
-{
-	char buf[SRMIO_ERROR_MSG_SIZE];
-	wchar_t msg[SRMIO_ERROR_MSG_SIZE+1];
-	va_list ap;
-	DWORD code;
-	char converted[SRMIO_ERROR_MSG_SIZE+1];
-
-	if( ! err )
-		return;
-
-	code = GetLastError();
-
-	va_start( ap, fmt );
-	vsnprintf( buf, SRMIO_ERROR_MSG_SIZE, fmt, ap );
-	va_end ( ap );
-
-	if( ! FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM
-		| FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL, code,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		(LPWSTR)&msg, SRMIO_ERROR_MSG_SIZE * sizeof(wchar_t),
-		NULL ) ){
-
-		DPRINTF( "FormatMessage failed, using error code" );
-		srmio_error_set( err, "%s: %d", code );
-		return;
-	}
-
-	if( ! WideCharToMultiByte( CP_ACP, 0,
-		msg, -1, converted, SRMIO_ERROR_MSG_SIZE,
-		NULL, NULL ) ){
-
-		DPRINTF( "String conversion failed, using error code" );
-		srmio_error_set( err, "%s: %d", code );
-		return;
-	}
-
-	srmio_error_set( err, "%s: %s", buf, converted );
-}
-
 static int _srmio_iow32_write( srmio_io_t h, const unsigned char *buf,
 	size_t len, srmio_error_t *err )
 {
@@ -86,12 +45,12 @@ static int _srmio_iow32_write( srmio_io_t h, const unsigned char *buf,
 	assert( buf );
 
 	if( ! WriteFile( SELF(h)->fh, buf, len, &cBytes, NULL ) ){
-		iow32_error( err, "WriteFile" );
+		srmio_error_win( err, "WriteFile" );
 		return -1;
 	}
 
 	if( ! FlushFileBuffers( SELF(h)->fh ) ){
-		iow32_error( err, "FlushFileBuffers" );
+		srmio_error_win( err, "FlushFileBuffers" );
 		return -1;
 	}
 
@@ -108,7 +67,7 @@ static int _srmio_iow32_read( srmio_io_t h, unsigned char *buf, size_t len,
 	assert( buf );
 
 	if( ! ReadFile( SELF(h)->fh, buf, len, &cBytes, NULL ) ){
-		iow32_error( err, "ReadFile" );
+		srmio_error_win( err, "ReadFile" );
 		return -1;
 	}
 
@@ -124,7 +83,7 @@ static bool _srmio_iow32_flush( srmio_io_t h, srmio_error_t *err )
 	if( ! PurgeComm( SELF(h)->fh, PURGE_RXABORT | PURGE_RXCLEAR
 		| PURGE_TXABORT | PURGE_TXCLEAR ) ){
 
-		iow32_error( err, "PurgeComm" );
+		srmio_error_win( err, "PurgeComm" );
 		return false;
 	}
 
@@ -137,7 +96,7 @@ static bool _srmio_iow32_send_break( srmio_io_t h, srmio_error_t *err )
 	assert( SELF(h)->fh != INVALID_HANDLE_VALUE );
 
 	if( ! SetCommBreak( SELF(h)->fh ) ){
-		iow32_error(err, "SetCommBreak" );
+		srmio_error_win(err, "SetCommBreak" );
 		return false;
 	}
 
@@ -148,7 +107,7 @@ static bool _srmio_iow32_send_break( srmio_io_t h, srmio_error_t *err )
 #endif
 
 	if( ! ClearCommBreak( SELF(h)->fh ) ){
-		iow32_error(err, "ClearCommBreak" );
+		srmio_error_win(err, "ClearCommBreak" );
 		return false;
 	}
 
@@ -167,7 +126,7 @@ static bool _srmio_iow32_update( srmio_io_t h, srmio_error_t *err )
 	DCB dcb;
 
 	if( ! GetCommState( SELF(h)->fh, &dcb ) ){
-		iow32_error( err, "GetCommState" );
+		srmio_error_win( err, "GetCommState" );
 		return false;
 	}
 
@@ -246,12 +205,12 @@ static bool _srmio_iow32_update( srmio_io_t h, srmio_error_t *err )
 	dcb.BaudRate = _srmio_iow32_baud[h->baudrate];
 
 	if( ! SetCommState( SELF(h)->fh, &dcb )){
-		iow32_error( err, "SetCommState" );
+		srmio_error_win( err, "SetCommState" );
 		return false;
 	}
 
 	if( ! SetCommTimeouts(SELF(h)->fh, &timeouts) ){
-		iow32_error( err, "SetCommTimeouts" );
+		srmio_error_win( err, "SetCommTimeouts" );
 		return false;
 	}
 
@@ -300,7 +259,7 @@ static bool _srmio_iow32_open( srmio_io_t h, srmio_error_t *err )
 		NULL, OPEN_EXISTING, 0, NULL);
 
 	if( SELF(h)->fh == INVALID_HANDLE_VALUE){
-		iow32_error( err, "CreateFile" );
+		srmio_error_win( err, "CreateFile" );
 		return false;
 	}
 

@@ -111,6 +111,10 @@ void srmio_error_setv( srmio_error_t *err, const char *fmt, va_list ap );
 	srmio_error_set( err, fmt ": %s", ##__VA_ARGS__ , strerror(errno) )
 void srmio_error_copy( srmio_error_t *dst, srmio_error_t *src );
 
+#ifdef HAVE_WINDOWS_H
+void srmio_error_win( srmio_error_t *err, const char *fmt, ... );
+#endif
+
 /************************************************************
  *
  * from common.c
