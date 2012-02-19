@@ -27,20 +27,27 @@
  */
 
 static lt_dlhandle d2xx_lib = NULL;
-static FT_STATUS (*FP_OpenEx)( PVOID pArg1, DWORD Flags, FT_HANDLE *pHandle) = NULL;
-static FT_STATUS (*FP_Close)( FT_HANDLE ftHandle) = NULL;
-static FT_STATUS (*FP_Purge)( FT_HANDLE ftHandle, DWORD dwMask ) = NULL;
-static FT_STATUS (*FP_SetBaudRate)( FT_HANDLE ftHandle, ULONG BaudRate) = NULL;
-static FT_STATUS (*FP_SetDataCharacteristics)( FT_HANDLE ftHandle, UCHAR WordLength, UCHAR StopBits, UCHAR Parity) = NULL;
-static FT_STATUS (*FP_SetFlowControl)( FT_HANDLE ftHandle, USHORT FlowControl, UCHAR XonChar, UCHAR XoffChar) = NULL;
-//static FT_STATUS (*FP_GetQueueStatus)( FT_HANDLE ftHandle, DWORD *dwRxBytes) = NULL;
-static FT_STATUS (*FP_SetTimeouts)( FT_HANDLE ftHandle, ULONG ReadTimeout, ULONG WriteTimeout) = NULL;
-static FT_STATUS (*FP_Read)( FT_HANDLE ftHandle, LPVOID lpBuffer, DWORD nBufferSize, LPDWORD lpBytesReturned) = NULL;
-static FT_STATUS (*FP_Write)( FT_HANDLE ftHandle, LPVOID lpBuffer, DWORD nBufferSize, LPDWORD lpBytesWritten) = NULL;
-static FT_STATUS (*FP_SetBreakOn)( FT_HANDLE ftHandle) = NULL;
-static FT_STATUS (*FP_SetBreakOff)( FT_HANDLE ftHandle) = NULL;
-//static FT_STATUS (*FP_CreateDeviceInfoList)( LPDWORD lpdwNumDevs) = NULL;
-//static FT_STATUS (*FP_GetDeviceInfoList)( FT_DEVICE_LIST_INFO_NODE *pDest, LPDWORD lpdwNumDevs) = NULL;
+
+#ifdef WIN32
+#define WIN32_STDCALL __stdcall
+#else
+#define WIN32_STDCALL
+#endif
+
+static FT_STATUS WIN32_STDCALL (*FP_OpenEx)( PVOID pArg1, DWORD Flags, FT_HANDLE *pHandle) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_Close)( FT_HANDLE ftHandle) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_Purge)( FT_HANDLE ftHandle, DWORD dwMask ) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_SetBaudRate)( FT_HANDLE ftHandle, ULONG BaudRate) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_SetDataCharacteristics)( FT_HANDLE ftHandle, UCHAR WordLength, UCHAR StopBits, UCHAR Parity) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_SetFlowControl)( FT_HANDLE ftHandle, USHORT FlowControl, UCHAR XonChar, UCHAR XoffChar) = NULL;
+//static FT_STATUS WIN32_STDCALL (*FP_GetQueueStatus)( FT_HANDLE ftHandle, DWORD *dwRxBytes) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_SetTimeouts)( FT_HANDLE ftHandle, ULONG ReadTimeout, ULONG WriteTimeout) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_Read)( FT_HANDLE ftHandle, LPVOID lpBuffer, DWORD nBufferSize, LPDWORD lpBytesReturned) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_Write)( FT_HANDLE ftHandle, LPVOID lpBuffer, DWORD nBufferSize, LPDWORD lpBytesWritten) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_SetBreakOn)( FT_HANDLE ftHandle) = NULL;
+static FT_STATUS WIN32_STDCALL (*FP_SetBreakOff)( FT_HANDLE ftHandle) = NULL;
+//static FT_STATUS WIN32_STDCALL (*FP_CreateDeviceInfoList)( LPDWORD lpdwNumDevs) = NULL;
+//static FT_STATUS WIN32_STDCALL (*FP_GetDeviceInfoList)( FT_DEVICE_LIST_INFO_NODE *pDest, LPDWORD lpdwNumDevs) = NULL;
 
 
 #define SYM(handle, var, name)	\
