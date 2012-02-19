@@ -48,11 +48,13 @@ AC_CHECK_HEADER([ftd2xx.h],[
 #endif
 ]))
 
+io_backends=""
 AC_SYS_POSIX_TERMIOS
 AM_CONDITIONAL([HAVE_TERMIOS],[ test "x$ac_cv_sys_posix_termios" = xyes ])
 AS_IF([test "x$ac_cv_sys_posix_termios" = xyes], [
   AC_SUBST([HAVE_TERMIOS], true)
   AC_DEFINE([HAVE_TERMIOS],[1],[Define if sytem has posix termios for serial device access.])
+  io_backends="$io_backends termios"
 ],[])
 
 
@@ -159,6 +161,7 @@ AM_CONDITIONAL([HAVE_WINCOM],[ test "x$ac_cv_func_SetCommState" = xyes ])
 AS_IF([test "x$ac_cv_func_SetCommState" = xyes], [
   AC_SUBST([HAVE_WINCOM], true)
   AC_DEFINE([HAVE_WINCOM],[1],[Define if sytem has win32 commport API.])
+  io_backends="$io_backends wincom"
 ],[])
 
 
@@ -248,15 +251,15 @@ AS_IF([ test -n "$ac_cv_d2xx_libname" ], [
   AC_SUBST([HAVE_D2XX],[true])
   AC_DEFINE([HAVE_D2XX],[1],[Define if system has libftd2xx.])
   AC_DEFINE_UNQUOTED([D2XX_LIBNAME],"$ac_cv_d2xx_libname",[Define to libftd2xx filname for dlopen.])
+  io_backends="$io_backends ftd2xx"
 
-], [ test "x$ac_cv_sys_posix_termios" = xyes ], [
-  # ok
+])
 
-], [ test "x$ac_cv_func_SetCommState" = xyes ], [
-  # ok
+AS_IF([ test -n "$io_backends" ], [
+  AC_MSG_NOTICE([detected serial IO backends:$io_backends])
 
 ], [
-  AC_MSG_WARN([*** no working serial API found ])
+  AC_MSG_WARN([*** no working serial IO found ])
 ])
 
 if test "x$ac_cv_func_nanosleep" != xyes && test "x$ac_cv_msec_sleep" != xyes ; then
