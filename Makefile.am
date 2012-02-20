@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS=foreign
 
-#AM_CFLAGS=-g -Wall -Wextra -DDEBUG
+AM_CFLAGS=-g -Wall -Wextra
 
 
 man1_INS=srmcmd.man_in
