@@ -2,7 +2,7 @@ AUTOMAKE_OPTIONS=foreign
 
 SUBDIRS = libltdl
 
-#AM_CFLAGS=-g -Wall -Wextra -DDEBUG
+AM_CFLAGS=-g -Wall -Wextra
 AM_CPPFLAGS = $(LTDLINCL)
 ACLOCAL_AMFLAGS = -I m4
 

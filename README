@@ -160,7 +160,7 @@ GObject price.
 
 If you experience problems with *your* PowerControl, please
  - recompile with -DVERBOSE -DDEBUG enabled. 
-   (./configure CFLAGS="-g -DVERBOSE -DDEBUG -Wall -Wextra")
+   (./configure CFLAGS="-DVERBOSE -DDEBUG")
 
 If you want to help me adding support for your PowerControl, please
 capture the communication:
