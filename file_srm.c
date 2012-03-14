@@ -654,7 +654,7 @@ bool srmio_file_srm7_write( srmio_data_t data, FILE *fh, srmio_error_t *err )
 	}
 
 	/* first "marker" for athlete name */
-	if( ! set_marker( buf, data->athlete, 1, data->cused, err ) )
+	if( ! set_marker( buf, data->athlete, 0, data->cused-1, err ) )
 		goto clean2;
 
 	if( ! _xwrite( fh, buf, 270, err ))
@@ -663,16 +663,14 @@ bool srmio_file_srm7_write( srmio_data_t data, FILE *fh, srmio_error_t *err )
 	/* other markers */
 	for( i = 0; i < data->mused; ++i ){
 		srmio_marker_t mk = data->marker[i];
-		unsigned first = mk->first+1;
-		unsigned last = mk->last+1;
 
-		if( ! set_marker( buf, mk->notes, first, last, err ))
+		if( ! set_marker( buf, mk->notes, mk->first, mk->last, err ))
 			goto clean2;
 
 		DPRINTF( "marker @0x%lx %u %u %s",
 			(unsigned long)ftell(fh),
-			first,
-			last,
+			mk->first,
+			mk->last,
 			mk->notes );
 
 		if( ! _xwrite( fh, buf, 270, err ))
