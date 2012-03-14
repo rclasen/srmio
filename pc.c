@@ -545,13 +545,13 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 			/* finish previous marker */
 			if( mfirst >= 0 && ( ! is_int || is_first ) )
 				if( ! srmio_data_add_marker( data, mfirst,
-					data->cused -1, err ) )
+					data->cused -2, err ) )
 
 					goto clean;
 
 			/* start marker */
 			if( is_first ){
-				mfirst = (int)data->cused;
+				mfirst = (int)data->cused -1;
 				SRMIO_PC_DEBUG(pch,  "new marker at %d", mfirst );
 
 			} else if( ! is_int ){

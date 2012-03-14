@@ -561,7 +561,7 @@ int main( int argc, char **argv )
 				/* finish previous marker */
 				if( mfirst >= 0 && ( ! is_int || is_first) ){
 					if( ! srmio_data_add_marker( data, mfirst,
-						data->cused -1, &err ) ){
+						data->cused -2, &err ) ){
 
 						fprintf( stderr, "failed to add marker: %s",
 							err.message );
@@ -571,7 +571,7 @@ int main( int argc, char **argv )
 
 				/* start marker */
 				if( is_first ){
-					mfirst = (int)data->cused;
+					mfirst = (int)data->cused -1;
 
 				} else if( ! is_int ){
 					mfirst = -1;
