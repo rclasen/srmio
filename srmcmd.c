@@ -341,7 +341,7 @@ int main( int argc, char **argv )
 			break;
 
 		  case 's':
-#ifdef HAVE_MKTEMPS
+#ifdef HAVE_MKSTEMPS
 			opt_split = atoi(optarg);
 #else
 			fprintf( stderr, "split isn't supported on this platform\n" );
