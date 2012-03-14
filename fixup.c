@@ -22,7 +22,7 @@ static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk,
 {
 	srmio_chunk_t last = data->chunks[data->cused-1];
 	srmio_time_t recint = chunk->dur;
-	srmio_time_t lnext = last->time + recint;
+	srmio_time_t lnext = last->time + last->dur;
 	unsigned miss;
 	unsigned i;
 
@@ -68,7 +68,7 @@ static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk,
 		if( NULL == (fill = srmio_chunk_new(err) ))
 			return false;
 
-		fill->time = last->time + (i * recint);
+		fill->time = last->time + last->dur + ((i-1) * recint);
 		fill->dur = recint;
 		fill->temp = part * (chunk->temp
 			- last->temp) + last->temp;
@@ -154,7 +154,7 @@ srmio_data_t srmio_data_fixup( srmio_data_t data, srmio_error_t *err )
 			goto clean1;
 
 		recint = this->dur;
-		lnext = last->time + recint;
+		lnext = last->time + last->dur;
 
 		/* overlapping < 1sec, adjust this time */
 		if( this->time < lnext
@@ -188,7 +188,7 @@ srmio_data_t srmio_data_fixup( srmio_data_t data, srmio_error_t *err )
 	for( c = fixed->cused -1; c > 0; --c ){
 		srmio_chunk_t this = fixed->chunks[c-1];
 		srmio_chunk_t next = fixed->chunks[c];
-		srmio_time_t recint = next->dur;
+		srmio_time_t recint = this->dur;
 		srmio_time_t nprev = next->time - recint - delta;
 
 		if( nprev < this->time ){

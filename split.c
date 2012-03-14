@@ -30,29 +30,32 @@ srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
 	srmio_error_set( err, "no data" );
 
 	for( c = 0; c < src->cused; ++c ){
-		srmio_time_t start = src->chunks[c]->time
-			- src->chunks[c]->dur;
 		int split = 0;
 
 		if( c == 0 ){
 			++split;
 
-		} else if( src->chunks[c]->dur != src->chunks[c-1]->dur ){
-			DPRINTF( "found recint change" );
-			++split;
+		} else {
+			srmio_time_t end = src->chunks[c-1]->time
+				+ src->chunks[c-1]->dur;
 
-		} else if( start > src->chunks[c-1]->time ){
-			if( start - src->chunks[c-1]->time > gap ){
-				DPRINTF( "found gap" );
+			if( src->chunks[c]->dur != src->chunks[c-1]->dur ){
+				DPRINTF( "found recint change" );
 				++split;
-			}
 
-		} else if( start < src->chunks[c-1]-> time ){
-			if( src->chunks[c-1]->time - start > overlap ){
-				DPRINTF( "found overlap" );
-				++split;
-			}
+			} else if( src->chunks[c]->time > end ){
+				if( src->chunks[c]->time - end > gap ){
+					DPRINTF( "found gap" );
+					++split;
+				}
 
+			} else if( end > src->chunks[c]->time ){
+				if( end - src->chunks[c]->time > overlap ){
+					DPRINTF( "found overlap" );
+					++split;
+				}
+
+			}
 		}
 
 		if( split ){

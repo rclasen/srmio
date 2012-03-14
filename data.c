@@ -297,7 +297,7 @@ srmio_marker_t *srmio_data_blocks( srmio_data_t data, srmio_error_t *err )
 		srmio_chunk_t prev = data->chunks[i-1];
 		srmio_chunk_t this = data->chunks[i];
 
-		if( prev->time + this->dur != this->time ){
+		if( prev->time + prev->dur != this->time ){
 
 			if( used >= avail ){
 				srmio_marker_t *tmp;

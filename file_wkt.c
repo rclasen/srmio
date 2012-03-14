@@ -66,7 +66,7 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh, srmio_error_t *err )
 			"%.3lf\t"	/* dist */
 			"%ld\t"		/* ele */
 			"%.1lf\n",	/* temp */
-			(double)(ck->time / 10),
+			(double)((ck->time + ck->dur) / 10),
 			(double)(ck->dur / 10),
 			(double)( (double)ck->pwr * ck->dur / 10 ),
 			ck->cad,
@@ -92,8 +92,8 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh, srmio_error_t *err )
 		srmio_chunk_t last = data->chunks[mk->last];
 
 		if( 0 > fprintf( fh, "%.1lf\t%.1lf\t%s\n",
-			(double)( (first->time - first->dur) / 10 ),
-			(double)( last->time / 10 ),
+			(double)( first->time / 10 ),
+			(double)( (last->time + last->dur) / 10 ),
 			mk->notes ? mk->notes : "" ) ){
 
 			srmio_error_errno( err, "write" );

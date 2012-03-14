@@ -44,7 +44,7 @@ typedef uint64_t srmio_time_t;	/* seconds since epoch * 10 */
 
 /* actual data tuple as retrieved from PowerControl or file */
 struct _srmio_chunk_t {
-	srmio_time_t	time;	/* chunk end time */
+	srmio_time_t	time;	/* chunk start time */
 	srmio_time_t	dur;	/* chunk duration */
 	double		temp;	/* temperature °C */
 	unsigned	pwr;	/* avg power W */
