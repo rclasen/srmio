@@ -219,6 +219,21 @@ bool srmio_data_time_start( srmio_data_t data, srmio_time_t *start, srmio_error_
 	return true;
 }
 
+bool srmio_data_time_end( srmio_data_t data, srmio_time_t *end, srmio_error_t *err )
+{
+	assert( data );
+	assert( end );
+
+	if( ! data->cused ){
+		srmio_error_set( err, "no data available" );
+		return false;
+	}
+
+	*end = data->chunks[data->cused -1]->time
+		+ data->chunks[data->cused -1]->dur;
+	return true;
+}
+
 
 /*
  * return common recording interval

@@ -336,7 +336,8 @@ static bool _scan_file( store_athlete_t athlete,
 
 	if( ! srmio_data_time_start( data, &start, err ))
 		goto clean2;
-	end = data->chunks[data->cused-1]->time;
+	if( ! srmio_data_time_end( data, &end, err ))
+		goto clean2;
 
 	if( ! _find_file( athlete, start, 0 )){
 		store_file_t file;

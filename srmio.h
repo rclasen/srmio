@@ -115,6 +115,7 @@ bool srmio_data_add_markerp( srmio_data_t data, srmio_marker_t mark, srmio_error
 bool srmio_data_add_marker( srmio_data_t data, unsigned first, unsigned last, srmio_error_t *err );
 
 bool srmio_data_time_start( srmio_data_t data, srmio_time_t *start, srmio_error_t *err );
+bool srmio_data_time_end( srmio_data_t data, srmio_time_t *end, srmio_error_t *err );
 bool srmio_data_recint( srmio_data_t data, srmio_time_t *recint, srmio_error_t *err );
 srmio_marker_t *srmio_data_blocks( srmio_data_t data, srmio_error_t *err );
 
