@@ -1453,8 +1453,9 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 	SELF(conn)->chunk_num = 0;
 	SELF(conn)->pkt_num++;
 
-	SRMIO_PC_DEBUG( conn, "mon=%u day=%u hour=%u min=%u sec=%u "
+	SRMIO_PC_DEBUG( conn, "time=%.1f mon=%u day=%u hour=%u min=%u sec=%u "
 		"dist=%lu temp=%d recint=%.1f na0=%x na2=%x",
+		(double)SELF(conn)->pkt_time/10,
 		(unsigned)btm.tm_mon,
 		(unsigned)btm.tm_mday,
 		(unsigned)btm.tm_hour,

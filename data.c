@@ -181,8 +181,15 @@ bool srmio_data_add_marker( srmio_data_t data, unsigned first, unsigned last, sr
 		first,
 		last );
 
-	if( first >= data->cused || first > last ){
-		srmio_error_set(err, "marker out of range");
+	if( first >= data->cused ){
+		srmio_error_set(err, "marker out of range: first=%u > used=%u",
+			first, data->cused );
+		return false;
+	}
+
+	if( first > last ){
+		srmio_error_set(err, "marker out of range: first=%u > last=%u",
+			first, last );
 		return false;
 	}
 

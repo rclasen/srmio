@@ -161,7 +161,8 @@ static unsigned _srm_mkdays( srmio_time_t input, srmio_error_t *err )
 	}
 
 	if( days < DAYS_SRM ){
-		srmio_error_set( err, "resulting date is outside supported range");
+		srmio_error_set( err, "resulting date %u-%02u-%02u is outside supported range",
+			year, tm.tm_mon+1, tm.tm_mday );
 		return -1;
 	}
 	days -= DAYS_SRM;
