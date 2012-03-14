@@ -40,15 +40,6 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh, srmio_error_t *err )
 		goto clean2;
 	}
 
-	if( data->mused && data->marker[0]->notes
-		&& 0 > fprintf( fh, "Athlete=%s\n",
-
-		data->marker[0]->notes ) ){
-
-		srmio_error_errno( err, "write" );
-		goto clean2;
-	}
-
 	if( 0 > fprintf( fh,
 		"Circum=%u\n"
 		"Slope=%.1lf\n"
@@ -95,7 +86,7 @@ bool srmio_file_wkt_write( srmio_data_t data, FILE *fh, srmio_error_t *err )
 		goto clean2;
 	}
 
-	for( i=1; i < data->mused; ++i ){
+	for( i=0; i < data->mused; ++i ){
 		srmio_marker_t mk = data->marker[i];
 		srmio_chunk_t first = data->chunks[mk->first];
 		srmio_chunk_t last = data->chunks[mk->last];
