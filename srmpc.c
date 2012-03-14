@@ -1794,11 +1794,11 @@ srm_data_t srmpc_get_data( srmpc_conn_t conn, int deleted, int fixup )
 
 		/* finish previous marker */
 		if( mfirst >= 0 && ( ! gh->iscont || gh->isfirst ) )
-			srm_data_add_marker( data, mfirst, data->cused -1 );
+			srm_data_add_marker( data, mfirst, data->cused -2 );
 
 		/* start marker */
 		if( gh->isfirst ){
-			mfirst = (int)data->cused;
+			mfirst = (int)data->cused -1;
 			DPRINTF( "srmpc_get_data: new marker at %d", mfirst );
 
 		} else if( ! gh->iscont )
