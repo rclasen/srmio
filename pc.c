@@ -562,6 +562,7 @@ bool srmio_pc_xfer_all( srmio_pc_t pch,
 
 		/* finalize marker at block end */
 		if( mfirst >= 0 ){
+			SRMIO_PC_DEBUG(pch,  "finalizing marker at block end" );
 			if( ! srmio_data_add_marker( data, mfirst,
 				data->cused -1, err ) )
 
