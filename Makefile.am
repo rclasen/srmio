@@ -64,8 +64,8 @@ else
 WINCOM_SRC =
 endif
 
-lib_LTLIBRARIES=libsrmio.la
-
+LIBSRMIO=libsrmio.la
+libsrmio_la_LDFLAGS = -version-info 1:0:0
 libsrmio_la_LIBADD=$(D2XX_LIB)
 libsrmio_la_DEPENDENCIES=
 libsrmio_la_SOURCES= \
@@ -94,22 +94,24 @@ libsrmio_la_SOURCES= \
 	split.c \
 	store.c
 
-bin_PROGRAMS=srmcmd srmdump srmsync
+lib_LTLIBRARIES=$(LIBSRMIO)
 
-srmcmd_LDADD= libsrmio.la $(D2XX_LIB)
-srmcmd_DEPENDENCIES= libsrmio.la
+srmcmd_LDADD= $(LIBSRMIO) $(D2XX_LIB)
+srmcmd_DEPENDENCIES= $(LIBSRMIO)
 srmcmd_SOURCES= \
 	srmcmd.c
 
-srmdump_LDADD= libsrmio.la $(D2XX_LIB)
-srmdump_DEPENDENCIES= libsrmio.la
+srmdump_LDADD= $(LIBSRMIO) $(D2XX_LIB)
+srmdump_DEPENDENCIES= $(LIBSRMIO)
 srmdump_SOURCES= \
 	srmdump.c
 
-srmsync_LDADD= libsrmio.la $(D2XX_LIB)
-srmsync_DEPENDENCIES= libsrmio.la
+srmsync_LDADD= $(LIBSRMIO) $(D2XX_LIB)
+srmsync_DEPENDENCIES= $(LIBSRMIO)
 srmsync_SOURCES= \
 	srmsync.c
+
+bin_PROGRAMS=srmcmd srmdump srmsync
 
 
 CLEANFILES=$(MANS)
