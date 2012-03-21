@@ -17,14 +17,6 @@
 
 const char *srmio_version = PACKAGE_STRING;
 
-#ifdef DEBUG
-void srmio_debugfunc( const char *msg, void *data )
-{
-	(void)data;
-	fprintf( stderr, "%s\n", msg );
-}
-#endif
-
 void srmio_dumphexv(srmio_logfunc_t func, void *data,
 	const unsigned char *buf, size_t blen,
 	const char *fmt, va_list ap )

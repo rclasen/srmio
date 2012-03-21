@@ -135,11 +135,9 @@ void srmio_debug( srmio_logfunc_t func, void *data, const char *fmt, ... );
 
 #include <ctype.h>
 
-void srmio_debugfunc( const char *msg, void *data );
-
 #define DPRINTF(x, ...)	fprintf( stderr, "%s: " x "\n", __func__, ##__VA_ARGS__ );
 #define DUMPHEX(fmt, buf, blen, ... ) \
-	srmio_dumphex(srmio_debugfunc, NULL, \
+	srmio_dumphex(NULL, NULL, \
 	buf, blen, "%s: " fmt, __func__, ##__VA_ARGS__ );
 
 #else
