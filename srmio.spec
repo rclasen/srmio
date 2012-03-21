@@ -1,50 +1,50 @@
 Name:		srmio
 Version:	0.1.0
 Release:	1%{?dist}
-Summary:	SRM Powercontrol V library functions
+Summary:	SRM Powercontrol library functions
 
 Group:		System Environment/Libraries
 License:	GPLv2
 URL:		http://www.zuto.de/project/srmio
-#Source0:	http://www.zuto.de/project/files/srmio/srmio-${version}.tar.gz
-Source0:	http://www.zuto.de/project/files/srmio/srmio-0.0.8.tar.gz
+Source0:	http://www.zuto.de/project/files/srmio/srmio-%{version}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
-BuildRequires:	libtool
-#Requires:	
+BuildRequires:	coreutils libtool
+Requires:	libsrmio = %{version}-%{release}
 
 %description
-srmio is a library to access the most important functions of a Schoberer
-Radmesstechnik (SRM) PowerControl V, VI and 7. You can download the data,
-mark it deleted, sync the time and set the recording interval. So
-hopefully you'll get around booting windows after each exercise. Though it
-is not intended as a replacement.
+Downloads from PowerControl or reads SRM files
 
-To be as compatible as possible, it's reading (SRM6/SRM7) and writing
-(SRM7) files in a the format srmwin uses.
+%package	-n libsrmio
+Summary:	Library files for %{name}
+Group:		Development/Libraries
+Requires:	libsrmio = %{version}-%{release}
 
-%package	devel
+%description    -n libsrmio
+Library to use to talk to PowerControl SRM.
+
+%package	-n libsrmio-devel
 Summary:	Development files for %{name}
 Group:		Development/Libraries
-Requires:	%{name} = %{version}-%{release}
+Requires:	libsrmio = %{version}-%{release}
 
-%description    devel
-The %{name}-devel package contains libraries and header files for
-developing applications that use %{name}.
+%description    -n libsrmio-devel
+The libsrmio-devel package contains libraries and header files for
+developing applications that use libsrmio.
 
 %prep
-%setup -q
+%setup -q -n srmio-0.1.0
 
 %build
 #chmod u+x genautomake.sh
 #./genautomake.sh
 %configure --disable-static
-#make %{?_smp_mflags}
-make
+make %{?_smp_mflags}
 
 %install
 rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
+rm -f ${RPM_BUILD_ROOT}%{_libdir}/libsrmio.la
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -57,17 +57,17 @@ rm -rf $RPM_BUILD_ROOT
 %doc README LICENSE Changes
 %{_mandir}/man1/*
 %{_bindir}/*
-%{_libdir}/libsrmio.so.*
 
-%files
+%files -n libsrmio
 %defattr(-,root,root,-)
 %doc README LICENSE Changes
-%{_mandir}/man1/*
-%{_bindir}/*
-%{_libdir}/*.a
-%{_libdir}/*.la
+%{_libdir}/libsrmio.so.*
+
+%files -n libsrmio-devel
+%defattr(-,root,root,-)
 %{_libdir}/libsrmio.so
 %{_includedir}/*.h
 
 %changelog
-
+* Sat Mar 21 2012 Gareth Coco <garethcoco@gmail.com>
+- First release (srmio 0.1.0)
