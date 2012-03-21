@@ -40,7 +40,7 @@ struct _srmio_pc5_t {
 	unsigned		pkt_cnt;
 
 	/* current pkt */
-	unsigned		pkt_num;	/* 0..pkts-1 */
+	int			pkt_num;	/* -1 / 0..pkts-1 */
 	srmio_time_t		pkt_time;
 	unsigned long		pkt_dist;
 	int			pkt_temp;
@@ -1282,7 +1282,13 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 	assert( conn );
 
-	SRMIO_PC_DEBUG( conn, "getting pkt %u/%u",
+	if( SELF(conn)->pkt_num +1 >= (int)SELF(conn)->pkt_cnt ){
+		conn->xfer_state = srmio_pc_xfer_state_success;
+		++ SELF(conn)->pkt_num;
+		return false;
+	}
+
+	SRMIO_PC_DEBUG( conn, "getting pkt %d/%u",
 		SELF(conn)->pkt_num +1,
 		SELF(conn)->pkt_cnt);
 
@@ -1291,7 +1297,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 		if( retries ){
 			/* request retransmit */
-			SRMIO_PC_LOG( conn, "received bad pkt %u, "
+			SRMIO_PC_LOG( conn, "received bad pkt %d, "
 				"requesting retransmit",
 				SELF(conn)->pkt_num );
 
@@ -1361,7 +1367,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 		} else if( ret == 0 && SELF(conn)->stxetx
 			&& SELF(conn)->pkt_cnt == 3
-			&& SELF(conn)->pkt_num == 0 ){
+			&& SELF(conn)->pkt_num < 0 ){
 
 			/* workaround stxetx + 3 pkts problem */
 			SRMIO_PC_DEBUG( conn, "stxetx, fixing pkts=0" );
@@ -1373,7 +1379,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 			&& SELF(conn)->pkt_data[0] == ETX ){
 
 			SRMIO_PC_ERROR( conn, &conn->err, "got unexpected end of "
-				"transfer for pkt %u", SELF(conn)->pkt_num );
+				"transfer for pkt %d", SELF(conn)->pkt_num );
 			conn->xfer_state = srmio_pc_xfer_state_failed;
 			return false;
 
@@ -1426,7 +1432,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 
 		if( ! SELF(conn)->pkt_recint ){
-			SRMIO_PC_LOG( conn, "pkt #%u has no recint",
+			SRMIO_PC_LOG( conn, "pkt #%d has no recint",
 				SELF(conn)->pkt_num );
 			continue;
 		}
@@ -1437,7 +1443,7 @@ static bool srmio_pc5_xfer_pkt_next( srmio_pc_t conn )
 
 	if( ! valid ){
 		conn->xfer_state = srmio_pc_xfer_state_failed;
-		SRMIO_PC_ERROR( conn, &conn->err, "got invalid pkt #%u, retries failed",
+		SRMIO_PC_ERROR( conn, &conn->err, "got invalid pkt #%d, retries failed",
 			SELF(conn)->pkt_num );
 		return false;
 	}
@@ -1537,7 +1543,7 @@ static bool _srmio_pc5_xfer_start( srmio_pc_t conn, srmio_error_t *err )
 	conn->xfer_type = srmio_pc_xfer_type_new;
 	conn->block_cnt = 1;
 	SELF(conn)->block_num = 0;
-	SELF(conn)->pkt_num = 0;
+	SELF(conn)->pkt_num = -1;
 	SELF(conn)->chunk_num = PC5_PKT_CHUNKS; /* triggers first pkt xfer */
 
 
@@ -1643,7 +1649,7 @@ static bool _srmio_pc5_xfer_chunk_next( srmio_pc_t conn, srmio_chunk_t chunk,
 		if( conn->xfer_state != srmio_pc_xfer_state_running )
 			return false;
 
-		if( SELF(conn)->pkt_num >= SELF(conn)->pkt_cnt ){
+		if( SELF(conn)->pkt_num >= (int)SELF(conn)->pkt_cnt ){
 			conn->xfer_state = srmio_pc_xfer_state_success;
 			return false;
 		}
@@ -1731,7 +1737,7 @@ static bool _srmio_pc5_xfer_finish( srmio_pc_t conn, srmio_error_t *err )
 	SRMIO_PC_DEBUG( conn,"");
 
 	/* abort */
-	if( SELF(conn)->pkt_num < SELF(conn)->pkt_cnt ){
+	if( SELF(conn)->pkt_num < (int)SELF(conn)->pkt_cnt ){
 		SRMIO_PC_LOG( conn, "aborting download" );
 		srmio_io_flush( conn->io, err );
 		_srmio_pc5_write( conn, BLOCK_ABRT, 1, err );
@@ -1774,7 +1780,7 @@ static bool _srmio_pc5_xfer_block_progress( srmio_pc_t conn,
 	assert( conn );
 
 	if( block_done )
-		*block_done = SELF(conn)->pkt_num;
+		*block_done = SELF(conn)->pkt_num +1;
 
 	return conn->xfer_state;
 }
