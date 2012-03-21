@@ -1,8 +1,21 @@
-srmio (0.1.0~git0) unstable; urgency=low
+srmio (0.1.0) unstable; urgency=low
 
-  * prepared next development version
+  * major API rework to allow new features
+  * added support for PCVI and PC7
+  * added support for Windows
+  * added support for ftd2xx drivers
+  * added better status indication
+  * added better error reporting
+  * added debug logging facility
+  * added srmsync + srmwin like store handling
+  * added simple srmdump example
+  * fixed srm file chunk timestamps
+  * fixed marker offsets/timestamps
+  * fixed PCV retransmissions
+  * fixed PCV guess or current year
+  * fixed plenty other issues
 
- -- Rainer Clasen <bj@zuto.de>  Thu, 14 Jul 2011 14:02:20 +0200
+ -- Rainer Clasen <bj@schlepp.mich.zuto.de>  Wed, 21 Mar 2012 12:11:19 +0100
 
 srmio (0.0.6) unstable; urgency=low
 
