@@ -18,12 +18,3 @@ autoheader
 automake --add-missing --copy --force-missing
 autoconf
 
-# hack to nuke rpath:
-#  http://wiki.debian.org/RpathIssue
-#  http://fedoraproject.org/wiki/RPath_Packaging_Draft
-ed libtool > /dev/null <<EOF
-,s|^hardcode_libdir_flag_spec=.*|hardcode_libdir_flag_spec=""|g
-,s|^runpath_var=LD_RUN_PATH|runpath_var=DIE_RPATH_DIE|g
-wq
-EOF
-
