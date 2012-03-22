@@ -99,7 +99,7 @@ static void progress( size_t total, size_t done, void *data )
 {
 	(void)data;
 
-	fprintf( stderr, "progress: %u/%u\r", done, total );
+	fprintf( stderr, "progress: %u/%u\r", (unsigned)done, (unsigned)total );
 }
 
 static void logfunc( const char *msg, void *data )

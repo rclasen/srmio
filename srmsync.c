@@ -235,12 +235,12 @@ bool do_preview( void )
 		if( skip ){
 			if( opt_verbose )
 				fprintf( stderr, "skip block #%u - in store: %s",
-					block_num, ctime(&t) );
+					(unsigned)block_num, ctime(&t) );
 			want_block[block_num] = false;
 		} else {
 			if( opt_verbose )
 				fprintf( stderr, "get block #%u - new: %s",
-					block_num, ctime(&t) );
+					(unsigned)block_num, ctime(&t) );
 			prog_sum += block.total;
 			want_block[block_num] = true;
 		}
@@ -546,7 +546,8 @@ int main( int argc, char **argv )
 					}
 
 					fprintf( stderr, "progress: %u/%u\r",
-						block_done, prog_total);
+						(unsigned)block_done,
+						(unsigned)prog_total);
 
 				}
 

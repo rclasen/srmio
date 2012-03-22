@@ -48,7 +48,8 @@ void srmio_dumphexv(srmio_logfunc_t func, void *data,
 		return;
 	len += r;
 
-	r = snprintf( msg+len, SRMIO_ERROR_MSG_SIZE - len, " %d:", blen );
+	r = snprintf( msg+len, SRMIO_ERROR_MSG_SIZE - len, " %u:",
+		(unsigned)blen );
 	if( 0 > r || r > SRMIO_ERROR_MSG_SIZE - len )
 		return;
 	len +=r;

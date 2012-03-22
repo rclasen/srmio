@@ -231,7 +231,7 @@ int main( int argc, char **argv )
 			0.1 * block.start,
 			0.1 * block.end,
 			0.1 * block.recint,
-			block.total,
+			(unsigned)block.total,
 			block.slope,
 			block.zeropos,
 			block.circum,
