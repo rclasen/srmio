@@ -26,8 +26,18 @@ static bool srmio_data_add_fillp( srmio_data_t data, srmio_chunk_t chunk,
 	unsigned miss;
 	unsigned i;
 
+	assert(data);
+	assert(data->cused);
+	assert(chunk);
+	assert(chunk->dur);
+
 	if( chunk->time < lnext ){
 		srmio_error_set( err, "data is overlapping, can't add" );
+		return false;
+	}
+
+	if( lnext < last->time ){
+		srmio_error_set( err, "time overflow error" );
 		return false;
 	}
 
