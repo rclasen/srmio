@@ -8,7 +8,8 @@ srmdump \- download your SRM PowerControl data
 
 .SH DESCRIPTION
 .B srmdump
-implemets the serial protocols for SRM's PowerControl V, VI and 7. It allows you to
+implements the serial protocols for SRM's PowerControl V, VI and 7.
+It allows you to
 download data from the PC attached to the serial device at \fIpath\fR.
 This is mostly an example application showing the API use of srmio.
 
@@ -53,7 +54,7 @@ This is just a very simplistic frontend for the lib. Please check the
 source distribution for details.
 
 .SH BUGS
-Yes. For sure. Just keep in mind, that protocoll and file formats are
+Yes. For sure. Just keep in mind, that protocol and file formats are
 reverse engineered...
 
 .SH AUTHORS

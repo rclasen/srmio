@@ -8,8 +8,8 @@ srmcmd \- download/access for SRM PowerControl
 
 .SH DESCRIPTION
 .B srmcmd
-implemets the serial protocols for SRM's PowerControl V, VI and 7. It allows you to
-download data from the PC attached to the serial device at \fIpath\fR and 
+implements the serial protocols for SRM's PowerControl V, VI and 7.
+It allows you to
 adjust the most important settings.
 
 .SH OPTIONS
@@ -36,7 +36,7 @@ of 1 sec - so they're always off with recints < 1sec. In addition these
 timestamps often mismatch the time covered by the tuples. With this option
 set, timestamps are adjusted to fit the recint and gaps at block boundaries
 of up to 2sec are filled with averaged data. That's what srmwin is doing,
-It seems wko doesn't ... The protcol for PCVI and PC7 doesn't have this
+It seems wko doesn't ... The protocol for PCVI and PC7 doesn't have this
 problem. 
 .TP
 \fB\-f\fR, \fB\-\-ftdi\fR
@@ -44,10 +44,10 @@ use ftdi serial driver and open device by the given description.
 .TP
 \fB\-g\fR, \fB\-\-get\fR[=all]
 Download newly recorded data from PC. With \fIall\fR specified, the
-"deletion" on the PCV is ignored and all data (that's not yet overwriten)
+"deletion" on the PCV is ignored and all data (that's not yet overwritten)
 is retrieved from the PCV (PCVI and PC7 don't seem to support getting
 "deleted" data). By default data is written to stdout as
-tab-seperated list.
+tab-separated list.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 A brief message.
@@ -144,7 +144,7 @@ This is just a very simplistic frontend for the lib. Please check the
 source distribution for details.
 
 .SH BUGS
-Yes. For sure. Just keep in mind, that protocoll and file formats are
+Yes. For sure. Just keep in mind, that protocol and file formats are
 reverse engineered...
 
 .SH AUTHORS

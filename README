@@ -43,7 +43,7 @@ If you use a developer snapshot, you first have use the autotools to build
 a configure script:
  sh genautomake.sh
 
-To workaround some desing issues with the error reporting, you can build
+To workaround some design issues with the error reporting, you can build
 the lib with support to print some more verbose error messages by defining
 the preprocessor variable VERBOSE:
  ./configure CFLAGS="-DVERBOSE"
@@ -61,7 +61,7 @@ chips. It's using the traditional unix termios to access the /dev/tty* or
 /dev/cu* devices offered by the kernel.
 
 Though, srmio is now easily extensible to other ways (FTDI D2xx, win32,
-...) through the abstracion layer in serio.c.
+...) through the abstraction layer in serio.c.
 
 
 Linux:
@@ -73,10 +73,10 @@ Linux:
 - PCVI/7: kernel 2.6.32 provided driver for /dev/ttyUSB works.
 
 You can make your life finding the proper device name a lot easier by
-letting udev creating meanigful symlinks for you by adding something like
+letting udev creating meaningful symlinks for you by adding something like
 this to a file like "/etc/udev/rules.d/51-local.rules":
 
- # /dev/prolific for PCV - unfortunatly no serial for unique identification
+ # /dev/prolific for PCV - unfortunately no serial for unique identification
  SUBSYSTEMS=="usb", KERNEL=="ttyUSB*", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", SYMLINK+="prolific"
  # /dev/pc7
  SUBSYSTEMS=="usb", KERNEL=="ttyUSB*", ATTRS{idProduct}=="POWERCONTROL 7", SYMLINK+="pc7"
@@ -109,9 +109,9 @@ Mac OS X:
 =========
 
 - PCV: With the original prolific drivers, starting the communication
-  succeeded only occasionaly (around 1 of 15 attempts worked). Once the
+  succeeded only occasionally (around 1 of 15 attempts worked). Once the
   communication got established, data transmission worked fine.
-  Reconecting kept working until the PCV had to be woken up, again. First
+  Reconnecting kept working until the PCV had to be woken up, again. First
   waking the PCV up by pushing MODE seemed to improve the success-rate but
   was still very flaky.
 
@@ -164,7 +164,7 @@ If you experience problems with *your* PowerControl, please
 
 If you want to help me adding support for your PowerControl, please
 capture the communication:
- - if possible, compile srmio with debuging.
+ - if possible, compile srmio with debugging.
  - capture output from 
    srmcmd -v $your_options > srmcmd.out 2>&1
  - download "portmon" from sysinternals
@@ -180,7 +180,7 @@ http://sourceforge.net/projects/usbsnoop/ and a decoder at
 http://www.stillhq.com/usblogdump/
 
 Known Problems:
- - Dates before 1970-1-1 are not supported (SRM usese 1880-1-1 as
+ - Dates before 1970-1-1 are not supported (SRM uses 1880-1-1 as
    reference). This might lead to problems with bad timestamps or when the
    PC clock is misadjusted.
  - there should be more messages in verbose mode
@@ -188,7 +188,7 @@ Known Problems:
  - doesn't use UUCP-Style Lockfiles.
  - result of PC in non-metric display mode is untested.
  - negative temperatures are untested.
- - libary interface should have proper documentation
+ - library interface should have proper documentation
  - for pc7 the data is a little bit different as what srmwin gets. srmwin
    seems to do some smoothing for the elevation. more important: for some
    (random?) chunks srmwin sets power and cadence to zero and I don't see
