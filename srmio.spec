@@ -1,5 +1,5 @@
 Name:		srmio
-Version:	0.1.0
+Version:	0.1.1~git0
 Release:	1%{?dist}
 Summary:	SRM Powercontrol library functions
 
@@ -33,7 +33,7 @@ The libsrmio-devel package contains libraries and header files for
 developing applications that use libsrmio.
 
 %prep
-%setup -q -n srmio-0.1.0
+%setup -q -n srmio-0.1.1
 
 %build
 #chmod u+x genautomake.sh

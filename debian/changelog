@@ -1,3 +1,13 @@
+srmio (0.1.1~git0) unstable; urgency=low
+
+  * split: fix marker end offset larger than chunks
+  * automatically include latest commit ID in built
+  * Homebrew recipe - For http://mxcl.github.com/homebrew/
+  * fixup: added assertions and overflow check
+  * spelling fixes
+
+ -- Rainer Clasen <bj@klick.mich.zuto.de>  Fri, 22 Feb 2013 10:28:50 +0100
+
 srmio (0.1.0) unstable; urgency=low
 
   * major API rework to allow new features

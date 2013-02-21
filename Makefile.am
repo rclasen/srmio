@@ -69,7 +69,7 @@ WINCOM_SRC =
 endif
 
 LIBSRMIO=libsrmio.la
-libsrmio_la_LDFLAGS = -version-info 1:0:0
+libsrmio_la_LDFLAGS = -version-info 2:0:1
 libsrmio_la_LIBADD=$(D2XX_LIB)
 libsrmio_la_DEPENDENCIES=
 libsrmio_la_SOURCES= \
