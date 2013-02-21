@@ -24,10 +24,14 @@ EXTRA_DIST= $(man_INS) \
 	debian/dirs \
 	debian/control \
 	genautomake.sh \
+	gencommit.sh \
 	genconfheader.sh \
-	srmwinget.sh
+	getcommit.sh \
+	srmwinget.sh \
+	.commit
 
-DISTCLEANFILES=srmio_config.h
+MOSTLYCLEANFILES= commit.c
+DISTCLEANFILES= srmio_config.h
 include_HEADERS= \
 	srmio.h \
 	srmio_config.h
@@ -92,7 +96,15 @@ libsrmio_la_SOURCES= \
 	pc5.c \
 	pc7.c \
 	split.c \
-	store.c
+	store.c \
+	commit.c
+
+.PHONY: .commit
+.commit:
+	$(SHELL) $(srcdir)/getcommit.sh $(srcdir) $@
+
+commit.c: .commit
+	$(SHELL) $(srcdir)/gencommit.sh $< > $@
 
 lib_LTLIBRARIES=$(LIBSRMIO)
 

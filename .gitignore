@@ -7,12 +7,14 @@
 *.exe
 *.swp
 *~
+.commit
 .deps
 .libs
 Makefile
 Makefile.in
 aclocal.m4
 autom4te.cache
+commit.c
 config.guess
 config.h
 config.h.in

@@ -108,7 +108,8 @@ int main( int argc, char **argv )
 	}
 
 	if( opt_version ){
-		printf( "srmdump %s\n", PACKAGE_VERSION );
+		printf( "srmdump %s commit %s\n", PACKAGE_VERSION,
+			srmio_commit );
 		return 0;
 	}
 
