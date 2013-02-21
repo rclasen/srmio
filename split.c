@@ -96,8 +96,8 @@ srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
 			if( mk->last < delta || mk->first > last )
 				continue;
 
-			DPRINTF( "found marker: %d - %d", mk->first,
-				mk->last );
+			DPRINTF( "found marker %u: %d - %d", m,
+				mk->first, mk->last );
 
 			if( NULL == (nm = srmio_marker_clone( mk, err )))
 				goto clean;
@@ -107,8 +107,9 @@ srmio_data_t *srmio_data_split( srmio_data_t src, srmio_time_t gap,
 			else
 				nm->first -= delta;
 
+			// nm->last < delta was handled, before
 			if( nm->last > last )
-				nm->last = last;
+				nm->last = list[c]->cused -1;
 			else
 				nm->last -= delta;
 
