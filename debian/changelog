@@ -1,3 +1,9 @@
+srmio (0.1.1~git1) unstable; urgency=low
+
+  * fix file IO on mingw
+
+ -- Rainer Clasen <bj@klick.mich.zuto.de>  Sun, 23 Jun 2013 14:23:08 +0200
+
 srmio (0.1.1~git0) unstable; urgency=low
 
   * split: fix marker end offset larger than chunks

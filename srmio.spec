@@ -1,5 +1,5 @@
 Name:		srmio
-Version:	0.1.1~git0
+Version:	0.1.1~git1
 Release:	1%{?dist}
 Summary:	SRM Powercontrol library functions
 
