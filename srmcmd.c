@@ -144,7 +144,7 @@ bool write_files( srmio_data_t *srmdata, bool fixup, char *fname,
 		if( ! do_fixup( srmdata, fixup ))
 			return false;
 
-		if( NULL == ( fh = fopen( fname, "w" ) )){
+		if( NULL == ( fh = fopen( fname, "wb" ) )){
 			fprintf( stderr, "fopen(%s) failed: %s\n",
 				fname, strerror(errno) );
 			return false;
@@ -410,7 +410,7 @@ int main( int argc, char **argv )
 		FILE *fh;
 		srmio_data_t srmdata;
 
-		if( NULL == (fh = fopen( fname, "r" ))){
+		if( NULL == (fh = fopen( fname, "rb" ))){
 			fprintf( stderr, "fopen(%s) failed: %s\n",
 				fname, strerror(errno) );
 			return 1;

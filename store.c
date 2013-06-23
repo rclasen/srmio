@@ -326,7 +326,7 @@ static bool _scan_file( store_athlete_t athlete,
 		return false;
 	}
 
-	if( NULL == (fh = fopen(path, "r"))){
+	if( NULL == (fh = fopen(path, "rb"))){
 		srmio_error_errno( err, "failed to open %s", path);
 		return false;
 	}
@@ -635,7 +635,7 @@ bool srmio_store_add( srmio_store_t store, srmio_data_t data,
 	if( ! srmio_store_fname( athlete, start, &fname, err))
 		return false;
 
-	if( NULL == (fh = fopen( fname, "w"))){
+	if( NULL == (fh = fopen( fname, "wb"))){
 		srmio_error_errno( err, "fopen(%s)", fname );
 		goto clean1;
 	}

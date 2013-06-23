@@ -289,7 +289,7 @@ bool save_data( void )
 	if( opt_write ){
 		FILE *fh;
 
-		if( NULL == (fh = fopen( opt_write, "w" ))){
+		if( NULL == (fh = fopen( opt_write, "wb" ))){
 			fprintf( stderr, "fopen %s failed: %s\n", opt_write,
 				strerror(errno));
 			return false;
