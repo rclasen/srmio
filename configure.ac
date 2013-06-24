@@ -298,6 +298,7 @@ HEADER_SYS_TIME_H=$ac_cv_header_sys_time_h
 HAVE_TERMIOS=$ac_cv_sys_posix_termios
 HAVE_WINCOM=$ac_cv_func_SetCommState
 HAVE_D2XX=$HAVE_D2XX
+PACKAGE_VERSION=$PACKAGE_VERSION
 ])
 
 AC_OUTPUT

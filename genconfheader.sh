@@ -68,6 +68,8 @@ if [ -n "$HAVE_D2XX" ]; then
 	echo "#define SRMIO_HAVE_D2XX"
 fi
 
+echo "#define SRMIO_VERSION \"$PACKAGE_VERSION\""
+
 cat<<EOF
 
 # ifdef __cplusplus
