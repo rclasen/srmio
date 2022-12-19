@@ -17,7 +17,7 @@ set -e
 
 
 # get file
-tmp=`tempfile -d "$srmbase" -s ".srm" `
+tmp=`mktemp -p "$srmbase" --suffix ".srm" `
 srmcmd $srmopt -g -w "$tmp" "$srmdev"
 
 # build filename
