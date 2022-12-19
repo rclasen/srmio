@@ -47,13 +47,8 @@ EOF
 fi
 
 
-if [ -n "$HEADER_TIME_WITH_SYS_TIME" ]; then
+if [ -n "$HEADER_SYS_TIME_H" ]; then
 	echo "#include <sys/time.h>"
-	echo "#include <time.h>"
-elif [ -n "$HEADER_SYS_TIME_H" ]; then
-	echo "#include <sys/time.h>"
-else
-	echo "#include <time.h>"
 fi
 
 if [ "$HAVE_TERMIOS"x = yesx ]; then

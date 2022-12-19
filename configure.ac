@@ -1,8 +1,8 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.61)
-AC_INIT([srmio], [0.1.1~git1], [bj@zuto.de])
+AC_PREREQ([2.69])
+AC_INIT([srmio],[0.1.1~git1],[bj@zuto.de])
 AM_INIT_AUTOMAKE([-Wall -Werror])
 AC_CONFIG_SRCDIR([srmio.h])
 AC_CONFIG_HEADER([config.h])
@@ -107,18 +107,18 @@ done
 # check for windows mkdir(dir) - stolen from wine
 AC_CACHE_CHECK([whether mkdir takes only one argument],
   ac_cv_one_arg_mkdir,
-  AC_TRY_LINK([[
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[[
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
 #endif
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif
-  ]],[[
+  ]]], [[[
 mkdir("foo");
-  ]], [
+  ]]])],[
     ac_cv_one_arg_mkdir=yes
-  ], [
+  ],[
     ac_cv_one_arg_mkdir=no
   ])
 )
@@ -131,15 +131,15 @@ fi
 # check for windows Sleep(msec)
 AC_CACHE_CHECK([for windows Sleep using milliseconds],
   ac_cv_msec_sleep,
-  AC_TRY_LINK([[
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[[
 #ifdef HAVE_WINDOWS_H
 # include <windows.h>
 #endif
-  ]], [[
+  ]]], [[[
 Sleep(1000);
-  ]], [
+  ]]])],[
     ac_cv_msec_sleep=yes
-  ], [
+  ],[
     ac_cv_msec_sleep=no
   ])
 )
@@ -150,17 +150,17 @@ fi
 
 AC_CACHE_CHECK([for windwos comm SetCommState],
   ac_cv_func_SetCommState,
-  AC_TRY_LINK([[
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[[
 #ifdef HAVE_WINDOWS_H
 # include <windows.h>
 #endif
- ]],[[
+ ]]], [[[
 HANDLE fh;
 DCB dcb;
 SetCommState(fh, &dcb);
- ]], [
+ ]]])],[
    ac_cv_func_SetCommState=yes
- ], [
+ ],[
    ac_cv_func_SetCommState=no
  ])
 )
@@ -293,7 +293,6 @@ HEADER_STDINT_H=$ac_cv_header_stdint_h
 HEADER_INTTYPES_H=$ac_cv_header_inttypes_h
 HEADER_STDBOOL_H=$ac_cv_header_stdbool_h
 HAVE__BOOL=$ac_cv_type__Bool
-HEADER_TIME_WITH_SYS_TIME=$ac_cv_header_time
 HEADER_SYS_TIME_H=$ac_cv_header_sys_time_h
 HAVE_TERMIOS=$ac_cv_sys_posix_termios
 HAVE_WINCOM=$ac_cv_func_SetCommState
