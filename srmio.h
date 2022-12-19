@@ -11,6 +11,7 @@
 #define _SRMIO_H
 
 #include <stdio.h>
+#include <time.h>
 #include "srmio_config.h"
 
 #ifdef __cplusplus
